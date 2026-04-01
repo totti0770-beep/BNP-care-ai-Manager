@@ -1,0 +1,740 @@
+npx react-native init NursingAiAssistant
+cd NursingAiAssistant
+npm install react-native-sqlite-storage react-native-biometrics react-native-vector-icons react-native-paper react-native-fs
+# للمحرك المحلي (يحتاج إعدادات Native إضافية)
+npm install llama.rn
+import SQLite from 'react-native-sqlite-storage'; // تفعيل SQLCipher للتشفير SQLite.enablePromise(true); const database_name = "NursingKnowledge.db"; const database_password = "Secure_Password_123!@#"; // في الإنتاج يتم جلبها من KeyStore export const getDBConnection = async () => { return SQLite.openDatabase( { name: database_name, location: 'default', key: database_password }, () => console.log("Database Connected (Encrypted)"), (err) => console.log("Database Error: ", err) ); }; export const createTables = async (db) => { // جدول الأقسام const categoriesQuery = ` CREATE TABLE IF NOT EXISTS Categories ( id INTEGER PRIMARY KEY, name TEXT NOT NULL );`; // جدول المعرفة (RAG Content) const knowledgeQuery = ` CREATE TABLE IF NOT EXISTS KnowledgeBase ( id INTEGER PRIMARY KEY AUTOINCREMENT, category_id INTEGER, content TEXT NOT NULL, source_name TEXT, page_number INTEGER, checksum TEXT, metadata TEXT, FOREIGN KEY (category_id) REFERENCES Categories (id) );`; try { await db.executeSql(categoriesQuery); await db.executeSql(knowledgeQuery); // إدخال الأقسام الثلاثة الأساسية await db.executeSql('INSERT OR IGNORE INTO Categories (id, name) VALUES (1, "Pharmacy"), (2, "Policies"), (3, "Quality");'); } catch (error) { console.error("Table Creation Error: ", error); } };
+// src/screens/HomeScreen.js
+import React from 'react';
+import { View, StyleSheet, Text, TouchableOpacity, Dimensions } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+const { width } = Dimensions.get('window');
+const Dashboard = ({ navigation }) => {
+const tiles = [
+{
+id: 1,
+title: 'المعايير الصيدلانية',
+subtitle: 'الجرعات، الثبات، والتوافق',
+icon: 'pill',
+color: '#4CC9F0',
+},
+{
+id: 2,
+title: 'السياسات التمريضية',
+subtitle: 'الإجراءات والتوثيق (OVR)',
+icon: 'file-document-outline',
+color: '#4361EE',
+},
+{
+id: 3,
+title: 'معايير الجودة (سباهي)',
+subtitle: 'أهداف السلامة (IPSG)',
+icon: 'shield-check-outline',
+color: '#3F37C9',
+},
+];
+return (
+<View style={styles.container}>
+<View style={styles.header}>
+<Text style={styles.headerTitle}>AI Nursing Assistance</Text>
+<Text style={styles.headerSubtitle}>المساعد الذكي للتمريض</Text>
+</View>
+<View style={styles.grid}>
+{tiles.map((tile) => (
+<TouchableOpacity 
+key={tile.id} 
+style={[styles.tile, { borderLeftColor: tile.color }]}
+onPress={() => console.log(`Navigate to ${tile.title}`)}
+>
+<View style={styles.tileContent}>
+<Icon name={tile.icon} size={40} color={tile.color} />
+<View style={styles.textContainer}>
+<Text style={styles.tileTitle}>{tile.title}</Text>
+<Text style={styles.tileSubtitle}>{tile.subtitle}</Text>
+</View>
+<Icon name="chevron-left" size={24} color="#555" />
+</View>
+</TouchableOpacity>
+))}
+</View>
+{/* زر الوصول السريع للدردشة */}
+<TouchableOpacity style={styles.fab}>
+<Icon name="robot-outline" size={30} color="#FFF" />
+</TouchableOpacity>
+</View>
+);
+};
+const styles = StyleSheet.create({
+container: {
+flex: 1,
+backgroundColor: '#0F172A', // Dark Mode background
+padding: 20,
+},
+header: {
+marginTop: 40,
+marginBottom: 30,
+alignItems: 'flex-end',
+},
+headerTitle: {
+fontSize: 28,
+fontFamily: 'Tajawal-Bold',
+color: '#F8FAFC',
+},
+headerSubtitle: {
+fontSize: 16,
+fontFamily: 'Tajawal-Regular',
+color: '#94A3B8',
+},
+grid: {
+gap: 15,
+},
+tile: {
+backgroundColor: '#1E293B',
+borderRadius: 15,
+padding: 20,
+borderLeftWidth: 5,
+elevation: 4,
+},
+tileContent: {
+flexDirection: 'row-reverse', // RTL
+alignItems: 'center',
+justifyContent: 'space-between',
+},
+textContainer: {
+flex: 1,
+marginRight: 20,
+alignItems: 'flex-end',
+},
+tileTitle: {
+fontSize: 18,
+fontFamily: 'Tajawal-Bold',
+color: '#F8FAFC',
+},
+tileSubtitle: {
+fontSize: 12,
+fontFamily: 'Tajawal-Regular',
+color: '#94A3B8',
+marginTop: 4,
+},
+fab: {
+position: 'absolute',
+bottom: 30,
+right: 30,
+backgroundColor: '#3B82F6',
+width: 65,
+height: 65,
+borderRadius: 32.5,
+justifyContent: 'center',
+alignItems: 'center',
+elevation: 8,
+}
+});
+export default Dashboard;
+import { LlamaContext } from 'llama.rn';
+export const generateResponse = async (userQuery, categoryId) => {
+const db = await getDBConnection();
+
+// 1. استخراج السياق (Context) من قاعدة البيانات بناءً على الكلمات المفتاحية
+const results = await db.executeSql(
+`SELECT content, source_info, page_number FROM KnowledgeBase 
+WHERE category_id = ? AND content LIKE ? LIMIT 3`,
+[categoryId, `%${userQuery}%`]
+);
+let context = "";
+results.forEach(row => {
+context += row.content + "\n";
+});
+// 2. بناء Prompt صارم يمنع الهلوسة
+const prompt = `
+أنت مساعد تمريض سريري محترف. استخدم المعلومات التالية فقط للإجابة على سؤال المستخدم.
+إذا لم تكن الإجابة موجودة في المعلومات المرفقة، قل "لم يتم العثور على المعلومة في المراجع الرسمية".
+
+المراجع:
+${context}
+
+السؤال: ${userQuery}
+
+الإجابة (بالتنسيق المطلوب: التحضير، التوافق، الثبات، معدل الحقن، المصدر):
+`;
+// 3. تشغيل موديل Llama المحلي
+// يتم تحميل موديل GGUF مسبقاً في الذاكرة
+// return await llamaContext.completion({ prompt });
+return "الرد المستخرج من الملفات..."; 
+};
+npm install react-native-document-picker react-native-fs crypto-js
+import RNFS from 'react-native-fs';
+import CryptoJS from 'crypto-js';
+import { getDBConnection } from '../database/db';
+export const processPDF = async (filePath, fileName, categoryId) => {
+const db = await getDBConnection();
+try {
+// 1. حساب SHA-256 لضمان أصالة المرجع
+const fileData = await RNFS.readFile(filePath, 'base64');
+const checksum = CryptoJS.SHA256(fileData).toString();
+// 2. استخراج النص (ملاحظة: في React Native نستخدم عادة مكتبة Native أو Bridge)
+// سنفترض هنا دالة تجريبية لاستخراج النص صفحة بصفحة
+const extractedPages = await simulatePdfExtraction(filePath); 
+for (let page of extractedPages) {
+const chunks = chunkText(page.text, 500); // تقسيم كل صفحة لقطع (500 حرف)
+for (let chunk of chunks) {
+await db.executeSql(
+`INSERT INTO KnowledgeBase (category_id, content, source_name, page_number, checksum) 
+VALUES (?, ?, ?, ?, ?)`,
+[categoryId, chunk, fileName, page.pageNumber, checksum]
+);
+}
+}
+return true;
+} catch (error) {
+console.error("PDF Processing Error: ", error);
+return false;
+}
+};
+// تقسيم النص للحفاظ على السياق (Context Window) للـ AI
+const chunkText = (text, size) => {
+const chunks = [];
+for (let i = 0; i < text.length; i += size) {
+chunks.push(text.substring(i, i + size));
+}
+return chunks;
+};
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import ReactNativeBiometrics from 'react-native-biometrics';
+import DocumentPicker from 'react-native-document-picker';
+import { processPDF } from '../services/pdfService';
+const AdminScreen = () => {
+const [loading, setLoading] = useState(false);
+const rnBiometrics = new ReactNativeBiometrics();
+const handleUpload = async (categoryId) => {
+// 1. التحقق من البصمة
+const { success } = await rnBiometrics.simplePrompt({ promptString: 'تأكيد الهوية لرفع ملفات رسمية' });
+
+if (!success) return Alert.alert("خطأ", "يجب التحقق من الهوية للوصول لهذه الصلاحية");
+try {
+// 2. اختيار الملف
+const res = await DocumentPicker.pick({
+type: [DocumentPicker.types.pdf],
+});
+setLoading(true);
+
+// 3. المعالجة والحفظ في قاعدة البيانات المشفرة
+const result = await processPDF(res[0].uri, res[0].name, categoryId);
+
+setLoading(false);
+if (result) Alert.alert("تم بنجاح", "تمت أرشفة المرجع في قاعدة البيانات المشفرة");
+
+} catch (err) {
+setLoading(false);
+if (!DocumentPicker.isCancel(err)) console.log(err);
+}
+};
+return (
+<View style={styles.container}>
+<Text style={styles.title}>لوحة الإدارة والتحديث</Text>
+
+{loading ? (
+<ActivityIndicator size="large" color="#4CC9F0" />
+) : (
+<View style={styles.buttonContainer}>
+<UploadButton 
+title="تحديث أدلة الصيدلة" 
+onPress={() => handleUpload(1)} 
+icon="pill" 
+/>
+<UploadButton 
+title="تحديث سياسات التمريض" 
+onPress={() => handleUpload(2)} 
+icon="file-document" 
+/>
+<UploadButton 
+title="تحديث معايير سباهي" 
+onPress={() => handleUpload(3)} 
+icon="shield-check" 
+/>
+</View>
+)}
+</View>
+);
+};
+// مكون زر الرفع بتصميم متناسق
+const UploadButton = ({ title, onPress, icon }) => (
+<TouchableOpacity style={styles.btn} onPress={onPress}>
+<Text style={styles.btnText}>{title}</Text>
+</TouchableOpacity>
+);
+const styles = StyleSheet.create({
+container: { flex: 1, backgroundColor: '#0F172A', padding: 20, justifyContent: 'center' },
+title: { fontSize: 22, color: '#FFF', fontFamily: 'Tajawal-Bold', textAlign: 'center', marginBottom: 40 },
+btn: { backgroundColor: '#1E293B', padding: 20, borderRadius: 12, marginBottom: 15, borderDashed: 1, borderWidth: 1, borderColor: '#4CC9F0' },
+btnText: { color: '#FFF', textAlign: 'center', fontFamily: 'Tajawal-Regular', fontSize: 16 }
+});
+export default AdminScreen;
+const pharmaceuticalPrompt = (context, query) => {
+return `
+بصفتك مساعد صيدلاني سريري، استخرج المعلومات التالية حصراً من السياق المرفق لـ "${query}":
+
+1. تحضير الدواء (Dilution): كيف يتم حله وتخفيفه؟
+2. التوافق (Compatibility): ما هي المحاليل المتوافقة معه؟
+3. الثبات (Stability): كم مدة صلاحيته بعد الحل (داخل نص الدردشة)؟
+4. معدل الحقن (Infusion Rate): ما هي السرعة الآمنة؟
+
+المصدر: [اسم الملف] - صفحة رقم [رقم الصفحة].
+
+إذا لم تجد المعلومة، أجب بـ: "عذراً، هذا الدواء غير مدرج في الدليل المعتمد حالياً".
+
+السياق:
+${context}
+`;
+};
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+View, Text, StyleSheet, FlatList, TextInput, 
+TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator 
+} from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { generateResponse } from '../services/aiEngine';
+const ChatScreen = ({ route }) => {
+const { categoryId, categoryName } = route.params; //Pharmacy, Policy, or Quality
+const [messages, setMessages] = useState([]);
+const [inputText, setInputText] = useState('');
+const [isLoading, setIsLoading] = useState(false);
+const flatListRef = useRef();
+const handleSend = async () => {
+if (inputText.trim() === '') return;
+const userMessage = {
+id: Date.now().toString(),
+text: inputText,
+sender: 'user',
+timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+};
+setMessages(prev => [...prev, userMessage]);
+setInputText('');
+setIsLoading(true);
+try {
+// استدعاء محرك الذكاء الاصطناعي المحلي (RAG)
+const aiResponse = await generateResponse(inputText, categoryId);
+
+const botMessage = {
+id: (Date.now() + 1).toString(),
+text: aiResponse.answer, // نص الإجابة
+source: aiResponse.source, // اسم الملف PDF
+page: aiResponse.page, // رقم الصفحة
+sender: 'bot',
+timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+};
+setMessages(prev => [...prev, botMessage]);
+} catch (error) {
+console.error(error);
+} finally {
+setIsLoading(false);
+}
+};
+const renderMessage = ({ item }) => (
+<View style={[styles.messageWrapper, item.sender === 'user' ? styles.userWrapper : styles.botWrapper]}>
+<View style={[styles.messageBubble, item.sender === 'user' ? styles.userBubble : styles.botBubble]}>
+<Text style={styles.messageText}>{item.text}</Text>
+
+{item.sender === 'bot' && item.source && (
+<View style={styles.sourceContainer}>
+<View style={styles.divider} />
+<View style={styles.sourceRow}>
+<Icon name="file-pdf-box" size={16} color="#4CC9F0" />
+<Text style={styles.sourceText}>المصدر: {item.source} [ص: {item.page}]</Text>
+</View>
+</View>
+)}
+
+<Text style={styles.timestamp}>{item.timestamp}</Text>
+</View>
+</View>
+);
+return (
+<View style={styles.container}>
+{/* Header */}
+<View style={styles.header}>
+<Text style={styles.headerTitle}>{categoryName}</Text>
+<Icon name="shield-check" size={20} color="#4CC9F0" />
+</View>
+{/* Chat Messages */}
+<FlatList
+ref={flatListRef}
+data={messages}
+renderItem={renderMessage}
+keyExtractor={item => item.id}
+contentContainerStyle={styles.chatList}
+onContentSizeChange={() => flatListRef.current.scrollToEnd()}
+/>
+{/* Typing Indicator */}
+{isLoading && (
+<View style={styles.loadingContainer}>
+<ActivityIndicator size="small" color="#4CC9F0" />
+<Text style={styles.loadingText}>جاري مراجعة المراجع الرسمية...</Text>
+</View>
+)}
+{/* Input Area */}
+<KeyboardAvoidingView 
+behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+keyboardVerticalOffset={90}
+>
+<View style={styles.inputContainer}>
+<TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+<Icon name="send" size={24} color="#FFF" style={styles.sendIcon} />
+</TouchableOpacity>
+<TextInput
+style={styles.input}
+placeholder="اسأل عن دواء، سياسة، أو معيار..."
+placeholderTextColor="#94A3B8"
+value={inputText}
+onChangeText={setInputText}
+multiline
+/>
+</View>
+</KeyboardAvoidingView>
+</View>
+);
+};
+const styles = StyleSheet.create({
+container: { flex: 1, backgroundColor: '#0F172A' },
+header: { 
+height: 60, backgroundColor: '#1E293B', 
+flexDirection: 'row-reverse', alignItems: 'center', 
+paddingHorizontal: 20, justifyContent: 'space-between',
+borderBottomWidth: 1, borderBottomColor: '#334155'
+},
+headerTitle: { color: '#FFF', fontFamily: 'Tajawal-Bold', fontSize: 18 },
+chatList: { padding: 15, paddingBottom: 20 },
+messageWrapper: { marginBottom: 15, width: '100%', flexDirection: 'row' },
+userWrapper: { justifyContent: 'flex-start' }, // User on the right for RTL
+botWrapper: { justifyContent: 'flex-end' },
+messageBubble: { maxWidth: '85%', borderRadius: 15, padding: 12 },
+userBubble: { backgroundColor: '#3B82F6', borderTopRightRadius: 2 },
+botBubble: { backgroundColor: '#1E293B', borderTopLeftRadius: 2, borderWidth: 1, borderColor: '#334155' },
+messageText: { color: '#FFF', fontFamily: 'Tajawal-Regular', fontSize: 15, lineHeight: 22, textAlign: 'right' },
+timestamp: { color: '#94A3B8', fontSize: 10, marginTop: 5, textAlign: 'left' },
+
+// تنسيق المصدر
+sourceContainer: { marginTop: 10 },
+divider: { height: 1, backgroundColor: '#334155', marginVertical: 8 },
+sourceRow: { flexDirection: 'row-reverse', alignItems: 'center' },
+sourceText: { color: '#4CC9F0', fontSize: 11, fontFamily: 'Tajawal-Bold', marginRight: 5 },
+loadingContainer: { flexDirection: 'row-reverse', padding: 10, alignItems: 'center', marginRight: 20 },
+loadingText: { color: '#94A3B8', fontSize: 12, fontFamily: 'Tajawal-Regular', marginRight: 10 },
+inputContainer: { 
+flexDirection: 'row', padding: 10, backgroundColor: '#1E293B', 
+alignItems: 'center', borderTopWidth: 1, borderTopColor: '#334155' 
+},
+input: { 
+flex: 1, backgroundColor: '#0F172A', borderRadius: 20, 
+paddingHorizontal: 15, paddingVertical: 8, color: '#FFF', 
+fontFamily: 'Tajawal-Regular', textAlign: 'right' 
+},
+sendButton: { 
+backgroundColor: '#3B82F6', width: 45, height: 45, 
+borderRadius: 22.5, justifyContent: 'center', alignItems: 'center', marginRight: 10 
+},
+sendIcon: { transform: [{ rotate: '180deg' }] } // لعكس اتجاه السهم في RTL
+});
+export default ChatScreen;
+// تعديل منطق الإرجاع
+export const generateResponse = async (userQuery, categoryId) => {
+// 1. استرجاع القطع النصية من SQLite (كما فعلنا سابقاً)
+// 2. إرسالها لموديل Llama
+// 3. محاكاة رد المحرك:
+return {
+answer: "يجب حل دواء Ceftriaxone بـ 10 مل من الماء المقطر. يبقى مستقراً لمدة 6 ساعات في درجة حرارة الغرفة و24 ساعة في الثلاجة. يُعطى عن طريق الحقن الوريدي البطئ خلال 2-4 دقائق.",
+source: "Clinical_Pharmacy_Guide_2024.pdf",
+page: 42
+};
+};
+// في الشاشة الرئيسية (Home Dashboard)
+onPress={() => navigation.navigate('Chat', { 
+categoryId: tile.id, 
+categoryName: tile.title 
+})}
+npx react-native init NursingAiAssistant cd NursingAiAssistant # تثبيت المكتبات الأساسية npm install @react-navigation/native @react-navigation/stack react-native-safe-area-context react-native-screens npm install react-native-sqlite-storage react-native-biometrics react-native-vector-icons react-native-paper react-native-fs react-native-document-picker crypto-js
+
+src/
+├── database/ # db.js (قاعدة البيانات المشفرة)
+├── services/ # aiEngine.js, pdfService.js (المنطق التقني)
+├── screens/ # HomeScreen.js, ChatScreen.js, AdminScreen.js
+├── assets/ # fonts/ (Tajawal)
+└── components/ # ChatBubble.js, Tile.js
+
+import SQLite from 'react-native-sqlite-storage';
+SQLite.enablePromise(true);
+export const getDB = async () => {
+return SQLite.openDatabase({
+name: "NursingShield.db",
+location: "default",
+key: "Your_Secret_Encryption_Key_2024" // SQLCipher Key
+});
+};
+export const initDB = async () => {
+const db = await getDB();
+await db.executeSql(`
+CREATE TABLE IF NOT EXISTS KnowledgeBase (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+category_id INTEGER, -- 1: Pharmacy, 2: Policies, 3: Quality
+content TEXT,
+source_name TEXT,
+page_number INTEGER,
+checksum TEXT
+);
+`);
+};
+import { getDB } from '../database/db';
+export const queryLocalRAG = async (userQuestion, categoryId) => {
+const db = await getDB();
+
+// البحث عن النصوص ذات الصلة في قاعدة البيانات (Simulated Semantic Search)
+const results = await db.executeSql(
+`SELECT content, source_name, page_number FROM KnowledgeBase 
+WHERE category_id = ? AND content LIKE ? LIMIT 2`,
+[categoryId, `%${userQuestion}%`]
+);
+let context = "";
+let sourceInfo = "المصدر غير متوفر";
+let pageNum = "";
+if (results[0].rows.length > 0) {
+const row = results[0].rows.item(0);
+context = row.content;
+sourceInfo = row.source_name;
+pageNum = row.page_number;
+} else {
+return { 
+answer: "عذراً، هذه المعلومة غير متوفرة في المراجع المرفوعة حالياً. يرجى الرجوع للمشرف.",
+source: null 
+};
+}
+// هنا يتم إرسال Context و Question إلى موديل Llama.rn المحلي
+// سنقوم بمحاكاة الرد المهيكل بناءً على الـ Prompt Engineering المطلوب
+const structuredAnswer = `
+- طريقة التحضير: بناءً على مرجع ${sourceInfo}، يتم التحضير وفق المعايير السريرية المحددة.
+- التوافق: متوافق مع المحاليل المذكورة في صـ ${pageNum}.
+- الثبات: يرجى التحقق من الملصق، الثبات القياسي كما في المرجع هو 6 ساعات.
+- معدل الحقن: حسب البروتوكول المعتمد.
+`;
+return {
+answer: structuredAnswer,
+source: sourceInfo,
+page: pageNum
+};
+};
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+const HomeScreen = ({ navigation }) => {
+const categories = [
+{ id: 1, title: 'المعايير الصيدلانية', sub: 'الجرعات والثبات', icon: 'pill', color: '#4CC9F0' },
+{ id: 2, title: 'السياسات التمريضية', sub: 'الإجراءات والتوثيق', icon: 'file-document-edit', color: '#4361EE' },
+{ id: 3, title: 'معايير الجودة', sub: 'سباهي وسلامة المرضى', icon: 'shield-check', color: '#3F37C9' },
+];
+return (
+<ScrollView style={styles.container}>
+<View style={styles.header}>
+<Text style={styles.appTitle}>Ai Nursing Assistance</Text>
+<Text style={styles.welcome}>مرحباً بك في المساعد السريري</Text>
+</View>
+<View style={styles.grid}>
+{categories.map((item) => (
+<TouchableOpacity 
+key={item.id} 
+style={[styles.tile, { borderRightColor: item.color }]}
+onPress={() => navigation.navigate('Chat', { categoryId: item.id, title: item.title })}
+>
+<Icon name={item.icon} size={40} color={item.color} />
+<View style={styles.textStack}>
+<Text style={styles.tileTitle}>{item.title}</Text>
+<Text style={styles.tileSub}>{item.sub}</Text>
+</View>
+<Icon name="chevron-left" size={24} color="#475569" />
+</TouchableOpacity>
+))}
+</View>
+<TouchableOpacity 
+style={styles.adminLink} 
+onPress={() => navigation.navigate('Admin')}
+>
+<Icon name="lock-shield" size={20} color="#94A3B8" />
+<Text style={styles.adminText}>لوحة الإدارة (للمشرفين فقط)</Text>
+</TouchableOpacity>
+</ScrollView>
+);
+};
+const styles = StyleSheet.create({
+container: { flex: 1, backgroundColor: '#0F172A', padding: 20 },
+header: { marginTop: 40, marginBottom: 30, alignItems: 'flex-end' },
+appTitle: { fontSize: 26, color: '#F8FAFC', fontFamily: 'Tajawal-Bold' },
+welcome: { fontSize: 16, color: '#94A3B8', fontFamily: 'Tajawal-Regular' },
+grid: { gap: 15 },
+tile: { 
+backgroundColor: '#1E293B', padding: 20, borderRadius: 15, 
+flexDirection: 'row-reverse', alignItems: 'center', borderRightWidth: 5 
+},
+textStack: { flex: 1, marginRight: 15, alignItems: 'flex-end' },
+tileTitle: { color: '#F8FAFC', fontSize: 18, fontFamily: 'Tajawal-Bold' },
+tileSub: { color: '#94A3B8', fontSize: 13, fontFamily: 'Tajawal-Regular' },
+adminLink: { marginTop: 40, flexDirection: 'row-reverse', justifyContent: 'center', opacity: 0.6 },
+adminText: { color: '#94A3B8', marginRight: 8, fontFamily: 'Tajawal-Regular' }
+});
+export default HomeScreen;
+import React, { useEffect } from 'react'; import { NavigationContainer } from '@react-navigation/native'; import { createStackNavigator } from '@react-navigation/stack'; import { initDB } from './src/database/db';  import HomeScreen from './src/screens/HomeScreen'; import ChatScreen from './src/screens/ChatScreen'; import AdminScreen from './src/screens/AdminScreen';  const Stack = createStackNavigator();  export default function App() { useEffect(() => { initDB(); // تهيئة قاعدة البيانات عند التشغيل }, []);  return ( <NavigationContainer> <Stack.Navigator screenOptions={{ headerShown: false }}> <Stack.Screen name="Home" component={HomeScreen} /> <Stack.Screen name="Chat" component={ChatScreen} /> <Stack.Screen name="Admin" component={AdminScreen} /> </Stack.Navigator> </NavigationContainer> ); }
+npm install react-native-biometrics react-native-document-picker react-native-fs crypto-js
+import React, { useState, useEffect } from 'react';
+import { 
+View, Text, StyleSheet, TouchableOpacity, 
+Alert, ActivityIndicator, ScrollView 
+} from 'react-native';
+import ReactNativeBiometrics, { BiometryTypes } from 'react-native-biometrics';
+import DocumentPicker from 'react-native-document-picker';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { processPDF } from '../services/pdfService'; // الخدمة التي أنشأناها سابقاً
+const AdminScreen = ({ navigation }) => {
+const [isAuthenticated, setIsAuthenticated] = useState(false);
+const [isProcessing, setIsProcessing] = useState(false);
+const rnBiometrics = new ReactNativeBiometrics();
+// 1. التحقق من البصمة عند دخول الشاشة
+useEffect(() => {
+handleBiometricAuth();
+}, []);
+const handleBiometricAuth = async () => {
+try {
+const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+if (available && (biometryType === BiometryTypes.FaceID || biometryType === BiometryTypes.TouchID || biometryType === BiometryTypes.Biometrics)) {
+const { success } = await rnBiometrics.simplePrompt({
+promptString: 'تأكيد هوية المسؤول',
+cancelButtonText: 'إلغاء',
+});
+if (success) {
+setIsAuthenticated(true);
+} else {
+navigation.goBack(); // العودة إذا فشل التحقق
+}
+} else {
+Alert.alert('تنبيه', 'خاصية البصمة غير متوفرة على هذا الجهاز. سيتم استخدام رمز الدخول الافتراضي.');
+// يمكن إضافة خيار Password هنا كبديل
+setIsAuthenticated(true); 
+}
+} catch (error) {
+console.error(error);
+navigation.goBack();
+}
+};
+// 2. معالجة رفع الملفات
+const handleUpload = async (categoryId, categoryName) => {
+try {
+const res = await DocumentPicker.pick({
+type: [DocumentPicker.types.pdf],
+});
+const file = res[0];
+setIsProcessing(true);
+// استدعاء خدمة المعالجة (توليد SHA-256 وتخزين النصوص)
+const success = await processPDF(file.uri, file.name, categoryId);
+setIsProcessing(false);
+if (success) {
+Alert.alert('تم التحديث', `تمت أرشفة ملف "${file.name}" بنجاح في قسم ${categoryName}`);
+} else {
+Alert.alert('خطأ', 'فشلت عملية معالجة الملف. تأكد من أن الملف غير محمي بكلمة مرور.');
+}
+} catch (err) {
+setIsProcessing(false);
+if (DocumentPicker.isCancel(err)) {
+// المستخدم أغلق نافذة الاختيار
+} else {
+console.error(err);
+}
+}
+};
+if (!isAuthenticated) {
+return (
+<View style={styles.authContainer}>
+<ActivityIndicator size="large" color="#3B82F6" />
+<Text style={styles.authText}>جاري التحقق من الهوية...</Text>
+</View>
+);
+}
+return (
+<ScrollView style={styles.container}>
+<View style={styles.header}>
+<TouchableOpacity onPress={() => navigation.goBack()}>
+<Icon name="arrow-right" size={28} color="#FFF" />
+</TouchableOpacity>
+<Text style={styles.headerTitle}>لوحة التحكم المركزية</Text>
+</View>
+<View style={styles.infoCard}>
+<Icon name="shield-lock" size={40} color="#10B981" />
+<Text style={styles.infoTitle}>الوضع الآمن مفعل</Text>
+<Text style={styles.infoSub}>يمكنك الآن رفع وتحديث المراجع الرسمية المعتمدة.</Text>
+</View>
+{isProcessing ? (
+<View style={styles.processingBox}>
+<ActivityIndicator size="large" color="#4CC9F0" />
+<Text style={styles.processingText}>جاري تحليل الملف واستخراج البيانات...</Text>
+<Text style={styles.processingSub}>يتم الآن التشفير والحفظ في قاعدة البيانات المحلية.</Text>
+</View>
+) : (
+<View style={styles.uploadSection}>
+<UploadTile 
+title="تحديث أدلة الصيدلة" 
+icon="pill" 
+onPress={() => handleUpload(1, 'الصيدلة')} 
+/>
+<UploadTile 
+title="تحديث سياسات التمريض" 
+icon="file-document-outline" 
+onPress={() => handleUpload(2, 'السياسات')} 
+/>
+<UploadTile 
+title="تحديث معايير الجودة" 
+icon="shield-check-outline" 
+onPress={() => handleUpload(3, 'الجودة')} 
+/>
+</View>
+)}
+</ScrollView>
+);
+};
+// مكون زر الرفع المصغر
+const UploadTile = ({ title, icon, onPress }) => (
+<TouchableOpacity style={styles.uploadBtn} onPress={onPress}>
+<Icon name={icon} size={30} color="#4CC9F0" />
+<Text style={styles.uploadBtnText}>{title}</Text>
+<Icon name="upload" size={20} color="#94A3B8" />
+</TouchableOpacity>
+);
+const styles = StyleSheet.create({
+container: { flex: 1, backgroundColor: '#0F172A', padding: 20 },
+authContainer: { flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center' },
+authText: { color: '#FFF', marginTop: 20, fontFamily: 'Tajawal-Bold' },
+header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 30, marginBottom: 20 },
+headerTitle: { color: '#FFF', fontSize: 22, fontFamily: 'Tajawal-Bold' },
+infoCard: { backgroundColor: '#1E293B', padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 25 },
+infoTitle: { color: '#10B981', fontSize: 18, fontFamily: 'Tajawal-Bold', marginTop: 10 },
+infoSub: { color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 5, fontFamily: 'Tajawal-Regular' },
+uploadSection: { gap: 15 },
+uploadBtn: { 
+backgroundColor: '#1E293B', padding: 18, borderRadius: 12, 
+flexDirection: 'row-reverse', alignItems: 'center', 
+borderWidth: 1, borderColor: '#334155', borderStyle: 'dashed' 
+},
+uploadBtnText: { color: '#FFF', flex: 1, marginRight: 15, textAlign: 'right', fontFamily: 'Tajawal-Bold', fontSize: 16 },
+processingBox: { padding: 40, alignItems: 'center' },
+processingText: { color: '#4CC9F0', fontSize: 16, fontFamily: 'Tajawal-Bold', marginTop: 20 },
+processingSub: { color: '#94A3B8', fontSize: 12, textAlign: 'center', marginTop: 10 }
+});
+export default AdminScreen;
+import React, { useEffect } from 'react'; import { StatusBar, I18nManager, LogBox } from 'react-native'; import { NavigationContainer } from '@react-navigation/native'; import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack'; import { SafeAreaProvider } from 'react-native-safe-area-context';  // استيراد الشاشات import HomeScreen from './src/screens/HomeScreen'; import ChatScreen from './src/screens/ChatScreen'; import AdminScreen from './src/screens/AdminScreen';  // استيراد تهيئة قاعدة البيانات import { initDB } from './src/database/db';  // إنشاء الـ Stack Navigator const Stack = createStackNavigator();  // تفعيل دعم اللغة العربية (RTL) بشكل إجباري للتطبيق I18nManager.allowRTL(true); I18nManager.forceRTL(true);  // تجاهل تحذيرات معينة (اختياري) LogBox.ignoreLogs(['ViewPropTypes will be removed']);  const App = () => {  useEffect(() => { // تشغيل قاعدة البيانات عند بدء التطبيق لأول مرة const setup = async () => { try { await initDB(); console.log("Database initialized successfully"); } catch (error) { console.error("Database initialization failed", error); } }; setup(); }, []);  return ( <SafeAreaProvider> <NavigationContainer> {/* تخصيص الـ StatusBar ليناسب الوضع الداكن */} <StatusBar barStyle="light-content" backgroundColor="#0F172A" />  <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false, // إخفاء الهيدر الافتراضي لأننا صممنا هيدر مخصص gestureEnabled: true, gestureDirection: 'horizontal', cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS, // حركة انتقال ناعمة }} > {/* الشاشة الرئيسية */} <Stack.Screen name="Home" component={HomeScreen} />  {/* شاشة الدردشة والذكاء الاصطناعي */} <Stack.Screen name="Chat" component={ChatScreen} />  {/* شاشة الإدارة المحمية بالبصمة */} <Stack.Screen name="Admin" component={AdminScreen} />  </Stack.Navigator> </NavigationContainer> </SafeAreaProvider> ); };  export default App;
+
+module.exports = {
+project: {
+ios: {},
+android: {},
+},
+assets: ['./assets/fonts/'],
+};
+
+<uses-permission android:name="android.permission.USE_BIOMETRIC" />
+npx react-native run-android
+# أو
+npx react-native run-ios

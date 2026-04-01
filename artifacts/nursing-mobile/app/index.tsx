@@ -1,0 +1,207 @@
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React from "react";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { CategoryCard } from "@/components/CategoryCard";
+import { useApp } from "@/contexts/AppContext";
+
+const CATEGORIES = [
+  {
+    id: "pharmacy" as const,
+    title: "المستحضرات الصيدلانية",
+    subtitle: "الجرعات والتفاعلات الدوائية",
+    accentColor: "#4CC9F0",
+    iconName: "medical" as const,
+  },
+  {
+    id: "policies" as const,
+    title: "سياسات التمريض",
+    subtitle: "البروتوكولات والإجراءات السريرية",
+    accentColor: "#4361EE",
+    iconName: "document-text" as const,
+  },
+  {
+    id: "quality" as const,
+    title: "الجودة والسباحي",
+    subtitle: "معايير JCIA وأهداف سلامة المرضى",
+    accentColor: "#7C3AED",
+    iconName: "shield-checkmark" as const,
+  },
+];
+
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+  const { documents } = useApp();
+
+  const topPad =
+    Platform.OS === "web" ? 67 : insets.top;
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: topPad + 16 }]}>
+        <Pressable
+          style={styles.adminButton}
+          onPress={() => router.push("/admin")}
+          testID="admin-button"
+        >
+          <Ionicons name="settings-outline" size={22} color="#94A3B8" />
+        </Pressable>
+        <View style={styles.headerCenter}>
+          <View style={styles.logoRow}>
+            <Ionicons name="hardware-chip" size={20} color="#4CC9F0" />
+          </View>
+          <Text style={styles.headerTitle}>مساعد التمريض الذكي</Text>
+          <Text style={styles.headerSubtitle}>نظام الاستفسار الطبي</Text>
+        </View>
+        <View style={styles.placeholderButton} />
+      </View>
+
+      {/* Content */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.sectionTitle}>اختر التصنيف</Text>
+        <Text style={styles.sectionSubtitle}>
+          اختر الفئة للحصول على إجابات مستندة إلى مصادر معتمدة
+        </Text>
+
+        {CATEGORIES.map((cat) => (
+          <CategoryCard
+            key={cat.id}
+            category={cat.id}
+            title={cat.title}
+            subtitle={cat.subtitle}
+            docCount={documents[cat.id]?.length ?? 0}
+            accentColor={cat.accentColor}
+            iconName={cat.iconName}
+            onPress={() =>
+              router.push({
+                pathname: "/chat/[category]",
+                params: { category: cat.id },
+              })
+            }
+          />
+        ))}
+
+        {/* Info card */}
+        <View style={styles.infoCard}>
+          <Ionicons name="information-circle-outline" size={18} color="#4CC9F0" />
+          <Text style={styles.infoText}>
+            الإجابات مستندة إلى الوثائق المرفوعة. تواصل مع الطاقم الطبي للقرارات الحرجة.
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#0F172A",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1E293B",
+  },
+  adminButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#1E293B",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  placeholderButton: {
+    width: 40,
+    height: 40,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  logoRow: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#4CC9F022",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#F8FAFC",
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#F8FAFC",
+    textAlign: "right",
+    fontFamily: "Inter_700Bold",
+    marginBottom: 6,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: "#94A3B8",
+    textAlign: "right",
+    fontFamily: "Inter_400Regular",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  infoCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "#0E2436",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#4CC9F030",
+    marginTop: 8,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#94A3B8",
+    textAlign: "right",
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+  },
+});

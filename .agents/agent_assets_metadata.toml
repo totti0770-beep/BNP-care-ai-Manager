@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "1F02GsOwEymSGnhpSd2S_"
+uri = "file://artifacts/nursing-mobile/assets/images/icon.png"
+type = "image"
+title = "generated_image"
