@@ -21,7 +21,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ```text
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
+│   ├── api-server/         # Express API server
+│   └── bestnursingai/      # BestNursingAI React+Vite web app
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
@@ -90,6 +91,26 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 ### `lib/api-client-react` (`@workspace/api-client-react`)
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
+
+### `artifacts/bestnursingai` (`@workspace/bestnursingai`)
+
+BestNursingAI — a full-featured nursing AI assistant web app. React+Vite, dark purple theme, frontend-only (no backend required).
+
+**Features:**
+- Login screen with demo credentials (admin/user roles)
+- AI chat with closed-loop RAG (retrieval-augmented generation using in-memory vector store)
+- Secure document upload with digital signature verification (SHA-256 checksums)
+- Document management, citations, and official sources whitelist
+- Audit log with filtering and export
+- RAG settings (confidence threshold slider)
+- Settings page (profile, language, permissions, notifications, theme, user management)
+- Bilingual: English and Arabic with RTL support (i18next)
+
+**Demo credentials:**
+- Admin: `admin@bestnursing.ai` / `admin123`
+- User: `user@bestnursing.ai` / `user123`
+
+**Key packages:** `i18next`, `react-i18next`, `i18next-browser-languagedetector`, `crypto-js`, `lucide-react`, `sonner`, shadcn/ui
 
 ### `scripts` (`@workspace/scripts`)
 
