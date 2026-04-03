@@ -22,7 +22,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
 │   ├── api-server/         # Express API server
-│   └── bestnursingai/      # BestNursingAI React+Vite web app
+│   ├── bestnursingai/      # BestNursingAI React+Vite web app
+│   └── nursing-mobile/     # Expo mobile nursing AI assistant (Arabic RTL)
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
@@ -111,6 +112,26 @@ BestNursingAI — a full-featured nursing AI assistant web app. React+Vite, dark
 - User: `user@bestnursing.ai` / `user123`
 
 **Key packages:** `i18next`, `react-i18next`, `i18next-browser-languagedetector`, `crypto-js`, `lucide-react`, `sonner`, shadcn/ui
+
+### `artifacts/nursing-mobile` (`@workspace/nursing-mobile`)
+
+Nursing AI Mobile — an Expo React Native app for clinical nursing AI assistant. Arabic RTL, dark navy theme (`#0F172A`).
+
+**Features:**
+- Home screen with 3 clinical category tiles (Pharmaceutical Standards, Nursing Policies, Quality/SABAHI)
+- AI chat per category with mock RAG responses, Arabic content, and document citations (source + page)
+- Suggestion chips on empty chat state
+- Admin panel with biometric authentication (`expo-local-authentication`; PIN fallback on web: `1234`)
+- Admin can add/remove reference documents per category (persisted via AsyncStorage)
+- Full Arabic RTL layout throughout
+- Stack navigation (no tabs), inverted FlatList chat pattern
+
+**Category colors:**
+- Pharmacy: `#4CC9F0` (cyan)
+- Nursing Policies: `#4361EE` (blue)
+- Quality/SABAHI: `#7C3AED` (purple)
+
+**Key packages:** `expo-local-authentication`, `@react-native-async-storage/async-storage`, `expo-haptics`, `react-native-keyboard-controller`
 
 ### `scripts` (`@workspace/scripts`)
 
