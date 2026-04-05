@@ -19,8 +19,10 @@ export interface EngineQueryResponse {
   query_type: "drug" | "protocol" | "general";
   answer: string;
   dose?: string | null;
+  indication?: string | null;
   safety_warning?: string | null;
   safety_alert: boolean;
+  confidence_label: "High" | "Medium" | "Low";
   safety_alerts?: string[];
   contraindications?: string[];
   interactions?: string[];
@@ -35,6 +37,7 @@ export interface EngineQueryResponse {
   rejected: boolean;
   rejection_reason?: string | null;
   processing_time_ms: number;
+  context_validation?: string | null;
 }
 
 export interface EngineDocument {

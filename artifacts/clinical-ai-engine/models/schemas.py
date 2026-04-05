@@ -78,13 +78,24 @@ class SafetyCheckResult(BaseModel):
     confidence: float
 
 
+class ContextValidationResult(BaseModel):
+    is_valid: bool
+    confidence_label: str
+    issues: List[str] = []
+    message: Optional[str] = None
+    source_count: int = 0
+    has_conflict: bool = False
+
+
 class QueryResponse(BaseModel):
     session_id: str
     query_type: QueryType
     answer: str
     dose: Optional[str] = None
+    indication: Optional[str] = None
     safety_warning: Optional[str] = None
     safety_alert: bool = False
+    confidence_label: str = "Low"
     citations: List[Citation]
     confidence: float
     rejected: bool = False
@@ -94,6 +105,7 @@ class QueryResponse(BaseModel):
     interactions: List[str] = []
     nursing_notes: List[str] = []
     safety_alerts: List[str] = []
+    context_validation: Optional[str] = None
 
 
 class AuditLogEntry(BaseModel):

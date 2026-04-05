@@ -109,6 +109,9 @@ export default function ChatScreen() {
             content: result.answer,
             timestamp: new Date().toISOString(),
             dose: result.dose ?? undefined,
+            indication: result.indication ?? undefined,
+            confidenceLabel: result.confidence_label ?? undefined,
+            contextValidation: result.context_validation ?? undefined,
             safetyAlert: result.safety_alert,
             rejected: result.rejected,
             safetyAlerts: result.safety_alerts?.length ? result.safety_alerts : undefined,
@@ -157,6 +160,9 @@ export default function ChatScreen() {
         citation={item.citation}
         accentColor={config.accentColor}
         dose={item.dose}
+        indication={item.indication}
+        confidenceLabel={item.confidenceLabel}
+        contextValidation={item.contextValidation}
         safetyAlert={item.safetyAlert}
         rejected={item.rejected}
         safetyAlerts={item.safetyAlerts}

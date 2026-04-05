@@ -8,6 +8,9 @@ interface MessageBubbleProps {
   citation?: { source: string; page: number };
   accentColor: string;
   dose?: string;
+  indication?: string;
+  confidenceLabel?: "High" | "Medium" | "Low";
+  contextValidation?: string;
   safetyAlert?: boolean;
   rejected?: boolean;
   safetyAlerts?: string[];
@@ -22,6 +25,9 @@ export function MessageBubble({
   citation,
   accentColor,
   dose,
+  indication,
+  confidenceLabel,
+  contextValidation,
   safetyAlert,
   rejected,
   safetyAlerts,
@@ -94,6 +100,36 @@ export function MessageBubble({
           </Text>
         </View>
 
+        {/* Confidence label badge */}
+        {isAI && confidenceLabel && (
+          <View style={[
+            styles.confidenceBadge,
+            confidenceLabel === "High" ? styles.confidenceHigh
+              : confidenceLabel === "Medium" ? styles.confidenceMedium
+              : styles.confidenceLow,
+          ]}>
+            <Ionicons
+              name="bar-chart-outline"
+              size={10}
+              color={confidenceLabel === "High" ? "#4ADE80" : confidenceLabel === "Medium" ? "#FBBF24" : "#F87171"}
+            />
+            <Text style={[
+              styles.confidenceText,
+              { color: confidenceLabel === "High" ? "#4ADE80" : confidenceLabel === "Medium" ? "#FBBF24" : "#F87171" }
+            ]}>
+              {confidenceLabel === "High" ? "ثقة عالية" : confidenceLabel === "Medium" ? "ثقة متوسطة" : "ثقة منخفضة"}
+            </Text>
+          </View>
+        )}
+
+        {/* Context validation warning */}
+        {isAI && contextValidation && (
+          <View style={styles.contextValidationCard}>
+            <Ionicons name="alert-circle-outline" size={12} color="#FCD34D" />
+            <Text style={styles.contextValidationText}>{contextValidation}</Text>
+          </View>
+        )}
+
         {/* Dose card */}
         {isAI && dose && (
           <View style={styles.doseCard}>
@@ -102,6 +138,17 @@ export function MessageBubble({
               <Text style={[styles.cardTitle, { color: "#4CC9F0" }]}>الجرعة</Text>
             </View>
             <Text style={styles.doseText}>{dose}</Text>
+          </View>
+        )}
+
+        {/* Indication card */}
+        {isAI && indication && (
+          <View style={[styles.infoCard, styles.indicationCard]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="pulse-outline" size={12} color="#2DD4BF" />
+              <Text style={[styles.cardTitle, { color: "#2DD4BF" }]}>الدواعي السريرية</Text>
+            </View>
+            <Text style={styles.indicationText}>{indication}</Text>
           </View>
         )}
 
@@ -368,5 +415,63 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontFamily: "Inter_400Regular",
     textAlign: "right",
+  },
+  confidenceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignSelf: "flex-start",
+  },
+  confidenceHigh: {
+    backgroundColor: "#4ADE8011",
+    borderColor: "#4ADE8044",
+  },
+  confidenceMedium: {
+    backgroundColor: "#FBBF2411",
+    borderColor: "#FBBF2444",
+  },
+  confidenceLow: {
+    backgroundColor: "#F8717111",
+    borderColor: "#F8717144",
+  },
+  confidenceText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+  },
+  contextValidationCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: "#1A1500",
+    borderRadius: 10,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#FCD34D33",
+    width: "100%",
+  },
+  contextValidationText: {
+    fontSize: 11,
+    color: "#FDE68A",
+    fontFamily: "Inter_400Regular",
+    textAlign: "right",
+    writingDirection: "rtl",
+    flex: 1,
+    lineHeight: 17,
+  },
+  indicationCard: {
+    backgroundColor: "#001A18",
+    borderColor: "#2DD4BF33",
+  },
+  indicationText: {
+    fontSize: 12,
+    color: "#99F6E4",
+    fontFamily: "Inter_400Regular",
+    textAlign: "right",
+    writingDirection: "rtl",
+    lineHeight: 18,
   },
 });

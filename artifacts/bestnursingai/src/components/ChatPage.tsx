@@ -5,7 +5,8 @@ import { useBackend } from '@/contexts/BackendContext';
 import {
   Send, Bot, User, Shield, AlertTriangle, BookOpen,
   Pill, Activity, ShieldAlert, Info, Zap, ClipboardList,
-  XCircle, ArrowLeftRight, CheckCircle2,
+  XCircle, ArrowLeftRight, CheckCircle2, Stethoscope,
+  BarChart2, AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,11 +42,33 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
 
   return (
     <div className="space-y-3 mt-1">
-      {/* Engine badge */}
+      {/* Engine badge + Confidence label */}
       {fromEngine && (
-        <div className="flex items-center gap-1.5">
-          <Zap className="w-3 h-3 text-violet-400" />
-          <span className="text-violet-400 text-xs font-medium">Live Clinical Engine</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-violet-400" />
+            <span className="text-violet-400 text-xs font-medium">Live Clinical Engine</span>
+          </div>
+          {bnp.confidenceLabel && (
+            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+              bnp.confidenceLabel === 'High'
+                ? 'bg-green-600/15 border-green-500/40 text-green-300'
+                : bnp.confidenceLabel === 'Medium'
+                ? 'bg-yellow-600/15 border-yellow-500/40 text-yellow-300'
+                : 'bg-red-600/15 border-red-500/40 text-red-300'
+            }`}>
+              <BarChart2 className="w-2.5 h-2.5" />
+              {bnp.confidenceLabel} Confidence
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Context Validation warning */}
+      {bnp.contextValidation && (
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-600/10 border border-amber-500/30">
+          <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+          <p className="text-amber-200 text-xs leading-relaxed">{bnp.contextValidation}</p>
         </div>
       )}
 
@@ -77,6 +100,19 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
           </div>
           <div className="px-4 py-3">
             <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line font-mono">{bnp.dose}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Indication section */}
+      {bnp.indication && (
+        <div className="rounded-xl bg-[#12122a] border border-teal-500/20 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-teal-600/10 border-b border-teal-500/20">
+            <Stethoscope className="w-3.5 h-3.5 text-teal-400" />
+            <span className="text-teal-300 text-xs font-semibold uppercase tracking-wide">Indication</span>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line">{bnp.indication}</p>
           </div>
         </div>
       )}

@@ -22,8 +22,10 @@ interface SearchResult {
 export interface BNPResponse {
   answer: string;
   dose?: string;
+  indication?: string;
   safetyWarning?: string;
   safetyAlert: boolean;
+  confidenceLabel?: "High" | "Medium" | "Low";
   safetyAlerts?: string[];
   contraindications?: string[];
   interactions?: string[];
@@ -35,6 +37,7 @@ export interface BNPResponse {
   rejected: boolean;
   rejectionReason?: string;
   notFound: boolean;
+  contextValidation?: string;
 }
 
 interface ClosedLoopRAGContextType {

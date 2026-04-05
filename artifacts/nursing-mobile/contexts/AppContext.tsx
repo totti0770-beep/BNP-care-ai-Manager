@@ -27,6 +27,9 @@ export interface Message {
   };
   timestamp: string;
   dose?: string;
+  indication?: string;
+  confidenceLabel?: "High" | "Medium" | "Low";
+  contextValidation?: string;
   safetyAlert?: boolean;
   rejected?: boolean;
   safetyAlerts?: string[];

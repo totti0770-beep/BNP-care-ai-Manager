@@ -65,8 +65,10 @@ function mapToBNP(engine: Awaited<ReturnType<typeof apiQuery>>): BNPResponse {
   return {
     answer: engine.answer,
     dose: engine.dose ?? undefined,
+    indication: engine.indication ?? undefined,
     safetyWarning: engine.safety_warning ?? undefined,
     safetyAlert: engine.safety_alert,
+    confidenceLabel: engine.confidence_label ?? "Low",
     safetyAlerts: engine.safety_alerts?.length ? engine.safety_alerts : undefined,
     contraindications: engine.contraindications?.length ? engine.contraindications : undefined,
     interactions: engine.interactions?.length ? engine.interactions : undefined,
@@ -81,6 +83,7 @@ function mapToBNP(engine: Awaited<ReturnType<typeof apiQuery>>): BNPResponse {
     queryType: mapQueryType(engine.query_type),
     notFound,
     rejected: false,
+    contextValidation: engine.context_validation ?? undefined,
   };
 }
 
