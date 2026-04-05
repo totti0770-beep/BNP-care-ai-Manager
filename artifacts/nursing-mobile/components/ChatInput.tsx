@@ -40,7 +40,7 @@ export function ChatInput({ onSend, isSending, accentColor }: ChatInputProps) {
             styles.sendButton,
             {
               backgroundColor:
-                text.trim() && !isSending ? accentColor : "#334155",
+                text.trim() && !isSending ? accentColor : "#2D1B4E",
             },
           ]}
           onPress={handleSend}
@@ -74,9 +74,9 @@ export function ChatInput({ onSend, isSending, accentColor }: ChatInputProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#0F172A",
+    backgroundColor: "#0A0A0F",
     borderTopWidth: 1,
-    borderTopColor: "#1E293B",
+    borderTopColor: "#2D1B4E",
     paddingTop: 12,
     paddingHorizontal: 16,
   },
@@ -84,10 +84,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 10,
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
     borderRadius: 24,
     paddingHorizontal: 6,
     paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#2D1B4E",
   },
   input: {
     flex: 1,

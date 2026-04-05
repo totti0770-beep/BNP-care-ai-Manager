@@ -29,7 +29,7 @@ const CATEGORY_CONFIG: Record<
   },
   policies: {
     title: "سياسات التمريض",
-    accentColor: "#4361EE",
+    accentColor: "#8B5CF6",
     iconName: "document-text",
   },
   quality: {
@@ -157,7 +157,7 @@ export default function AdminScreen() {
   if (isAuthenticating) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#4CC9F0" />
+        <ActivityIndicator size="large" color="#8B5CF6" />
         <Text style={styles.authText}>جارٍ التحقق من الهوية...</Text>
       </View>
     );
@@ -168,7 +168,7 @@ export default function AdminScreen() {
       <View style={[styles.container, styles.centerContent]}>
         <View style={styles.pinCard}>
           <View style={styles.pinIconContainer}>
-            <Ionicons name="lock-closed" size={32} color="#4CC9F0" />
+            <Ionicons name="lock-closed" size={32} color="#8B5CF6" />
           </View>
           <Text style={styles.pinTitle}>لوحة الإدارة</Text>
           <Text style={styles.pinSubtitle}>أدخل رمز المرور للمتابعة</Text>
@@ -201,7 +201,7 @@ export default function AdminScreen() {
       <View style={[styles.header, { paddingTop: topPad + 12 }]}>
         <View style={styles.headerLeft}>
           <View style={styles.adminBadge}>
-            <Ionicons name="shield-checkmark" size={14} color="#4CC9F0" />
+            <Ionicons name="shield-checkmark" size={14} color="#8B5CF6" />
             <Text style={styles.adminBadgeText}>مدير</Text>
           </View>
         </View>
@@ -220,7 +220,7 @@ export default function AdminScreen() {
       >
         {/* Info bar */}
         <View style={styles.infoBar}>
-          <Ionicons name="cloud-upload-outline" size={16} color="#4CC9F0" />
+          <Ionicons name="cloud-upload-outline" size={16} color="#8B5CF6" />
           <Text style={styles.infoBarText}>
             إدارة الوثائق المرجعية لكل تصنيف طبي
           </Text>
@@ -256,7 +256,7 @@ export default function AdminScreen() {
 
               {docs.length === 0 ? (
                 <View style={styles.emptyDocs}>
-                  <Ionicons name="document-outline" size={24} color="#334155" />
+                  <Ionicons name="document-outline" size={24} color="#2D1B4E" />
                   <Text style={styles.emptyDocsText}>لا توجد وثائق مرفوعة</Text>
                 </View>
               ) : (
@@ -358,7 +358,7 @@ export default function AdminScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
+    backgroundColor: "#0A0A0F",
   },
   centerContent: {
     alignItems: "center",
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#1E293B",
+    borderBottomColor: "#2D1B4E",
     gap: 12,
   },
   headerLeft: {
@@ -386,14 +386,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#4CC9F015",
+    backgroundColor: "#8B5CF615",
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "#8B5CF630",
   },
   adminBadgeText: {
     fontSize: 11,
-    color: "#4CC9F0",
+    color: "#8B5CF6",
     fontFamily: "Inter_600SemiBold",
   },
   headerCenter: {
@@ -411,7 +413,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -424,11 +426,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#0E2436",
+    backgroundColor: "#0D0820",
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#4CC9F030",
+    borderColor: "#8B5CF630",
   },
   infoBarText: {
     flex: 1,
@@ -438,10 +440,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   categorySection: {
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
     borderRadius: 16,
     padding: 16,
     gap: 12,
+    borderWidth: 1,
+    borderColor: "#2D1B4E",
   },
   categoryHeader: {
     flexDirection: "row",
@@ -494,9 +498,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#0F172A",
+    backgroundColor: "#0A0A0F",
     borderRadius: 10,
     padding: 12,
+    borderWidth: 1,
+    borderColor: "#2D1B4E",
   },
   docRemoveBtn: {
     padding: 6,
@@ -541,17 +547,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0,0,0,0.8)",
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
   },
   modalCard: {
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
     borderRadius: 20,
     padding: 24,
     width: "100%",
     gap: 12,
+    borderWidth: 1,
+    borderColor: "#2D1B4E",
   },
   modalTitle: {
     fontSize: 16,
@@ -568,14 +576,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   modalInput: {
-    backgroundColor: "#0F172A",
+    backgroundColor: "#0A0A0F",
     borderRadius: 10,
     padding: 12,
     fontSize: 14,
     color: "#F8FAFC",
     fontFamily: "Inter_400Regular",
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#2D1B4E",
     textAlign: "right",
   },
   modalActions: {
@@ -587,7 +595,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: "#334155",
+    backgroundColor: "#2D1B4E",
     alignItems: "center",
   },
   modalCancelText: {
@@ -599,7 +607,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: "#4361EE",
+    backgroundColor: "#8B5CF6",
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
@@ -611,21 +619,25 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   pinCard: {
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
     borderRadius: 24,
     padding: 32,
     width: "85%",
     alignItems: "center",
     gap: 12,
+    borderWidth: 1,
+    borderColor: "#2D1B4E",
   },
   pinIconContainer: {
     width: 64,
     height: 64,
     borderRadius: 20,
-    backgroundColor: "#4CC9F015",
+    backgroundColor: "#8B5CF615",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "#8B5CF630",
   },
   pinTitle: {
     fontSize: 20,
@@ -642,14 +654,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   pinInput: {
-    backgroundColor: "#0F172A",
+    backgroundColor: "#0A0A0F",
     borderRadius: 12,
     padding: 14,
     fontSize: 24,
     color: "#F8FAFC",
     fontFamily: "Inter_700Bold",
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#2D1B4E",
     width: "100%",
     letterSpacing: 8,
     textAlign: "center",
@@ -660,7 +672,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   pinButton: {
-    backgroundColor: "#4361EE",
+    backgroundColor: "#8B5CF6",
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 32,

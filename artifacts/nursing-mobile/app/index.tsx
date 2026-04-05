@@ -27,7 +27,7 @@ const CATEGORIES = [
     id: "policies" as const,
     title: "سياسات التمريض",
     subtitle: "البروتوكولات والإجراءات السريرية",
-    accentColor: "#4361EE",
+    accentColor: "#8B5CF6",
     iconName: "document-text" as const,
   },
   {
@@ -48,7 +48,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A0A0F" />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 16 }]}>
@@ -61,7 +61,7 @@ export default function HomeScreen() {
         </Pressable>
         <View style={styles.headerCenter}>
           <View style={styles.logoRow}>
-            <Ionicons name="hardware-chip" size={20} color="#4CC9F0" />
+            <Ionicons name="hardware-chip" size={20} color="#8B5CF6" />
           </View>
           <Text style={styles.headerTitle}>مساعد التمريض الذكي</Text>
           <Text style={styles.headerSubtitle}>نظام الاستفسار الطبي</Text>
@@ -100,7 +100,7 @@ export default function HomeScreen() {
 
         {/* Info card */}
         <View style={styles.infoCard}>
-          <Ionicons name="information-circle-outline" size={18} color="#4CC9F0" />
+          <Ionicons name="information-circle-outline" size={18} color="#8B5CF6" />
           <Text style={styles.infoText}>
             الإجابات مستندة إلى الوثائق المرفوعة. تواصل مع الطاقم الطبي للقرارات الحرجة.
           </Text>
@@ -113,7 +113,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
+    backgroundColor: "#0A0A0F",
   },
   header: {
     flexDirection: "row",
@@ -121,13 +121,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#1E293B",
+    borderBottomColor: "#2D1B4E",
   },
   adminButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#4CC9F022",
+    backgroundColor: "#8B5CF622",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 6,
@@ -189,11 +189,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    backgroundColor: "#0E2436",
+    backgroundColor: "#0D0820",
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#4CC9F030",
+    borderColor: "#8B5CF630",
     marginTop: 8,
   },
   infoText: {

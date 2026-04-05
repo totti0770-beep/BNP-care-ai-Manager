@@ -30,7 +30,7 @@ const CATEGORY_CONFIG: Record<
   },
   policies: {
     title: "سياسات التمريض",
-    accentColor: "#4361EE",
+    accentColor: "#8B5CF6",
     iconName: "document-text",
   },
   quality: {
@@ -213,7 +213,7 @@ function getSuggestions(category: Category): string[] {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
+    backgroundColor: "#0A0A0F",
   },
   flex: {
     flex: 1,
@@ -224,14 +224,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#1E293B",
+    borderBottomColor: "#2D1B4E",
     gap: 12,
   },
   headerButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
   },
   suggestionText: {
     fontSize: 14,

@@ -84,7 +84,7 @@ export function CategoryCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
     borderRadius: 16,
     padding: 20,
     flexDirection: "row",

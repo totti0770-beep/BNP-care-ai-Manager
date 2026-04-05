@@ -92,9 +92,11 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   aiBubble: {
-    backgroundColor: "#1E293B",
+    backgroundColor: "#1A1A2E",
     borderBottomLeftRadius: 4,
     alignItems: "flex-end",
+    borderWidth: 1,
+    borderColor: "#2D1B4E",
   },
   text: {
     fontSize: 15,
