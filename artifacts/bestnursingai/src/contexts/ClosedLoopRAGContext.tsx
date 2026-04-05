@@ -24,6 +24,10 @@ export interface BNPResponse {
   dose?: string;
   safetyWarning?: string;
   safetyAlert: boolean;
+  safetyAlerts?: string[];
+  contraindications?: string[];
+  interactions?: string[];
+  nursingNotes?: string[];
   sources: { documentName: string; pageNumber: number; similarity: number; excerpt?: string }[];
   confidenceLevel: number;
   sessionId?: string;

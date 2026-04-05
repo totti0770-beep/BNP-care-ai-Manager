@@ -67,6 +67,10 @@ function mapToBNP(engine: Awaited<ReturnType<typeof apiQuery>>): BNPResponse {
     dose: engine.dose ?? undefined,
     safetyWarning: engine.safety_warning ?? undefined,
     safetyAlert: engine.safety_alert,
+    safetyAlerts: engine.safety_alerts?.length ? engine.safety_alerts : undefined,
+    contraindications: engine.contraindications?.length ? engine.contraindications : undefined,
+    interactions: engine.interactions?.length ? engine.interactions : undefined,
+    nursingNotes: engine.nursing_notes?.length ? engine.nursing_notes : undefined,
     sources: engine.citations.map((c) => ({
       documentName: c.document_name,
       pageNumber: c.page_number,

@@ -26,6 +26,13 @@ export interface Message {
     page: number;
   };
   timestamp: string;
+  dose?: string;
+  safetyAlert?: boolean;
+  rejected?: boolean;
+  safetyAlerts?: string[];
+  nursingNotes?: string[];
+  contraindications?: string[];
+  interactions?: string[];
 }
 
 interface AppState {

@@ -7,6 +7,13 @@ interface MessageBubbleProps {
   content: string;
   citation?: { source: string; page: number };
   accentColor: string;
+  dose?: string;
+  safetyAlert?: boolean;
+  rejected?: boolean;
+  safetyAlerts?: string[];
+  nursingNotes?: string[];
+  contraindications?: string[];
+  interactions?: string[];
 }
 
 export function MessageBubble({
@@ -14,31 +21,146 @@ export function MessageBubble({
   content,
   citation,
   accentColor,
+  dose,
+  safetyAlert,
+  rejected,
+  safetyAlerts,
+  nursingNotes,
+  contraindications,
+  interactions,
 }: MessageBubbleProps) {
   const isUser = role === "user";
+  const isAI = role === "assistant";
+
+  const hasSafetyData =
+    isAI &&
+    (safetyAlerts?.length ||
+      nursingNotes?.length ||
+      contraindications?.length ||
+      interactions?.length);
 
   return (
     <View style={[styles.container, isUser ? styles.userContainer : styles.aiContainer]}>
       {!isUser && (
-        <View style={[styles.avatar, { backgroundColor: accentColor + "22" }]}>
-          <Ionicons name="hardware-chip-outline" size={16} color={accentColor} />
+        <View
+          style={[
+            styles.avatar,
+            {
+              backgroundColor: rejected
+                ? "#FF000022"
+                : safetyAlert
+                ? "#F9731622"
+                : accentColor + "22",
+            },
+          ]}
+        >
+          <Ionicons
+            name={rejected ? "warning" : safetyAlert ? "shield-half" : "hardware-chip-outline"}
+            size={16}
+            color={rejected ? "#F87171" : safetyAlert ? "#F97316" : accentColor}
+          />
         </View>
       )}
-      <View style={styles.bubbleWrapper}>
+
+      <View style={[styles.bubbleWrapper, isUser && styles.userBubbleWrapper]}>
+        {/* Safety alert banner */}
+        {isAI && safetyAlert && (
+          <View style={[styles.alertBanner, rejected ? styles.rejectedBanner : styles.warningBanner]}>
+            <Ionicons
+              name={rejected ? "close-circle" : "alert-circle"}
+              size={12}
+              color={rejected ? "#F87171" : "#F97316"}
+            />
+            <Text style={[styles.alertBannerText, rejected ? styles.rejectedText : styles.warningText]}>
+              {rejected ? "تنبيه: جرعة غير آمنة — تم الإيقاف" : "تنبيه سلامة نشط"}
+            </Text>
+          </View>
+        )}
+
+        {/* Main bubble */}
         <View
           style={[
             styles.bubble,
             isUser
               ? [styles.userBubble, { backgroundColor: accentColor }]
-              : styles.aiBubble,
+              : [
+                  styles.aiBubble,
+                  rejected && styles.rejectedBubble,
+                ],
           ]}
         >
-          <Text
-            style={[styles.text, isUser ? styles.userText : styles.aiText]}
-          >
+          <Text style={[styles.text, isUser ? styles.userText : styles.aiText]}>
             {content}
           </Text>
         </View>
+
+        {/* Dose card */}
+        {isAI && dose && (
+          <View style={styles.doseCard}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="medical" size={12} color="#4CC9F0" />
+              <Text style={[styles.cardTitle, { color: "#4CC9F0" }]}>الجرعة</Text>
+            </View>
+            <Text style={styles.doseText}>{dose}</Text>
+          </View>
+        )}
+
+        {/* Safety alerts list */}
+        {isAI && safetyAlerts && safetyAlerts.length > 0 && (
+          <View style={[styles.infoCard, styles.safetyAlertsCard]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="shield-half-outline" size={12} color="#F97316" />
+              <Text style={[styles.cardTitle, { color: "#F97316" }]}>تنبيهات السلامة</Text>
+            </View>
+            {safetyAlerts.map((alert, i) => (
+              <Text key={i} style={styles.safetyAlertItem}>{alert}</Text>
+            ))}
+          </View>
+        )}
+
+        {/* Contraindications */}
+        {isAI && contraindications && contraindications.length > 0 && (
+          <View style={[styles.infoCard, styles.contraCard]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="ban-outline" size={12} color="#FBBF24" />
+              <Text style={[styles.cardTitle, { color: "#FBBF24" }]}>موانع الاستخدام</Text>
+            </View>
+            {contraindications.map((c, i) => (
+              <Text key={i} style={styles.contraItem}>• {c}</Text>
+            ))}
+          </View>
+        )}
+
+        {/* Interactions */}
+        {isAI && interactions && interactions.length > 0 && (
+          <View style={[styles.infoCard, styles.interactionCard]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="git-compare-outline" size={12} color="#FBBF24" />
+              <Text style={[styles.cardTitle, { color: "#FBBF24" }]}>التفاعلات الدوائية</Text>
+            </View>
+            {interactions.map((d, i) => (
+              <Text key={i} style={styles.contraItem}>⇄ {d}</Text>
+            ))}
+          </View>
+        )}
+
+        {/* Nursing notes */}
+        {isAI && nursingNotes && nursingNotes.length > 0 && (
+          <View style={[styles.infoCard, styles.nursingCard]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="clipboard-outline" size={12} color={accentColor} />
+              <Text style={[styles.cardTitle, { color: accentColor }]}>ملاحظات التمريض</Text>
+            </View>
+            {nursingNotes.map((note, i) => (
+              <View key={i} style={styles.nursingNoteRow}>
+                <Ionicons name="checkmark-circle" size={11} color={accentColor} style={styles.nursingIcon} />
+                <Text style={styles.nursingNoteText}>{note}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Citation */}
         {citation && !isUser && (
           <View style={styles.citation}>
             <Ionicons name="document-text-outline" size={12} color="#64748B" />
@@ -48,6 +170,7 @@ export function MessageBubble({
           </View>
         )}
       </View>
+
       {isUser && (
         <View style={[styles.avatar, { backgroundColor: accentColor + "33" }]}>
           <Ionicons name="person" size={16} color={accentColor} />
@@ -80,13 +203,47 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   bubbleWrapper: {
-    maxWidth: "75%",
+    maxWidth: "82%",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+  userBubbleWrapper: {
     alignItems: "flex-end",
+  },
+  alertBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    width: "100%",
+  },
+  warningBanner: {
+    backgroundColor: "#F9731611",
+    borderColor: "#F9731644",
+  },
+  rejectedBanner: {
+    backgroundColor: "#F8717111",
+    borderColor: "#F8717144",
+  },
+  alertBannerText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    textAlign: "right",
+  },
+  warningText: {
+    color: "#F97316",
+  },
+  rejectedText: {
+    color: "#F87171",
   },
   bubble: {
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    width: "100%",
   },
   userBubble: {
     borderBottomRightRadius: 4,
@@ -94,13 +251,16 @@ const styles = StyleSheet.create({
   aiBubble: {
     backgroundColor: "#1A1A2E",
     borderBottomLeftRadius: 4,
-    alignItems: "flex-end",
     borderWidth: 1,
     borderColor: "#2D1B4E",
   },
+  rejectedBubble: {
+    borderColor: "#F8717133",
+    backgroundColor: "#1A1A2E",
+  },
   text: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 21,
     textAlign: "right",
     writingDirection: "rtl",
   },
@@ -112,11 +272,95 @@ const styles = StyleSheet.create({
     color: "#F8FAFC",
     fontFamily: "Inter_400Regular",
   },
+  doseCard: {
+    backgroundColor: "#0D2233",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#4CC9F033",
+    width: "100%",
+  },
+  infoCard: {
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    width: "100%",
+    gap: 4,
+  },
+  safetyAlertsCard: {
+    backgroundColor: "#1A120A",
+    borderColor: "#F9731633",
+  },
+  contraCard: {
+    backgroundColor: "#1A1A00",
+    borderColor: "#FBBF2433",
+  },
+  interactionCard: {
+    backgroundColor: "#1A1505",
+    borderColor: "#FBBF2433",
+  },
+  nursingCard: {
+    backgroundColor: "#0F0A1A",
+    borderColor: "#8B5CF633",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 4,
+  },
+  cardTitle: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    textAlign: "right",
+  },
+  doseText: {
+    fontSize: 12,
+    color: "#E2E8F0",
+    fontFamily: "Inter_400Regular",
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  safetyAlertItem: {
+    fontSize: 11,
+    color: "#FDBA74",
+    fontFamily: "Inter_400Regular",
+    textAlign: "right",
+    writingDirection: "rtl",
+    lineHeight: 17,
+  },
+  contraItem: {
+    fontSize: 11,
+    color: "#D1D5DB",
+    fontFamily: "Inter_400Regular",
+    textAlign: "right",
+    writingDirection: "rtl",
+    lineHeight: 17,
+  },
+  nursingNoteRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 5,
+  },
+  nursingIcon: {
+    marginTop: 2,
+    flexShrink: 0,
+  },
+  nursingNoteText: {
+    fontSize: 11,
+    color: "#C4B5FD",
+    fontFamily: "Inter_400Regular",
+    flex: 1,
+    textAlign: "right",
+    writingDirection: "rtl",
+    lineHeight: 16,
+  },
   citation: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: 4,
     paddingHorizontal: 4,
   },
   citationText: {

@@ -21,6 +21,29 @@ Rule-based medication safety layer integrated into query pipeline (`services/dru
 
 Query response extended fields: `contraindications`, `interactions`, `nursing_notes`, `safety_alerts`, `rejected`, `rejection_reason`.
 
+## Mobile App — Real Backend Connection
+
+`artifacts/nursing-mobile/services/clinicalApi.ts` — full JWT-auth client calling:
+```
+https://${EXPO_PUBLIC_DOMAIN}/bnp-api → Clinical AI Engine (via Vite proxy)
+```
+- `queryEngine(question, weight?)` → full clinical response with safety fields
+- `checkEngineHealth()` → connectivity check
+- JWT auto-auth + re-auth on 401
+
+`MessageBubble.tsx` updated to display: safety alert banner, dose card, safety alerts list, contraindications, drug interactions, nursing notes (all Arabic RTL).
+
+`chat/[category].tsx` now calls real Clinical AI Engine instead of mock data.
+
+## Web App — Safety Sections in Chat UI
+
+`BNPResponseCard` in `ChatPage.tsx` now renders 4 new sections (after Safety Warning):
+- **Safety Alerts** — orange cards with SafetyEngine alert list
+- **Clinical Flags** — yellow cards with contraindications + drug interactions
+- **Nursing Notes** — violet cards with administration checklist
+
+Updated interfaces: `EngineQueryResponse` (clinicalApi.ts), `BNPResponse` (ClosedLoopRAGContext.tsx), `mapToBNP()` (BackendContext.tsx).
+
 ## Original Workspace Notes
 
 ## Stack

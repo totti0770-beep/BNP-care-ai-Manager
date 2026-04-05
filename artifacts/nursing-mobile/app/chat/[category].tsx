@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageBubble } from "@/components/MessageBubble";
 import { Category, Message, useApp } from "@/contexts/AppContext";
-import { getMockResponse } from "@/data/mockResponses";
+import { queryEngine } from "@/services/clinicalApi";
 
 const CATEGORY_CONFIG: Record<
   Category,
@@ -42,6 +42,11 @@ const CATEGORY_CONFIG: Record<
 
 function generateId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+}
+
+function extractWeight(text: string): number | undefined {
+  const m = text.match(/(\d+(?:\.\d+)?)\s*kg/i);
+  return m ? parseFloat(m[1]) : undefined;
 }
 
 export default function ChatScreen() {
@@ -73,20 +78,66 @@ export default function ChatScreen() {
       };
       addMessage(cat, userMsg);
 
-      await new Promise((resolve) =>
-        setTimeout(resolve, 800 + Math.random() * 700)
-      );
+      try {
+        const weight = extractWeight(text);
+        const result = await queryEngine(text, weight);
 
-      const { content, citation } = getMockResponse(cat, text);
-      const aiMsg: Message = {
-        id: generateId(),
-        role: "assistant",
-        content,
-        citation,
-        timestamp: new Date().toISOString(),
-      };
-      addMessage(cat, aiMsg);
-      setIsSending(false);
+        let aiMsg: Message;
+
+        if (!result) {
+          aiMsg = {
+            id: generateId(),
+            role: "assistant",
+            content: "تعذّر الاتصال بالمحرك السريري. يرجى المحاولة مرة أخرى.",
+            timestamp: new Date().toISOString(),
+          };
+        } else if (result.rejected) {
+          aiMsg = {
+            id: generateId(),
+            role: "assistant",
+            content: result.rejection_reason ?? "تم رفض الاستعلام من طبقة السلامة.",
+            timestamp: new Date().toISOString(),
+            rejected: true,
+            safetyAlert: true,
+            safetyAlerts: result.safety_alerts,
+          };
+        } else {
+          const firstCitation = result.citations[0];
+          aiMsg = {
+            id: generateId(),
+            role: "assistant",
+            content: result.answer,
+            timestamp: new Date().toISOString(),
+            dose: result.dose ?? undefined,
+            safetyAlert: result.safety_alert,
+            rejected: result.rejected,
+            safetyAlerts: result.safety_alerts?.length ? result.safety_alerts : undefined,
+            nursingNotes: result.nursing_notes?.length ? result.nursing_notes : undefined,
+            contraindications: result.contraindications?.length
+              ? result.contraindications
+              : undefined,
+            interactions: result.interactions?.length ? result.interactions : undefined,
+            citation: firstCitation
+              ? {
+                  source: firstCitation.document_name,
+                  page: firstCitation.page_number,
+                }
+              : undefined,
+          };
+        }
+
+        addMessage(cat, aiMsg);
+      } catch {
+        const errMsg: Message = {
+          id: generateId(),
+          role: "assistant",
+          content: "حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.",
+          timestamp: new Date().toISOString(),
+        };
+        addMessage(cat, errMsg);
+      } finally {
+        setIsSending(false);
+      }
     },
     [cat, addMessage]
   );
@@ -105,6 +156,13 @@ export default function ChatScreen() {
         content={item.content}
         citation={item.citation}
         accentColor={config.accentColor}
+        dose={item.dose}
+        safetyAlert={item.safetyAlert}
+        rejected={item.rejected}
+        safetyAlerts={item.safetyAlerts}
+        nursingNotes={item.nursingNotes}
+        contraindications={item.contraindications}
+        interactions={item.interactions}
       />
     ),
     [config.accentColor]
@@ -178,7 +236,7 @@ export default function ChatScreen() {
               isSending ? (
                 <View style={styles.typingIndicator}>
                   <ActivityIndicator size="small" color={config.accentColor} />
-                  <Text style={styles.typingText}>يكتب...</Text>
+                  <Text style={styles.typingText}>يعالج...</Text>
                 </View>
               ) : null
             }

@@ -21,6 +21,10 @@ export interface EngineQueryResponse {
   dose?: string | null;
   safety_warning?: string | null;
   safety_alert: boolean;
+  safety_alerts?: string[];
+  contraindications?: string[];
+  interactions?: string[];
+  nursing_notes?: string[];
   citations: Array<{
     document_name: string;
     page_number: number;

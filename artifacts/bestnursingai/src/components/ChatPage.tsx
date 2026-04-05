@@ -4,7 +4,8 @@ import { useClosedLoopRAG, BNPResponse, SYSTEM_NAME } from '@/contexts/ClosedLoo
 import { useBackend } from '@/contexts/BackendContext';
 import {
   Send, Bot, User, Shield, AlertTriangle, BookOpen,
-  Pill, Activity, ShieldAlert, Info, Zap,
+  Pill, Activity, ShieldAlert, Info, Zap, ClipboardList,
+  XCircle, ArrowLeftRight, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,6 +91,78 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
           <div className="px-4 py-3">
             <p className="text-red-200 text-sm leading-relaxed whitespace-pre-line">{bnp.safetyWarning}</p>
           </div>
+        </div>
+      )}
+
+      {/* Safety Alerts list */}
+      {bnp.safetyAlerts && bnp.safetyAlerts.length > 0 && (
+        <div className="rounded-xl bg-[#12122a] border border-orange-500/30 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-orange-600/10 border-b border-orange-500/20">
+            <ShieldAlert className="w-3.5 h-3.5 text-orange-400" />
+            <span className="text-orange-300 text-xs font-semibold uppercase tracking-wide">Safety Alerts</span>
+          </div>
+          <ul className="px-4 py-3 space-y-1.5">
+            {bnp.safetyAlerts.map((alert, i) => (
+              <li key={i} className="text-orange-200 text-sm leading-relaxed">{alert}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Contraindications & Interactions */}
+      {((bnp.contraindications && bnp.contraindications.length > 0) ||
+        (bnp.interactions && bnp.interactions.length > 0)) && (
+        <div className="rounded-xl bg-[#12122a] border border-yellow-500/20 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-yellow-600/10 border-b border-yellow-500/20">
+            <XCircle className="w-3.5 h-3.5 text-yellow-400" />
+            <span className="text-yellow-300 text-xs font-semibold uppercase tracking-wide">Clinical Flags</span>
+          </div>
+          <div className="px-4 py-3 space-y-3">
+            {bnp.contraindications && bnp.contraindications.length > 0 && (
+              <div>
+                <p className="text-yellow-400 text-xs font-semibold mb-1.5">Contraindications</p>
+                <ul className="space-y-0.5">
+                  {bnp.contraindications.map((c, i) => (
+                    <li key={i} className="text-gray-300 text-xs flex items-center gap-1.5">
+                      <span className="text-yellow-500">•</span> {c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {bnp.interactions && bnp.interactions.length > 0 && (
+              <div>
+                <p className="text-yellow-400 text-xs font-semibold mb-1.5 flex items-center gap-1">
+                  <ArrowLeftRight className="w-3 h-3" /> Drug Interactions
+                </p>
+                <ul className="space-y-0.5">
+                  {bnp.interactions.map((d, i) => (
+                    <li key={i} className="text-gray-300 text-xs flex items-center gap-1.5">
+                      <span className="text-yellow-500">⇄</span> {d}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Nursing Notes */}
+      {bnp.nursingNotes && bnp.nursingNotes.length > 0 && (
+        <div className="rounded-xl bg-[#12122a] border border-violet-500/20 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-violet-600/10 border-b border-violet-500/20">
+            <ClipboardList className="w-3.5 h-3.5 text-violet-400" />
+            <span className="text-violet-300 text-xs font-semibold uppercase tracking-wide">Nursing Notes</span>
+          </div>
+          <ul className="px-4 py-3 space-y-1.5">
+            {bnp.nursingNotes.map((note, i) => (
+              <li key={i} className="flex items-start gap-2 text-gray-300 text-xs leading-relaxed">
+                <CheckCircle2 className="w-3 h-3 text-violet-400 mt-0.5 flex-shrink-0" />
+                {note}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
