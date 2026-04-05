@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "javascript"]
+modules = ["nodejs-24", "javascript", "python-3.11"]
 
 [[artifacts]]
 id = "artifacts/api-server"
@@ -17,6 +17,27 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "artifacts/clinical-ai-engine: Clinical AI Engine"
+
+[[workflows.workflow]]
+name = "artifacts/clinical-ai-engine: Clinical AI Engine"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd artifacts/clinical-ai-engine && uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level info"
+waitForPort = 8000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
@@ -27,3 +48,9 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+packages = ["cargo", "freetype", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "libiconv", "libjpeg_turbo", "mupdf", "openjpeg", "rustc", "swig", "xcbuild"]
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "a7e539d7cfaa76152e8d5d72e9abb1a6e8d064c232ce40a142e5cd1a197388d1"

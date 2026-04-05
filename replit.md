@@ -133,6 +133,56 @@ Nursing AI Mobile — an Expo React Native app for clinical nursing AI assistant
 
 **Key packages:** `expo-local-authentication`, `@react-native-async-storage/async-storage`, `expo-haptics`, `react-native-keyboard-controller`
 
+### `artifacts/clinical-ai-engine` (Python FastAPI)
+
+Production-grade Clinical AI Engine — standalone Python FastAPI service running on port 8000.
+
+**Stack:** Python 3.11 · FastAPI · FAISS (vector DB) · PostgreSQL · LangChain · OpenAI GPT-4o
+
+**Architecture:**
+```
+routers/
+  auth.py        — JWT auth (register, login, /me, audit log)
+  documents.py   — PDF upload → extract → chunk → index in FAISS
+  query.py       — Main clinical query pipeline
+services/
+  pdf_processor.py       — PyMuPDF extraction + LangChain chunker (~500 tokens/chunk)
+  embeddings.py          — HybridRetriever: FAISS (semantic) + BM25 (keyword), 60/40 blend
+  clinical_router.py     — Classifies query → DRUG | PROTOCOL | GENERAL
+  drug_calculator.py     — Drug DB with mg/kg dose calculation and overdose thresholds
+  safety_layer.py        — Rejects low-confidence answers, enforces citation requirement
+  response_generator.py  — GPT-4o with BNP system prompt; fallback to RAG-only if no key
+models/
+  database.py    — psycopg2 PostgreSQL: bnp_users, bnp_documents, bnp_chunks, bnp_audit_log
+  schemas.py     — Pydantic models for all request/response types
+```
+
+**Key endpoints:**
+- `POST /auth/register` — create user
+- `POST /auth/login` → JWT token (24h)
+- `POST /documents/upload` — upload PDF (multipart), auto-indexes in FAISS
+- `GET  /documents/` — list indexed documents
+- `POST /query/` — hybrid RAG query → structured BNP response (Answer/Dose/Safety Warning/Sources)
+- `GET  /health` — service health + indexed chunk count
+- `GET  /docs` — Swagger UI (FastAPI auto-generated)
+
+**Security:** JWT HS256 (JWT_SECRET env var), SHA-256 password hashing (passlib sha256_crypt)
+
+**Response format (mandatory BNP format):**
+```
+Answer: [clinical answer sourced from indexed documents]
+Dose: [calculated dose if medication question]
+Safety Warning: [contraindications, overdose risks]
+Sources: [citations with document name, page number, relevance %]
+```
+
+**Environment vars:**
+- `DATABASE_URL` — PostgreSQL (auto-provided by Replit)
+- `JWT_SECRET` — random 64-char hex (auto-generated)
+- `OPENAI_API_KEY` — optional; enables GPT-4o response generation (fallback: RAG-only)
+
+**Workflow command:** `cd artifacts/clinical-ai-engine && uvicorn main:app --host 0.0.0.0 --port 8000 --reload`
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
