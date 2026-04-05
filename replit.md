@@ -95,17 +95,24 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 
 ### `artifacts/bestnursingai` (`@workspace/bestnursingai`)
 
-BestNursingAI — a full-featured nursing AI assistant web app. React+Vite, dark purple theme, frontend-only (no backend required).
+BestNursingAI — a full-featured nursing AI assistant web app. React+Vite, dark purple theme.
 
 **Features:**
 - Login screen with demo credentials (admin/user roles)
-- AI chat with closed-loop RAG (retrieval-augmented generation using in-memory vector store)
-- Secure document upload with digital signature verification (SHA-256 checksums)
+- AI chat connected to the real Clinical AI Engine (with local ClosedLoopRAG fallback)
+- Secure document upload with engine indexing + local verification (SHA-256 checksums)
 - Document management, citations, and official sources whitelist
 - Audit log with filtering and export
 - RAG settings (confidence threshold slider)
 - Settings page (profile, language, permissions, notifications, theme, user management)
 - Bilingual: English and Arabic with RTL support (i18next)
+
+**Backend Integration:**
+- Vite proxy: `/bnp-api/*` → `http://localhost:8000/*` (Clinical AI Engine)
+- `src/services/clinicalApi.ts` — typed API client with auto JWT auth and token refresh
+- `src/contexts/BackendContext.tsx` — React context providing `sendQuery`, `uploadToEngine`, `engineDocuments`
+- ChatPage uses the real engine when available; falls back to local ClosedLoopRAG automatically
+- Upload pages index PDFs into the real FAISS engine + record locally for UI display
 
 **Demo credentials:**
 - Admin: `admin@bestnursing.ai` / `admin123`
@@ -137,21 +144,22 @@ Nursing AI Mobile — an Expo React Native app for clinical nursing AI assistant
 
 Production-grade Clinical AI Engine — standalone Python FastAPI service running on port 8000.
 
-**Stack:** Python 3.11 · FastAPI · FAISS (vector DB) · PostgreSQL · LangChain · OpenAI GPT-4o
+**Stack:** Python 3.11 · FastAPI · LangChain Community · FAISS (LangChain wrapper) · BM25 · PostgreSQL · OpenAI GPT-4o
 
 **Architecture:**
 ```
 routers/
   auth.py        — JWT auth (register, login, /me, audit log)
-  documents.py   — PDF upload → extract → chunk → index in FAISS
+  documents.py   — PDF upload → PyPDFLoader → RecursiveCharacterTextSplitter → FAISS index
   query.py       — Main clinical query pipeline
 services/
-  pdf_processor.py       — PyMuPDF extraction + LangChain chunker (~500 tokens/chunk)
-  embeddings.py          — HybridRetriever: FAISS (semantic) + BM25 (keyword), 60/40 blend
+  pdf_processor.py       — LangChain PyPDFLoader + RecursiveCharacterTextSplitter (~500 chars/chunk)
+  embeddings.py          — HybridRetriever: LangChain FAISS + OpenAIEmbeddings (text-embedding-3-small)
+                           + BM25Okapi; 60% semantic / 40% keyword blend; FakeEmbeddings fallback
   clinical_router.py     — Classifies query → DRUG | PROTOCOL | GENERAL
   drug_calculator.py     — Drug DB with mg/kg dose calculation and overdose thresholds
   safety_layer.py        — Rejects low-confidence answers, enforces citation requirement
-  response_generator.py  — GPT-4o with BNP system prompt; fallback to RAG-only if no key
+  response_generator.py  — LangChain ChatOpenAI (GPT-4o) with BNP system prompt; RAG-only fallback
 models/
   database.py    — psycopg2 PostgreSQL: bnp_users, bnp_documents, bnp_chunks, bnp_audit_log
   schemas.py     — Pydantic models for all request/response types

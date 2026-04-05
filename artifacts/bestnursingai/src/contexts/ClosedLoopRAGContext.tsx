@@ -24,9 +24,10 @@ export interface BNPResponse {
   dose?: string;
   safetyWarning?: string;
   safetyAlert: boolean;
-  sources: { documentName: string; pageNumber: number; similarity: number }[];
+  sources: { documentName: string; pageNumber: number; similarity: number; excerpt?: string }[];
   confidenceLevel: number;
-  sessionId: string;
+  sessionId?: string;
+  queryType?: string;
   rejected: boolean;
   rejectionReason?: string;
   notFound: boolean;

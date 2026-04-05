@@ -1,16 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Upload, Search, Download, Trash2, Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { FileText, Upload, Search, Download, Trash2, Eye, CheckCircle, XCircle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useDocumentVerification } from '@/contexts/DocumentVerificationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBackend } from '@/contexts/BackendContext';
 
 const DocumentsPage: React.FC = () => {
   const { t } = useTranslation();
   const { verifiedDocuments, removeDocument, downloadDocument, verifyDocument } = useDocumentVerification();
   const { hasPermission } = useAuth();
+  const { isEngineAvailable, uploadToEngine, engineDocuments, removeFromEngine, indexedChunks } = useBackend();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,7 +31,17 @@ const DocumentsPage: React.FC = () => {
     }
 
     setIsUploading(true);
-    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    // Upload to engine if available
+    if (isEngineAvailable) {
+      const result = await uploadToEngine(file);
+      if (result) {
+        toast.success(`Indexed ${result.chunks} chunks into Clinical AI Engine`);
+      } else {
+        toast.error('Engine upload failed — saved locally only');
+      }
+    }
+
     await verifyDocument(file);
     setIsUploading(false);
   };

@@ -4,6 +4,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext';
 import { DocumentVerificationProvider } from '@/contexts/DocumentVerificationContext';
 import { AuditLogProvider } from '@/contexts/AuditLogContext';
 import { ClosedLoopRAGProvider } from '@/contexts/ClosedLoopRAGContext';
+import { BackendProvider } from '@/contexts/BackendContext';
 import { Toaster } from '@/components/ui/sonner';
 import LoginScreen from '@/components/LoginScreen';
 import Sidebar from '@/components/Sidebar';
@@ -74,17 +75,19 @@ function App() {
       <AuditLogProvider>
         <DocumentVerificationProvider>
           <ClosedLoopRAGProvider>
-            <AppContent />
-            <Toaster
-              position="top-center"
-              toastOptions={{
-                style: {
-                  background: '#1a1a2e',
-                  color: '#fff',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                },
-              }}
-            />
+            <BackendProvider>
+              <AppContent />
+              <Toaster
+                position="top-center"
+                toastOptions={{
+                  style: {
+                    background: '#1a1a2e',
+                    color: '#fff',
+                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                  },
+                }}
+              />
+            </BackendProvider>
           </ClosedLoopRAGProvider>
         </DocumentVerificationProvider>
       </AuditLogProvider>

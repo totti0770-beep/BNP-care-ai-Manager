@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDocumentVerification } from '@/contexts/DocumentVerificationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBackend } from '@/contexts/BackendContext';
 import {
   Shield,
   Upload,
@@ -12,6 +13,7 @@ import {
   Fingerprint,
   FileText,
   X,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +24,7 @@ const SecureUploadPage: React.FC = () => {
   const { t } = useTranslation();
   const { verifyDocument, officialSources, verifiedDocuments, removeDocument, downloadDocument } = useDocumentVerification();
   const { hasPermission } = useAuth();
+  const { isEngineAvailable, uploadToEngine } = useBackend();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -58,7 +61,18 @@ const SecureUploadPage: React.FC = () => {
   const handleUpload = async () => {
     if (!pendingFile) return;
     setIsVerifying(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Upload to engine first (real indexing)
+    if (isEngineAvailable) {
+      const result = await uploadToEngine(pendingFile);
+      if (result) {
+        toast.success(`Indexed ${result.chunks} chunks into Clinical AI Engine`);
+      } else {
+        toast.error('Engine upload failed — document saved locally only');
+      }
+    }
+
+    // Always also record locally (for UI display)
     await verifyDocument(pendingFile, signature);
     setIsVerifying(false);
     setSignature('');

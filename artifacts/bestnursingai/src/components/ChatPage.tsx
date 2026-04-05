@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useClosedLoopRAG, BNPResponse, SYSTEM_NAME } from '@/contexts/ClosedLoopRAGContext';
+import { useBackend } from '@/contexts/BackendContext';
 import {
   Send, Bot, User, Shield, AlertTriangle, BookOpen,
-  Pill, Activity, ShieldAlert, Info,
+  Pill, Activity, ShieldAlert, Info, Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,7 @@ interface Message {
   sender: 'user' | 'ai';
   timestamp: Date;
   bnp?: BNPResponse;
+  fromEngine?: boolean;
 }
 
 const SUGGESTED = [
@@ -26,7 +28,7 @@ const SUGGESTED = [
 ];
 
 // ── BNP structured response renderer ─────────────────────────────────────────
-function BNPResponseCard({ bnp }: { bnp: BNPResponse }) {
+function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: boolean }) {
   if (bnp.notFound) {
     return (
       <div className="flex items-start gap-2 mt-1 p-3 rounded-xl bg-yellow-600/10 border border-yellow-500/30">
@@ -38,6 +40,14 @@ function BNPResponseCard({ bnp }: { bnp: BNPResponse }) {
 
   return (
     <div className="space-y-3 mt-1">
+      {/* Engine badge */}
+      {fromEngine && (
+        <div className="flex items-center gap-1.5">
+          <Zap className="w-3 h-3 text-violet-400" />
+          <span className="text-violet-400 text-xs font-medium">Live Clinical Engine</span>
+        </div>
+      )}
+
       {/* Safety Alert banner */}
       {bnp.safetyAlert && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/40">
@@ -99,6 +109,9 @@ function BNPResponseCard({ bnp }: { bnp: BNPResponse }) {
                   <p className="text-gray-500 text-xs">
                     Page {src.pageNumber} · Relevance: {(src.similarity * 100).toFixed(0)}%
                   </p>
+                  {src.excerpt && (
+                    <p className="text-gray-600 text-xs mt-0.5 line-clamp-2 italic">"{src.excerpt}"</p>
+                  )}
                 </div>
               </div>
             ))}
@@ -132,6 +145,8 @@ function BNPResponseCard({ bnp }: { bnp: BNPResponse }) {
 const ChatPage: React.FC = () => {
   const { t } = useTranslation();
   const { generateResponse, confidenceThreshold } = useClosedLoopRAG();
+  const { isEngineAvailable, isChecking, indexedChunks, openaiEnabled, sendQuery } = useBackend();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -141,7 +156,7 @@ const ChatPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
     if (!text.trim() || isTyping) return;
 
     const userMsg: Message = {
@@ -154,18 +169,35 @@ const ChatPage: React.FC = () => {
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      const bnp = generateResponse(text.trim());
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        content: '',
-        sender: 'ai',
-        timestamp: new Date(),
-        bnp,
-      };
-      setMessages(prev => [...prev, aiMsg]);
-      setIsTyping(false);
-    }, 1200 + Math.random() * 600);
+    let bnp: BNPResponse;
+    let fromEngine = false;
+
+    if (isEngineAvailable) {
+      // Use real Clinical AI Engine
+      const engineResult = await sendQuery(text.trim());
+      if (engineResult) {
+        bnp = engineResult;
+        fromEngine = true;
+      } else {
+        // Engine call failed — fall back to local
+        bnp = generateResponse(text.trim());
+      }
+    } else {
+      // Local demo fallback
+      await new Promise(resolve => setTimeout(resolve, 1200 + Math.random() * 600));
+      bnp = generateResponse(text.trim());
+    }
+
+    const aiMsg: Message = {
+      id: (Date.now() + 1).toString(),
+      content: '',
+      sender: 'ai',
+      timestamp: new Date(),
+      bnp,
+      fromEngine,
+    };
+    setMessages(prev => [...prev, aiMsg]);
+    setIsTyping(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -174,6 +206,24 @@ const ChatPage: React.FC = () => {
       sendMessage(input);
     }
   };
+
+  // Engine status badge
+  const engineBadge = isChecking ? (
+    <span className="px-3 py-1 rounded-full bg-gray-600/20 text-gray-400 text-xs flex items-center gap-1">
+      <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
+      Connecting...
+    </span>
+  ) : isEngineAvailable ? (
+    <span className="px-3 py-1 rounded-full bg-violet-600/20 text-violet-300 text-xs flex items-center gap-1">
+      <Zap className="w-3 h-3" />
+      Live Engine · {indexedChunks} chunks{openaiEnabled ? ' · GPT-4o' : ''}
+    </span>
+  ) : (
+    <span className="px-3 py-1 rounded-full bg-green-600/20 text-green-400 text-xs flex items-center gap-1">
+      <Shield className="w-3 h-3" />
+      {t('offlineOnly')}
+    </span>
+  );
 
   return (
     <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] h-screen">
@@ -186,14 +236,13 @@ const ChatPage: React.FC = () => {
           </div>
           <div>
             <h2 className="text-white font-semibold">{SYSTEM_NAME}</h2>
-            <p className="text-gray-400 text-xs">Hospital-Grade · RAG-Only · Confidence ≥{(confidenceThreshold * 100).toFixed(0)}%</p>
+            <p className="text-gray-400 text-xs">
+              Hospital-Grade · RAG-Only · Confidence ≥{(confidenceThreshold * 100).toFixed(0)}%
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full bg-green-600/20 text-green-400 text-xs flex items-center gap-1">
-            <Shield className="w-3 h-3" />
-            {t('offlineOnly')}
-          </span>
+          {engineBadge}
         </div>
       </div>
 
@@ -205,8 +254,14 @@ const ChatPage: React.FC = () => {
               <Bot className="w-10 h-10 text-white" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-1">{SYSTEM_NAME}</h3>
-            <p className="text-gray-400 text-sm mb-1">Answers sourced exclusively from approved clinical documents</p>
-            <p className="text-gray-600 text-xs mb-6">Includes dose calculation · Safety warnings · Citation references</p>
+            <p className="text-gray-400 text-sm mb-1">
+              {isEngineAvailable
+                ? `Connected to Clinical AI Engine · ${indexedChunks} chunks indexed`
+                : 'Answers sourced exclusively from approved clinical documents'}
+            </p>
+            <p className="text-gray-600 text-xs mb-6">
+              Includes dose calculation · Safety warnings · Citation references
+            </p>
             <div className="flex flex-wrap justify-center gap-2 max-w-lg">
               {SUGGESTED.map((s) => (
                 <button
@@ -229,6 +284,8 @@ const ChatPage: React.FC = () => {
                   ? 'bg-gradient-to-br from-red-600 to-orange-600'
                   : msg.bnp?.notFound
                   ? 'bg-gradient-to-br from-yellow-600 to-orange-500'
+                  : msg.fromEngine
+                  ? 'bg-gradient-to-br from-violet-600 to-purple-700'
                   : 'bg-gradient-to-br from-gray-600 to-gray-700'
               }`}>
                 {msg.sender === 'user' ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-white" />}
@@ -240,7 +297,7 @@ const ChatPage: React.FC = () => {
                     <p className="text-sm">{msg.content}</p>
                   </div>
                 ) : (
-                  msg.bnp && <BNPResponseCard bnp={msg.bnp} />
+                  msg.bnp && <BNPResponseCard bnp={msg.bnp} fromEngine={msg.fromEngine} />
                 )}
                 <span className="text-xs text-gray-600 mt-1 px-1">
                   {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -253,7 +310,11 @@ const ChatPage: React.FC = () => {
         {/* Typing indicator */}
         {isTyping && (
           <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              isEngineAvailable
+                ? 'bg-gradient-to-br from-violet-600 to-purple-700'
+                : 'bg-gradient-to-br from-gray-600 to-gray-700'
+            }`}>
               <Bot className="w-4 h-4 text-white" />
             </div>
             <div className="bg-[#1a1a2e] rounded-2xl px-4 py-3 border border-purple-500/20">
@@ -261,7 +322,9 @@ const ChatPage: React.FC = () => {
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                <span className="text-gray-500 text-xs ml-2">Processing clinical context...</span>
+                <span className="text-gray-500 text-xs ml-2">
+                  {isEngineAvailable ? 'Querying Clinical AI Engine...' : 'Processing clinical context...'}
+                </span>
               </div>
             </div>
           </div>
