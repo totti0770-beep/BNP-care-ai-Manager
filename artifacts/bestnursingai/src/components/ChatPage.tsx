@@ -1,26 +1,134 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useClosedLoopRAG } from '@/contexts/ClosedLoopRAGContext';
-import { Send, Bot, User, Paperclip, Mic, Shield, AlertTriangle, BookOpen } from 'lucide-react';
+import { useClosedLoopRAG, BNPResponse, SYSTEM_NAME } from '@/contexts/ClosedLoopRAGContext';
+import {
+  Send, Bot, User, Shield, AlertTriangle, BookOpen,
+  Pill, Activity, ShieldAlert, Info,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
 
 interface Message {
   id: string;
   content: string;
   sender: 'user' | 'ai';
   timestamp: Date;
-  sources?: {
-    documentName: string;
-    pageNumber: number;
-    similarity: number;
-  }[];
-  confidenceLevel?: number;
-  rejected?: boolean;
-  rejectionReason?: string;
+  bnp?: BNPResponse;
 }
 
+const SUGGESTED = [
+  'What is the hand hygiene protocol?',
+  'Paracetamol dose for 70 kg adult',
+  'ICU vital signs monitoring protocol',
+  'Insulin double-check procedure',
+  'Fall prevention assessment steps',
+  'Morphine overdose antidote',
+];
+
+// ── BNP structured response renderer ─────────────────────────────────────────
+function BNPResponseCard({ bnp }: { bnp: BNPResponse }) {
+  if (bnp.notFound) {
+    return (
+      <div className="flex items-start gap-2 mt-1 p-3 rounded-xl bg-yellow-600/10 border border-yellow-500/30">
+        <Info className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+        <p className="text-yellow-200 text-sm">Not found in provided medical sources.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 mt-1">
+      {/* Safety Alert banner */}
+      {bnp.safetyAlert && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/40">
+          <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span className="text-red-300 text-xs font-semibold uppercase tracking-wide">Safety Alert Active</span>
+        </div>
+      )}
+
+      {/* Answer section */}
+      <div className="rounded-xl bg-[#12122a] border border-purple-500/20 overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-2 bg-purple-600/10 border-b border-purple-500/20">
+          <Activity className="w-3.5 h-3.5 text-purple-400" />
+          <span className="text-purple-300 text-xs font-semibold uppercase tracking-wide">Answer</span>
+        </div>
+        <div className="px-4 py-3">
+          <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line">{bnp.answer}</p>
+        </div>
+      </div>
+
+      {/* Dose section */}
+      {bnp.dose && (
+        <div className="rounded-xl bg-[#12122a] border border-cyan-500/20 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-cyan-600/10 border-b border-cyan-500/20">
+            <Pill className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-cyan-300 text-xs font-semibold uppercase tracking-wide">Dose</span>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line font-mono">{bnp.dose}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Safety Warning section */}
+      {bnp.safetyWarning && (
+        <div className="rounded-xl bg-[#12122a] border border-red-500/30 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-red-600/10 border-b border-red-500/20">
+            <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+            <span className="text-red-300 text-xs font-semibold uppercase tracking-wide">Safety Warning</span>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-red-200 text-sm leading-relaxed whitespace-pre-line">{bnp.safetyWarning}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Sources */}
+      {bnp.sources.length > 0 && (
+        <div className="rounded-xl bg-[#12122a] border border-green-500/20 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-green-600/10 border-b border-green-500/20">
+            <BookOpen className="w-3.5 h-3.5 text-green-400" />
+            <span className="text-green-300 text-xs font-semibold uppercase tracking-wide">Sources</span>
+          </div>
+          <div className="px-4 py-3 space-y-1.5">
+            {bnp.sources.map((src, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span className="text-green-500 text-xs mt-0.5">[{i + 1}]</span>
+                <div>
+                  <p className="text-gray-300 text-xs">{src.documentName}</p>
+                  <p className="text-gray-500 text-xs">
+                    Page {src.pageNumber} · Relevance: {(src.similarity * 100).toFixed(0)}%
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Confidence */}
+      <div className="flex items-center gap-2 px-1">
+        <div className="h-1 flex-1 rounded-full bg-gray-800">
+          <div
+            className={`h-1 rounded-full transition-all ${
+              bnp.confidenceLevel >= 0.7 ? 'bg-green-500' :
+              bnp.confidenceLevel >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'
+            }`}
+            style={{ width: `${Math.min(bnp.confidenceLevel * 100, 100)}%` }}
+          />
+        </div>
+        <span className={`text-xs font-medium ${
+          bnp.confidenceLevel >= 0.7 ? 'text-green-400' :
+          bnp.confidenceLevel >= 0.5 ? 'text-yellow-400' : 'text-red-400'
+        }`}>
+          {(bnp.confidenceLevel * 100).toFixed(0)}% confidence
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 const ChatPage: React.FC = () => {
   const { t } = useTranslation();
   const { generateResponse, confidenceThreshold } = useClosedLoopRAG();
@@ -29,68 +137,56 @@ const ChatPage: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const sendMessage = (text: string) => {
+    if (!text.trim() || isTyping) return;
 
-    const userMessage: Message = {
+    const userMsg: Message = {
       id: Date.now().toString(),
-      content: input,
+      content: text.trim(),
       sender: 'user',
       timestamp: new Date(),
     };
-
-    setMessages([...messages, userMessage]);
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
 
     setTimeout(() => {
-      const response = generateResponse(input);
-
-      const aiMessage: Message = {
+      const bnp = generateResponse(text.trim());
+      const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
-        content: response.rejected ? t('insufficientContext') : response.answer,
+        content: '',
         sender: 'ai',
         timestamp: new Date(),
-        sources: response.sources,
-        confidenceLevel: response.confidenceLevel,
-        rejected: response.rejected,
-        rejectionReason: response.rejectionReason,
+        bnp,
       };
-
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages(prev => [...prev, aiMsg]);
       setIsTyping(false);
-
-      if (response.rejected) {
-        toast.warning(t('insufficientContext'));
-      }
-    }, 1500);
+    }, 1200 + Math.random() * 600);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      sendMessage(input);
     }
   };
 
   return (
     <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] h-screen">
+
+      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-purple-500/20">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-white font-semibold">Nursing AI Assistant</h2>
-            <p className="text-gray-400 text-sm">{t('closedLoopRAG')} • {t('confidence')}: {(confidenceThreshold * 100).toFixed(0)}%</p>
+            <h2 className="text-white font-semibold">{SYSTEM_NAME}</h2>
+            <p className="text-gray-400 text-xs">Hospital-Grade · RAG-Only · Confidence ≥{(confidenceThreshold * 100).toFixed(0)}%</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -101,89 +197,71 @@ const ChatPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center mb-4">
               <Bot className="w-10 h-10 text-white" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">{t('howCanIHelp')}</h3>
-            <p className="text-gray-400 max-w-md mb-6">{t('askNursingQuestion')}</p>
+            <h3 className="text-xl font-semibold text-white mb-1">{SYSTEM_NAME}</h3>
+            <p className="text-gray-400 text-sm mb-1">Answers sourced exclusively from approved clinical documents</p>
+            <p className="text-gray-600 text-xs mb-6">Includes dose calculation · Safety warnings · Citation references</p>
             <div className="flex flex-wrap justify-center gap-2 max-w-lg">
-              {[t('medicationProtocols'), t('patientSafety'), t('infectionControl'), t('criticalCare')].map((label) => (
-                <span key={label} className="px-3 py-1.5 rounded-full bg-[#1a1a2e] border border-purple-500/30 text-gray-400 text-sm cursor-pointer hover:border-purple-500/60 transition-colors" onClick={() => setInput(label)}>
-                  {label}
-                </span>
+              {SUGGESTED.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => sendMessage(s)}
+                  className="px-3 py-1.5 rounded-full bg-[#1a1a2e] border border-purple-500/30 text-gray-400 text-sm hover:border-purple-500/60 hover:text-gray-200 transition-all"
+                >
+                  {s}
+                </button>
               ))}
             </div>
           </div>
         ) : (
-          messages.map((message) => (
-            <div key={message.id} className={`flex gap-3 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                message.sender === 'user'
+          messages.map((msg) => (
+            <div key={msg.id} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                msg.sender === 'user'
                   ? 'bg-gradient-to-br from-purple-500 to-violet-600'
-                  : message.rejected
-                  ? 'bg-gradient-to-br from-yellow-500 to-orange-600'
+                  : msg.bnp?.safetyAlert
+                  ? 'bg-gradient-to-br from-red-600 to-orange-600'
+                  : msg.bnp?.notFound
+                  ? 'bg-gradient-to-br from-yellow-600 to-orange-500'
                   : 'bg-gradient-to-br from-gray-600 to-gray-700'
               }`}>
-                {message.sender === 'user' ? (
-                  <User className="w-4 h-4 text-white" />
-                ) : message.rejected ? (
-                  <AlertTriangle className="w-4 h-4 text-white" />
-                ) : (
-                  <Bot className="w-4 h-4 text-white" />
-                )}
+                {msg.sender === 'user' ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-white" />}
               </div>
-              <div className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                message.sender === 'user'
-                  ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white'
-                  : message.rejected
-                  ? 'bg-yellow-600/20 text-yellow-200 border border-yellow-500/30'
-                  : 'bg-[#1a1a2e] text-gray-200 border border-purple-500/20'
-              }`}>
-                <p>{message.content}</p>
 
-                {!message.rejected && message.sources && message.sources.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-purple-500/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <BookOpen className="w-4 h-4 text-purple-400" />
-                      <span className="text-xs text-purple-400">{t('sources')}</span>
-                    </div>
-                    {message.sources.map((source, idx) => (
-                      <div key={idx} className="text-xs text-gray-400 mb-1">
-                        • {source.documentName} ({t('page')} {source.pageNumber}) - {(source.similarity * 100).toFixed(1)}%
-                      </div>
-                    ))}
-                    {message.confidenceLevel && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="text-xs text-gray-500">{t('confidence')}:</span>
-                        <span className={`text-xs font-medium ${
-                          message.confidenceLevel >= 0.8 ? 'text-green-400' :
-                          message.confidenceLevel >= 0.6 ? 'text-yellow-400' : 'text-red-400'
-                        }`}>
-                          {(message.confidenceLevel * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                    )}
+              <div className={`max-w-[78%] ${msg.sender === 'user' ? 'items-end' : 'items-start'} flex flex-col`}>
+                {msg.sender === 'user' ? (
+                  <div className="bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-2xl rounded-tr-sm px-4 py-3">
+                    <p className="text-sm">{msg.content}</p>
                   </div>
+                ) : (
+                  msg.bnp && <BNPResponseCard bnp={msg.bnp} />
                 )}
-
-                <span className="text-xs opacity-50 mt-2 block">{message.timestamp.toLocaleTimeString()}</span>
+                <span className="text-xs text-gray-600 mt-1 px-1">
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
             </div>
           ))
         )}
+
+        {/* Typing indicator */}
         {isTyping && (
           <div className="flex gap-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center">
               <Bot className="w-4 h-4 text-white" />
             </div>
             <div className="bg-[#1a1a2e] rounded-2xl px-4 py-3 border border-purple-500/20">
-              <div className="flex gap-1">
+              <div className="flex gap-1 items-center">
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="text-gray-500 text-xs ml-2">Processing clinical context...</span>
               </div>
             </div>
           </div>
@@ -191,31 +269,27 @@ const ChatPage: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Input */}
       <div className="p-4 border-t border-purple-500/20">
         <div className="flex items-center gap-2 bg-[#1a1a2e] rounded-xl border border-purple-500/30 p-2">
-          <button className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors">
-            <Paperclip className="w-5 h-5 text-gray-400" />
-          </button>
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder={t('typeMessage')}
-            className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-500 focus-visible:ring-0 shadow-none"
+            onKeyDown={handleKeyDown}
+            placeholder="Ask a clinical question... (include patient weight for dose calculation)"
+            className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-500 focus-visible:ring-0 shadow-none text-sm"
+            disabled={isTyping}
           />
-          <button className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors">
-            <Mic className="w-5 h-5 text-gray-400" />
-          </button>
           <Button
-            onClick={handleSend}
-            disabled={!input.trim()}
+            onClick={() => sendMessage(input)}
+            disabled={!input.trim() || isTyping}
             className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white px-4"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4" />
           </Button>
         </div>
-        <p className="text-center text-gray-500 text-xs mt-2">
-          {t('closedLoopRAG')} • {t('officialOnlyFilter')} • {t('contextRejection')}
+        <p className="text-center text-gray-600 text-xs mt-2">
+          {SYSTEM_NAME} · RAG-Only · No Hallucination · Sources Always Cited
         </p>
       </div>
     </div>
