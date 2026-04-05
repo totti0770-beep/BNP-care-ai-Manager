@@ -1,0 +1,252 @@
+# BNP Clinical AI Engine — Safety-First Upgrade (Medication Safety Engine)
+
+# FastAPI + FAISS + Rule-Based Safety + Structured Clinical Output
+
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional, Dict
+import uvicorn
+import os
+
+# === AI / RAG ===
+
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import FAISS
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.document_loaders import PyPDFLoader
+from langchain.chat_models import ChatOpenAI
+
+# === Security ===
+
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+app = FastAPI(title="BNP Clinical AI Engine — Safety Edition")
+
+# ================= CONFIG =================
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DB_PATH = "faiss_index"
+
+# ================= SECURITY =================
+
+security = HTTPBearer()
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+if credentials.credentials != "securetoken":
+raise HTTPException(status_code=403, detail="Invalid token")
+return credentials.credentials
+
+# ================= EMBEDDINGS =================
+
+embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+
+if os.path.exists(DB_PATH):
+vectorstore = FAISS.load_local(DB_PATH, embeddings)
+else:
+vectorstore = None
+
+# ================= DRUG SAFETY DATABASE (MVP) =================
+
+# NOTE: Replace with real verified datasets (BNF/FDA) in production
+
+DRUG_DB: Dict[str, Dict] = {
+"heparin": {
+"dose_per_kg": 0.7,
+"max_dose": 5000,
+"frequency": "q8-12h",
+"contraindications": ["active bleeding", "severe thrombocytopenia"],
+"interactions": ["warfarin", "aspirin"],
+"high_risk": True
+},
+"paracetamol": {
+"dose_per_kg": 15,
+"max_dose": 4000,
+"frequency": "q6h",
+"contraindications": ["severe liver disease"],
+"interactions": [],
+"high_risk": False
+}
+}
+
+# ================= MODELS =================
+
+class QueryRequest(BaseModel):
+question: str
+weight: Optional[float] = None
+age: Optional[int] = None
+drug_name: Optional[str] = None
+other_drugs: Optional[List[str]] = []
+conditions: Optional[List[str]] = []
+
+class ClinicalResponse(BaseModel):
+answer: str
+dose: Optional[str]
+indication: Optional[str]
+contraindications: List[str]
+interactions: List[str]
+nursing_notes: List[str]
+safety_alerts: List[str]
+confidence: str
+sources: List[str]
+
+# ================= DOCUMENT UPLOAD =================
+
+@app.post("/upload")
+async def upload_pdf(file: UploadFile = File(...), token: str = Depends(verify_token)):
+filepath = f"temp_{file.filename}"
+with open(filepath, "wb") as f:
+f.write(await file.read())
+
+```
+loader = PyPDFLoader(filepath)
+docs = loader.load()
+
+splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+chunks = splitter.split_documents(docs)
+
+global vectorstore
+
+if vectorstore is None:
+    vectorstore = FAISS.from_documents(chunks, embeddings)
+else:
+    vectorstore.add_documents(chunks)
+
+vectorstore.save_local(DB_PATH)
+
+return {"message": "PDF processed and stored."}
+```
+
+# ================= INTENT DETECTION =================
+
+def detect_intent(q: str):
+ql = q.lower()
+if any(w in ql for w in ["dose", "جرعة", "mg", "ml"]):
+return "drug"
+if any(w in ql for w in ["protocol", "sepsis", "icu"]):
+return "protocol"
+return "general"
+
+# ================= SAFETY ENGINE =================
+
+class SafetyEngine:
+@staticmethod
+def calculate_dose(drug: str, weight: float):
+if drug not in DRUG_DB:
+return None, []
+d = DRUG_DB[drug]
+dose = d["dose_per_kg"] * weight
+alerts = []
+if dose > d["max_dose"]:
+alerts.append("🚨 OVERDOSE: exceeds maximum safe dose")
+return dose, alerts
+
+```
+@staticmethod
+def check_contraindications(drug: str, conditions: List[str]):
+    alerts = []
+    if drug not in DRUG_DB:
+        return alerts
+    for c in conditions or []:
+        if c.lower() in [x.lower() for x in DRUG_DB[drug]["contraindications"]]:
+            alerts.append(f"⚠️ Contraindication: {c}")
+    return alerts
+
+@staticmethod
+def check_interactions(drug: str, other_drugs: List[str]):
+    alerts = []
+    if drug not in DRUG_DB:
+        return alerts
+    for od in other_drugs or []:
+        if od.lower() in [x.lower() for x in DRUG_DB[drug]["interactions"]]:
+            alerts.append(f"⚠️ Interaction with {od}")
+    return alerts
+
+@staticmethod
+def high_risk_flag(drug: str):
+    if drug in DRUG_DB and DRUG_DB[drug]["high_risk"]:
+        return ["🔴 High Risk Medication"]
+    return []
+```
+
+# ================= QUERY =================
+
+@app.post("/query", response_model=ClinicalResponse)
+async def query_ai(req: QueryRequest, token: str = Depends(verify_token)):
+if vectorstore is None:
+raise HTTPException(status_code=400, detail="No documents uploaded")
+
+```
+docs = vectorstore.similarity_search(req.question, k=5)
+context = "\n".join([d.page_content for d in docs])
+
+intent = detect_intent(req.question)
+llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, temperature=0)
+
+system_prompt = """
+```
+
+You are BNP Clinical AI Engine.
+
+* Answer ONLY from context
+* If missing data say: Insufficient clinical data
+* Always be concise and clinical
+  """
+
+  user_prompt = f"Context:\n{context}\nQuestion:\n{req.question}"
+
+  answer = llm.predict(system_prompt + user_prompt)
+
+  # ===== SAFETY =====
+
+  safety_alerts = []
+  dose_text = None
+  contraindications = []
+  interactions = []
+  nursing_notes = []
+
+  if intent == "drug" and req.drug_name and req.weight:
+  dose, alerts = SafetyEngine.calculate_dose(req.drug_name.lower(), req.weight)
+  if dose is not None:
+  dose_text = f"{dose} mg"
+  safety_alerts += alerts
+
+  ```
+    safety_alerts += SafetyEngine.high_risk_flag(req.drug_name.lower())
+    safety_alerts += SafetyEngine.check_contraindications(req.drug_name.lower(), req.conditions)
+    safety_alerts += SafetyEngine.check_interactions(req.drug_name.lower(), req.other_drugs)
+
+    contraindications = DRUG_DB.get(req.drug_name.lower(), {}).get("contraindications", [])
+    interactions = DRUG_DB.get(req.drug_name.lower(), {}).get("interactions", [])
+
+    nursing_notes.append("Verify patient identity before administration")
+    nursing_notes.append("Double-check dosage and route")
+
+    # HARD BLOCK
+    if any("OVERDOSE" in a for a in safety_alerts):
+        answer = "❌ Unsafe dosage detected. Administration blocked."
+  ```
+
+  confidence = "High" if len(docs) >= 3 else "Medium"
+
+  return ClinicalResponse(
+  answer=answer,
+  dose=dose_text,
+  indication=None,
+  contraindications=contraindications,
+  interactions=interactions,
+  nursing_notes=nursing_notes,
+  safety_alerts=safety_alerts,
+  confidence=confidence,
+  sources=[f"doc_{i}" for i in range(len(docs))]
+  )
+
+# ================= HEALTH =================
+
+@app.get("/")
+def root():
+return {"status": "BNP Safety Engine Running"}
+
+# ================= RUN =================
+
+if **name** == "**main**":
+uvicorn.run(app, host="0.0.0.0", port=8000)
