@@ -123,6 +123,68 @@ export interface ClinicalQueryResponse {
   context_validation?: string | null;
 }
 
+// ── Drug Calculator result type ───────────────────────────────────────────────
+
+export interface DrugCalcResult {
+  answer: string;
+  dose?: string;
+  indication?: string;
+  safetyAlert: boolean;
+  confidenceLabel?: "High" | "Medium" | "Low";
+  rejected: boolean;
+  rejectionReason?: string;
+  safetyAlerts: string[];
+  contraindications: string[];
+  nursingNotes: string[];
+  contextValidation?: string;
+  source?: string;
+}
+
+export async function calculateDrug(
+  drugName: string,
+  patientWeightKg?: number
+): Promise<DrugCalcResult | null> {
+  try {
+    const question = patientWeightKg
+      ? `What is the dose of ${drugName} for a patient weighing ${patientWeightKg} kg?`
+      : `What is the dose and indication of ${drugName}?`;
+
+    const res = await authFetch("/query/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question,
+        drug_name: drugName,
+        patient_weight_kg: patientWeightKg ?? null,
+        top_k: 5,
+      }),
+    });
+    if (!res || !res.ok) return null;
+    const data: ClinicalQueryResponse = await res.json();
+
+    const topCitation = data.citations?.[0];
+
+    return {
+      answer: data.answer,
+      dose: data.dose ?? undefined,
+      indication: data.indication ?? undefined,
+      safetyAlert: data.safety_alert,
+      confidenceLabel: data.confidence_label,
+      rejected: data.rejected,
+      rejectionReason: data.rejection_reason ?? undefined,
+      safetyAlerts: data.safety_alerts ?? [],
+      contraindications: data.contraindications ?? [],
+      nursingNotes: data.nursing_notes ?? [],
+      contextValidation: data.context_validation ?? undefined,
+      source: topCitation
+        ? `${topCitation.document_name} — ص ${topCitation.page_number}`
+        : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function queryEngine(
   question: string,
   patientWeightKg?: number

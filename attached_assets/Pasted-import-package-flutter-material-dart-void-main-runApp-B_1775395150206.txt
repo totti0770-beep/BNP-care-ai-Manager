@@ -1,0 +1,178 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(BNPApp());
+}
+
+class BNPApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'BNP Nursing Assistant',
+      theme: ThemeData(
+        primarySwatch: Colors.teal,
+        brightness: Brightness.light,
+      ),
+      home: HomeScreen(),
+    );
+  }
+}
+
+class HomeScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('BNP Nursing Assistant'),
+      ),
+      body: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TileButton(
+              title: 'Drug Assistant',
+              color: Colors.redAccent,
+              icon: Icons.local_hospital,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => DrugAssistantScreen()));
+              },
+            ),
+            SizedBox(height: 16),
+            TileButton(
+              title: 'Protocols',
+              color: Colors.blueAccent,
+              icon: Icons.description,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => ProtocolsScreen()));
+              },
+            ),
+            SizedBox(height: 16),
+            TileButton(
+              title: 'Ask AI',
+              color: Colors.green,
+              icon: Icons.smart_toy,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => AIQueryScreen()));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class TileButton extends StatelessWidget {
+  final String title;
+  final Color color;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  TileButton({required this.title, required this.color, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(2, 2))],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 36),
+            SizedBox(width: 16),
+            Text(
+              title,
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =================== DRUG ASSISTANT SCREEN ===================
+class DrugAssistantScreen extends StatefulWidget {
+  @override
+  _DrugAssistantScreenState createState() => _DrugAssistantScreenState();
+}
+
+class _DrugAssistantScreenState extends State<DrugAssistantScreen> {
+  final TextEditingController drugController = TextEditingController();
+  final TextEditingController weightController = TextEditingController();
+  List<String> safetyAlerts = [];
+  String doseResult = '';
+
+  void calculateDose() {
+    // هنا يتم الربط مع Safety Engine Backend عبر API
+    setState(() {
+      double weight = double.tryParse(weightController.text) ?? 0;
+      if (drugController.text.toLowerCase() == 'heparin') {
+        double dose = weight * 0.7;
+        doseResult = '$dose mg';
+        safetyAlerts = ['🚨 Overdose check enabled', '⚠️ High Risk Drug'];
+        if (dose > 5000) {
+          safetyAlerts.add('❌ Dose exceeds maximum limit');
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Drug Assistant')),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: drugController,
+              decoration: InputDecoration(labelText: 'Drug Name'),
+            ),
+            TextField(
+              controller: weightController,
+              decoration: InputDecoration(labelText: 'Patient Weight (kg)'),
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(onPressed: calculateDose, child: Text('Calculate Dose')),
+            SizedBox(height: 20),
+            if (doseResult.isNotEmpty)
+              Text('Dose: $doseResult', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 10),
+            ...safetyAlerts.map((alert) => Text(alert, style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =================== PROTOCOLS SCREEN ===================
+class ProtocolsScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Protocols')),
+      body: Center(child: Text('Protocol summaries will appear here.')), // لاحقًا API integration
+    );
+  }
+}
+
+// =================== AI QUERY SCREEN ===================
+class AIQueryScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Ask AI')),
+      body: Center(child: Text('AI query interface with structured clinical output.')), // لاحقًا API integration
+    );
+  }
+}

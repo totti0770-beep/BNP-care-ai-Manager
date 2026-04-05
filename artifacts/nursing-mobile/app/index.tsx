@@ -75,6 +75,26 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Drug Assistant — featured card */}
+        <Pressable
+          style={styles.drugAssistantCard}
+          onPress={() => router.push("/drug-assistant")}
+        >
+          <View style={styles.drugAssistantLeft}>
+            <View style={styles.drugAssistantIcon}>
+              <Ionicons name="medical" size={24} color="#F97316" />
+            </View>
+            <View>
+              <Text style={styles.drugAssistantTitle}>حاسبة الجرعات</Text>
+              <Text style={styles.drugAssistantSub}>Drug Dose Calculator</Text>
+            </View>
+          </View>
+          <View style={styles.drugAssistantRight}>
+            <Text style={styles.drugAssistantBadge}>جديد</Text>
+            <Ionicons name="chevron-back" size={18} color="#F97316" />
+          </View>
+        </Pressable>
+
         <Text style={styles.sectionTitle}>اختر التصنيف</Text>
         <Text style={styles.sectionSubtitle}>
           اختر الفئة للحصول على إجابات مستندة إلى مصادر معتمدة
@@ -184,6 +204,58 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     marginBottom: 24,
     lineHeight: 20,
+  },
+  drugAssistantCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#1A1208",
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#F9731633",
+    marginBottom: 24,
+  },
+  drugAssistantLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  drugAssistantIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F9731622",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  drugAssistantTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "#F8FAFC",
+    textAlign: "right",
+  },
+  drugAssistantSub: {
+    fontSize: 11,
+    color: "#F97316",
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
+  },
+  drugAssistantRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  drugAssistantBadge: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    color: "#F97316",
+    backgroundColor: "#F9731622",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#F9731644",
   },
   infoCard: {
     flexDirection: "row",

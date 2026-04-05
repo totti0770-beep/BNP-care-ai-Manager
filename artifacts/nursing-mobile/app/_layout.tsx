@@ -26,6 +26,7 @@ function RootLayoutNav() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="chat/[category]" options={{ headerShown: false }} />
       <Stack.Screen name="admin" options={{ headerShown: false }} />
+      <Stack.Screen name="drug-assistant" options={{ headerShown: false }} />
     </Stack>
   );
 }
