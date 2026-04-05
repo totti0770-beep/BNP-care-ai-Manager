@@ -121,24 +121,38 @@ def generate_response(
 ) -> str:
     """
     Generate fully structured 6-section clinical response via GPT-4o.
-    Falls back to RAG-only if no API key.
+    Prefers Replit AI Integration proxy; falls back to user OPENAI_API_KEY; then RAG-only.
     """
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    # Prefer Replit AI Integration (no scope restrictions)
+    ai_base_url = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "").strip()
+    ai_api_key  = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "").strip()
 
-    if not api_key:
-        logger.info("OPENAI_API_KEY not set — using RAG-only fallback")
-        return _rag_only_response(chunks)
+    # Fall back to user-provided key (direct OpenAI)
+    if not (ai_base_url and ai_api_key):
+        direct_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if not direct_key:
+            logger.info("No OpenAI credentials — using RAG-only fallback")
+            return _rag_only_response(chunks)
+        ai_api_key = direct_key
+        ai_base_url = None  # use default OpenAI endpoint
 
     try:
         from langchain_openai import ChatOpenAI
         from langchain_core.messages import SystemMessage, HumanMessage
 
-        llm = ChatOpenAI(
+        init_kwargs = dict(
             model="gpt-4o",
-            openai_api_key=api_key,
+            openai_api_key=ai_api_key,
             temperature=0,
             max_tokens=1400,
         )
+        if ai_base_url:
+            init_kwargs["openai_api_base"] = ai_base_url
+            logger.info("Using Replit AI Integration proxy for GPT-4o")
+        else:
+            logger.info("Using direct OPENAI_API_KEY for GPT-4o")
+
+        llm = ChatOpenAI(**init_kwargs)
 
         context_block = _build_context(chunks)
         doc_count = len(set(c["document_name"] for c in chunks))
