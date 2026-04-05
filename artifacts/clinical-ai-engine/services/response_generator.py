@@ -1,6 +1,6 @@
 """
-Response Generator — uses OpenAI GPT with the BNP Clinical AI Engine system prompt.
-Falls back to structured RAG-only response if no API key is set.
+Response Generator — LangChain ChatOpenAI with BNP Clinical AI Engine system prompt.
+Falls back to structured RAG-only response if OPENAI_API_KEY is not set.
 """
 import os
 import logging
@@ -9,36 +9,37 @@ from models.schemas import QueryType, Citation
 
 logger = logging.getLogger(__name__)
 
+# ── BNP System Prompt (injected into every GPT call) ─────────────────────────
 BNP_SYSTEM_PROMPT = """You are BNP Clinical AI Engine, a hospital-grade nursing assistant.
 
 STRICT RULES:
-- You MUST answer ONLY from the provided RAG context below. Do NOT use any outside knowledge.
-- If the answer is NOT in the context, say exactly: "Not found in provided medical sources."
-- Always include citations referencing the source documents.
-- NEVER hallucinate, speculate, or add information not present in the context.
-- Always be precise, clinically accurate, and concise.
+- Answer ONLY from the RAG context provided below. Do NOT use outside knowledge.
+- If the answer is NOT in the context, respond exactly: "Not found in provided medical sources."
+- Always cite the source document name and page number.
+- NEVER hallucinate, speculate, or add information absent from the context.
+- Be precise, clinically accurate, and concise.
 
 CLINICAL BEHAVIOR:
-- Medication questions → provide safe dosage range, calculate dose if weight provided, add overdose warnings.
-- Protocol questions → summarize step-by-step, highlight critical actions with emphasis.
-- Risk questions → add a SAFETY WARNING section.
+- Medication questions → provide safe dosage range, calculate dose if weight is given, add overdose warnings.
+- Protocol questions → summarize step-by-step, highlight critical actions.
+- Risk / emergency questions → add a clearly labeled SAFETY WARNING section.
 
-OUTPUT FORMAT (MANDATORY — use this exact structure):
+MANDATORY OUTPUT FORMAT — always use this exact structure:
 
 Answer:
-[clear, direct clinical answer sourced from context]
+[direct clinical answer sourced exclusively from context]
 
 Dose (if applicable):
-[dose calculation or safe range — only if medication question]
+[dose calculation or safe range — medication questions only]
 
 Safety Warning:
-[contraindications, overdose risks, critical precautions — only if relevant]
+[contraindications, overdose risks, critical precautions — if relevant]
 
 Sources:
-[cite each source document with name and page number]"""
+[list each source: document name — Page X]"""
 
 
-def _build_context_block(chunks: List[dict]) -> str:
+def _build_context(chunks: List[dict]) -> str:
     if not chunks:
         return "No relevant context found in the knowledge base."
     parts = []
@@ -50,20 +51,21 @@ def _build_context_block(chunks: List[dict]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-def _fallback_response(chunks: List[dict], query_type: QueryType, question: str) -> str:
+def _rag_only_response(chunks: List[dict]) -> str:
     """Structured response without GPT — pure RAG extraction."""
     if not chunks:
         return "Not found in provided medical sources."
 
     top = chunks[0]
-    answer = f"Answer:\n{top['content']}"
-
-    if len(chunks) > 1:
-        answer += f"\n\nSources:\n"
-        for i, c in enumerate(chunks, 1):
-            answer += f"[{i}] {c['document_name']} — Page {c['page_number']}\n"
-
-    return answer
+    lines = [
+        "Answer:",
+        top["content"],
+        "",
+        "Sources:",
+    ]
+    for i, c in enumerate(chunks, 1):
+        lines.append(f"[{i}] {c['document_name']} — Page {c['page_number']}")
+    return "\n".join(lines)
 
 
 def generate_response(
@@ -73,48 +75,51 @@ def generate_response(
     citations: List[Citation],
 ) -> str:
     """
-    Generate a structured clinical response.
-    Uses OpenAI if OPENAI_API_KEY is set, otherwise returns structured RAG-only response.
+    Generate structured clinical response via LangChain ChatOpenAI.
+    Falls back to RAG-only if no API key is available.
     """
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
     if not api_key:
-        logger.info("OPENAI_API_KEY not set — using fallback RAG-only response")
-        return _fallback_response(chunks, query_type, question)
+        logger.info("OPENAI_API_KEY not set — using RAG-only fallback")
+        return _rag_only_response(chunks)
 
     try:
-        from openai import OpenAI
+        from langchain_openai import ChatOpenAI
+        from langchain_core.messages import SystemMessage, HumanMessage
 
-        client = OpenAI(api_key=api_key)
-        context_block = _build_context_block(chunks)
+        llm = ChatOpenAI(
+            model="gpt-4o",
+            openai_api_key=api_key,
+            temperature=0,              # Maximum determinism for clinical accuracy
+            max_tokens=1024,
+        )
 
-        user_message = (
+        context_block = _build_context(chunks)
+
+        user_content = (
             f"RAG CONTEXT:\n{context_block}\n\n"
             f"CLINICAL QUESTION: {question}\n\n"
             f"Query Type: {query_type.value.upper()}\n\n"
-            "Answer following the mandatory output format."
+            "Answer using the mandatory BNP output format."
         )
 
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": BNP_SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-            max_tokens=1024,
-            temperature=0.1,    # Low temperature for clinical accuracy
-        )
+        messages = [
+            SystemMessage(content=BNP_SYSTEM_PROMPT),
+            HumanMessage(content=user_content),
+        ]
 
-        return response.choices[0].message.content or _fallback_response(chunks, query_type, question)
+        response = llm.invoke(messages)
+        return response.content or _rag_only_response(chunks)
 
     except Exception as e:
-        logger.error(f"OpenAI API error: {e}")
-        return _fallback_response(chunks, query_type, question)
+        logger.error(f"ChatOpenAI error: {e}")
+        return _rag_only_response(chunks)
 
 
 def parse_bnp_sections(response_text: str) -> dict:
     """
-    Parse BNP-formatted response text into structured sections.
+    Parse BNP-formatted GPT response into structured sections.
     Returns dict with keys: answer, dose, safety_warning
     """
     import re
@@ -126,6 +131,6 @@ def parse_bnp_sections(response_text: str) -> dict:
 
     return {
         "answer": extract("Answer") or response_text,
-        "dose": extract("Dose(?:\\s+\\(if applicable\\))?"),
+        "dose": extract(r"Dose(?:\s+\(if applicable\))?"),
         "safety_warning": extract("Safety Warning"),
     }

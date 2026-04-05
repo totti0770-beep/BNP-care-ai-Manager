@@ -1,8 +1,9 @@
 """
-Hybrid Retrieval Engine
-- Semantic search: FAISS + TF-IDF embeddings (sklearn)
-- Keyword search: BM25 (rank_bm25)
-- Hybrid: weighted combination of both scores
+Hybrid Retrieval Engine — LangChain FAISS + OpenAI Embeddings
+- Semantic search: FAISS via LangChain + text-embedding-3-small
+- Keyword search:  BM25 (rank_bm25)
+- Hybrid:          60% semantic + 40% keyword
+Falls back to TF-IDF embeddings when OPENAI_API_KEY is not set.
 """
 import os
 import uuid
@@ -11,51 +12,74 @@ import pickle
 import numpy as np
 from pathlib import Path
 from typing import List, Optional
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine
-from rank_bm25 import BM25Okapi
-import faiss
 
 logger = logging.getLogger(__name__)
 
-# Always resolve relative to THIS file's directory so the path is correct
-# regardless of where uvicorn is launched from
-_HERE = Path(__file__).parent.parent  # artifacts/clinical-ai-engine/
+_HERE = Path(__file__).parent.parent          # artifacts/clinical-ai-engine/
 INDEX_DIR = _HERE / "data" / "faiss_index"
 INDEX_DIR.mkdir(parents=True, exist_ok=True)
 
-FAISS_INDEX_PATH = INDEX_DIR / "index.faiss"
+FAISS_LANGCHAIN_PATH = str(INDEX_DIR / "lc_index")
 META_PATH = INDEX_DIR / "meta.pkl"
-TF_IDF_DIM = 1024
+
+
+# ── Embedding backend ─────────────────────────────────────────────────────────
+def _make_fake_embeddings():
+    from langchain_community.embeddings import FakeEmbeddings
+    return FakeEmbeddings(size=1536)
+
+
+def _get_embeddings():
+    """Return LangChain embeddings object — OpenAI if key valid, else deterministic fallback."""
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        logger.warning("OPENAI_API_KEY not set — using FakeEmbeddings (semantic search degraded)")
+        return _make_fake_embeddings()
+
+    try:
+        from langchain_openai import OpenAIEmbeddings
+        emb = OpenAIEmbeddings(
+            model="text-embedding-3-small",
+            openai_api_key=api_key,
+        )
+        # Quick connectivity check — embed a single test string
+        emb.embed_query("test")
+        logger.info("✅ OpenAI embeddings (text-embedding-3-small) verified")
+        return emb
+    except Exception as e:
+        logger.warning(f"OpenAI embeddings unavailable ({e}) — using FakeEmbeddings fallback")
+        return _make_fake_embeddings()
 
 
 class HybridRetriever:
     """
-    Maintains a FAISS index for semantic similarity search,
+    Maintains a LangChain FAISS vector store for semantic similarity search
     and a BM25 index for keyword search.
-    Combines scores for hybrid retrieval.
     """
 
     def __init__(self):
-        self.chunks: List[dict] = []
-        self.tfidf = TfidfVectorizer(max_features=TF_IDF_DIM, ngram_range=(1, 2), sublinear_tf=True)
-        self.tfidf_matrix = None
-        self.bm25: Optional[BM25Okapi] = None
-        self.faiss_index: Optional[faiss.Index] = None
+        self.chunks: List[dict] = []        # metadata for all indexed chunks
+        self.bm25 = None
+        self._vectorstore = None
+        self._embeddings = _get_embeddings()
         self._load_state()
 
     # ── Persistence ───────────────────────────────────────────────────────────
     def _load_state(self):
-        if META_PATH.exists() and FAISS_INDEX_PATH.exists():
+        lc_path = Path(FAISS_LANGCHAIN_PATH)
+        if lc_path.exists() and META_PATH.exists():
             try:
+                from langchain_community.vectorstores import FAISS
+                self._vectorstore = FAISS.load_local(
+                    FAISS_LANGCHAIN_PATH,
+                    self._embeddings,
+                    allow_dangerous_deserialization=True,
+                )
                 with open(META_PATH, "rb") as f:
                     state = pickle.load(f)
                 self.chunks = state["chunks"]
-                self.tfidf = state["tfidf"]
-                self.tfidf_matrix = state["tfidf_matrix"]
                 self.bm25 = state["bm25"]
-                self.faiss_index = faiss.read_index(str(FAISS_INDEX_PATH))
-                logger.info(f"✅ Loaded retriever: {len(self.chunks)} chunks")
+                logger.info(f"✅ Loaded LangChain FAISS index: {len(self.chunks)} chunks")
             except Exception as e:
                 logger.warning(f"Could not load saved state: {e} — starting fresh")
                 self._reset()
@@ -64,115 +88,121 @@ class HybridRetriever:
 
     def _reset(self):
         self.chunks = []
-        self.tfidf_matrix = None
         self.bm25 = None
-        self.faiss_index = None
+        self._vectorstore = None
 
     def _save_state(self):
         try:
-            state = {
-                "chunks": self.chunks,
-                "tfidf": self.tfidf,
-                "tfidf_matrix": self.tfidf_matrix,
-                "bm25": self.bm25,
-            }
+            if self._vectorstore:
+                self._vectorstore.save_local(FAISS_LANGCHAIN_PATH)
             with open(META_PATH, "wb") as f:
-                pickle.dump(state, f)
-            if self.faiss_index is not None:
-                faiss.write_index(self.faiss_index, str(FAISS_INDEX_PATH))
+                pickle.dump({"chunks": self.chunks, "bm25": self.bm25}, f)
         except Exception as e:
             logger.error(f"Save error: {e}")
 
+    def _rebuild_bm25(self):
+        from rank_bm25 import BM25Okapi
+        tokenized = [c["content"].lower().split() for c in self.chunks]
+        self.bm25 = BM25Okapi(tokenized) if tokenized else None
+
     # ── Indexing ──────────────────────────────────────────────────────────────
-    def _rebuild_indices(self):
-        """Rebuild TF-IDF, FAISS, and BM25 from self.chunks."""
-        if not self.chunks:
-            return
-
-        texts = [c["content"] for c in self.chunks]
-
-        # TF-IDF + FAISS
-        self.tfidf_matrix = self.tfidf.fit_transform(texts).toarray().astype("float32")
-        norms = np.linalg.norm(self.tfidf_matrix, axis=1, keepdims=True)
-        norms[norms == 0] = 1
-        self.tfidf_matrix = self.tfidf_matrix / norms   # L2-normalise
-
-        dim = self.tfidf_matrix.shape[1]
-        self.faiss_index = faiss.IndexFlatIP(dim)       # Inner product = cosine on normalised vecs
-        self.faiss_index.add(self.tfidf_matrix)
-
-        # BM25
-        tokenized = [t.lower().split() for t in texts]
-        self.bm25 = BM25Okapi(tokenized)
-
-        logger.info(f"Rebuilt indices: {len(self.chunks)} chunks, FAISS dim={dim}")
-
     def add_chunks(self, chunks: List[dict], document_id: str, document_name: str):
-        """Add new chunks to the index (incremental)."""
+        """Add chunks to FAISS index and BM25. Rebuilds both indices."""
+        from langchain_community.vectorstores import FAISS
+        from langchain_core.documents import Document
+
+        lc_docs = []
         for chunk in chunks:
             chunk_id = str(uuid.uuid4())
-            self.chunks.append({
+            meta = {
                 "chunk_id": chunk_id,
                 "document_id": document_id,
                 "document_name": document_name,
-                "content": chunk["content"],
                 "page_number": chunk.get("page_number", 1),
                 "chunk_index": chunk.get("chunk_index", 0),
-            })
+            }
+            lc_docs.append(Document(page_content=chunk["content"], metadata=meta))
+            self.chunks.append({"content": chunk["content"], **meta})
 
-        self._rebuild_indices()
+        # Add to or create FAISS vector store
+        if self._vectorstore is None:
+            self._vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
+        else:
+            self._vectorstore.add_documents(lc_docs)
+
+        self._rebuild_bm25()
         self._save_state()
-        logger.info(f"Added {len(chunks)} chunks for doc '{document_name}'")
+        logger.info(f"Indexed {len(chunks)} chunks for '{document_name}'")
 
     def remove_document(self, document_id: str):
-        """Remove all chunks for a document and rebuild."""
+        """Remove all chunks for a document and rebuild the full index."""
         before = len(self.chunks)
-        self.chunks = [c for c in self.chunks if c["document_id"] != document_id]
-        if len(self.chunks) < before:
-            self._rebuild_indices()
-            self._save_state()
+        remaining = [c for c in self.chunks if c["document_id"] != document_id]
+        if len(remaining) == before:
+            return  # Nothing to remove
+
+        self.chunks = remaining
+        self._vectorstore = None
+
+        if remaining:
+            from langchain_community.vectorstores import FAISS
+            from langchain_core.documents import Document
+            lc_docs = [
+                Document(
+                    page_content=c["content"],
+                    metadata={k: v for k, v in c.items() if k != "content"},
+                )
+                for c in remaining
+            ]
+            self._vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
+
+        self._rebuild_bm25()
+        self._save_state()
+        logger.info(f"Removed document {document_id}. Remaining chunks: {len(remaining)}")
 
     # ── Search ────────────────────────────────────────────────────────────────
     def hybrid_search(self, query: str, top_k: int = 5) -> List[dict]:
         """
-        Hybrid search: 60% semantic (FAISS) + 40% keyword (BM25).
-        Returns top_k results with combined relevance score.
+        Hybrid search: 60% semantic (LangChain FAISS) + 40% keyword (BM25).
+        Returns list of chunk dicts with 'relevance_score'.
         """
-        if not self.chunks or self.faiss_index is None:
+        if not self.chunks or self._vectorstore is None:
             return []
 
-        texts = [c["content"] for c in self.chunks]
-        n = len(texts)
+        n = len(self.chunks)
         k = min(top_k, n)
 
-        # ── Semantic (TF-IDF + FAISS) ────────────────────────────────────────
-        query_vec = self.tfidf.transform([query]).toarray().astype("float32")
-        norm = np.linalg.norm(query_vec)
-        if norm > 0:
-            query_vec = query_vec / norm
+        # ── Semantic (FAISS similarity scores) ───────────────────────────────
+        sem_scores = np.zeros(n, dtype=float)
+        try:
+            results_with_scores = self._vectorstore.similarity_search_with_score(query, k=k)
+            # LangChain FAISS returns L2 distance (lower = better) — convert to similarity
+            for doc, dist in results_with_scores:
+                # Find matching chunk index by chunk_id
+                cid = doc.metadata.get("chunk_id")
+                for i, c in enumerate(self.chunks):
+                    if c.get("chunk_id") == cid:
+                        # Convert L2 distance to similarity: 1 / (1 + dist)
+                        sem_scores[i] = 1.0 / (1.0 + float(dist))
+                        break
+        except Exception as e:
+            logger.error(f"FAISS search error: {e}")
 
-        semantic_scores_np = np.zeros(n, dtype=float)
-        if self.faiss_index.ntotal > 0:
-            D, I = self.faiss_index.search(query_vec, k)
-            for rank, idx in enumerate(I[0]):
-                if 0 <= idx < n:
-                    semantic_scores_np[idx] = float(D[0][rank])
-
-        # Normalize to [0,1]
-        sem_max = semantic_scores_np.max()
+        sem_max = sem_scores.max()
         if sem_max > 0:
-            semantic_scores_np /= sem_max
+            sem_scores /= sem_max
 
         # ── Keyword (BM25) ───────────────────────────────────────────────────
-        bm25_scores = np.array(self.bm25.get_scores(query.lower().split()), dtype=float)
-        bm25_scores = np.clip(bm25_scores, 0, None)   # BM25 can be negative — clip to 0
-        bm25_max = bm25_scores.max()
-        if bm25_max > 0:
-            bm25_scores /= bm25_max
+        bm25_scores = np.zeros(n, dtype=float)
+        if self.bm25:
+            raw = np.array(self.bm25.get_scores(query.lower().split()), dtype=float)
+            bm25_scores = np.clip(raw, 0, None)
+            bm25_max = bm25_scores.max()
+            if bm25_max > 0:
+                bm25_scores /= bm25_max
 
-        # ── Hybrid combination ───────────────────────────────────────────────
-        combined = 0.6 * semantic_scores_np + 0.4 * bm25_scores
-
+        # ── Hybrid combination ────────────────────────────────────────────────
+        combined = 0.6 * sem_scores + 0.4 * bm25_scores
         top_indices = np.argsort(combined)[::-1][:top_k]
 
         results = []
@@ -180,9 +210,9 @@ class HybridRetriever:
             score = float(combined[idx])
             if score < 0.01:
                 continue
-            chunk = self.chunks[idx].copy()
-            chunk["relevance_score"] = round(score, 4)
-            results.append(chunk)
+            result = self.chunks[idx].copy()
+            result["relevance_score"] = round(score, 4)
+            results.append(result)
 
         return results
 
@@ -190,11 +220,8 @@ class HybridRetriever:
     def chunk_count(self) -> int:
         return len(self.chunks)
 
-    def get_document_chunks(self, document_id: str) -> List[dict]:
-        return [c for c in self.chunks if c["document_id"] == document_id]
 
-
-# Singleton
+# ── Singleton ─────────────────────────────────────────────────────────────────
 _retriever: Optional[HybridRetriever] = None
 
 

@@ -1,0 +1,133 @@
+# BNP Clinical AI Engine Backend (Production-Ready Starter)
+# Tech: FastAPI + FAISS + PostgreSQL + LangChain
+
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+from pydantic import BaseModel
+from typing import List
+import uvicorn
+import os
+
+# === AI / RAG ===
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import FAISS
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.document_loaders import PyPDFLoader
+from langchain.chat_models import ChatOpenAI
+
+# === Security ===
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+app = FastAPI(title="BNP Clinical AI Engine")
+
+# === Config ===
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DB_PATH = "faiss_index"
+
+# === Security Layer ===
+security = HTTPBearer()
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials.credentials != "securetoken":
+        raise HTTPException(status_code=403, detail="Invalid token")
+    return credentials.credentials
+
+# === Embeddings ===
+embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+
+# Load or create FAISS index
+if os.path.exists(DB_PATH):
+    vectorstore = FAISS.load_local(DB_PATH, embeddings)
+else:
+    vectorstore = None
+
+# === Models ===
+class QueryRequest(BaseModel):
+    question: str
+    weight: float = None
+
+# === Upload API ===
+@app.post("/upload")
+async def upload_pdf(file: UploadFile = File(...), token: str = Depends(verify_token)):
+    filepath = f"temp_{file.filename}"
+    with open(filepath, "wb") as f:
+        f.write(await file.read())
+
+    loader = PyPDFLoader(filepath)
+    docs = loader.load()
+
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    chunks = splitter.split_documents(docs)
+
+    global vectorstore
+
+    if vectorstore is None:
+        vectorstore = FAISS.from_documents(chunks, embeddings)
+    else:
+        vectorstore.add_documents(chunks)
+
+    vectorstore.save_local(DB_PATH)
+
+    return {"message": "PDF processed and stored."}
+
+# === Clinical Router ===
+def detect_intent(question: str):
+    q = question.lower()
+    if any(word in q for word in ["dose", "جرعة", "mg", "ml"]):
+        return "drug"
+    elif any(word in q for word in ["protocol", "sepsis", "icu"]):
+        return "protocol"
+    return "general"
+
+# === Drug Calculation ===
+def calculate_dose(weight: float):
+    if not weight:
+        return "Weight required"
+    return f"Recommended range: {weight * 0.5} - {weight * 1.0} mg"
+
+# === Query API ===
+@app.post("/query")
+async def query_ai(req: QueryRequest, token: str = Depends(verify_token)):
+    if vectorstore is None:
+        raise HTTPException(status_code=400, detail="No documents uploaded")
+
+    docs = vectorstore.similarity_search(req.question, k=5)
+    context = "\n".join([d.page_content for d in docs])
+
+    intent = detect_intent(req.question)
+
+    llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, temperature=0)
+
+    system_prompt = """
+    You are BNP Clinical AI Engine.
+    Answer ONLY from the provided context.
+    Always include sources.
+    """
+
+    user_prompt = f"""
+    Context:
+    {context}
+
+    Question:
+    {req.question}
+    """
+
+    response = llm.predict(system_prompt + user_prompt)
+
+    dose = None
+    if intent == "drug":
+        dose = calculate_dose(req.weight)
+
+    return {
+        "answer": response,
+        "dose": dose,
+        "sources": len(docs)
+    }
+
+# === Health Check ===
+@app.get("/")
+def root():
+    return {"status": "BNP AI Engine Running"}
+
+# === Run ===
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
