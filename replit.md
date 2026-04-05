@@ -1,8 +1,27 @@
-# Workspace
+# BestNursingAI Workspace
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Full-stack clinical AI platform for nurses — pnpm monorepo (TypeScript + Python FastAPI). Three production artifacts: web app, mobile app, and clinical AI engine backend.
+
+## SafetyEngine (Clinical AI Engine)
+
+Rule-based medication safety layer integrated into query pipeline (`services/drug_calculator.py`):
+
+| Check | Trigger | Result |
+|---|---|---|
+| High-risk flag | Drug in `DRUG_DB` with `high_risk: True` | 🔴 Alert in `safety_alerts` |
+| Contraindications | Patient `conditions` intersect drug `contraindications` | ⚠️ Alert in `safety_alerts` |
+| Drug interactions | `other_drugs` list intersect drug `interactions` | ⚠️ Alert in `safety_alerts` |
+| Overdose HARD BLOCK | `dose_per_kg × weight > adult_max_dose_mg` | ❌ `rejected=True`, answer blocked |
+| Nursing notes | Always generated for drug queries | Admin checklist in `nursing_notes` |
+
+**DRUG_DB high-risk drugs:** heparin, morphine, insulin, warfarin.
+**DRUG_DB fields:** `adult_max_dose_mg` (per-dose hard block), `adult_max_daily_mg`, `contraindications`, `interactions`, `high_risk`, `frequency`.
+
+Query response extended fields: `contraindications`, `interactions`, `nursing_notes`, `safety_alerts`, `rejected`, `rejection_reason`.
+
+## Original Workspace Notes
 
 ## Stack
 

@@ -49,6 +49,10 @@ class QueryRequest(BaseModel):
     question: str = Field(..., min_length=3)
     patient_weight_kg: Optional[float] = None
     top_k: int = Field(default=5, ge=1, le=20)
+    drug_name: Optional[str] = None
+    other_drugs: Optional[List[str]] = []
+    conditions: Optional[List[str]] = []
+    age: Optional[int] = None
 
 
 class Citation(BaseModel):
@@ -86,6 +90,10 @@ class QueryResponse(BaseModel):
     rejected: bool = False
     rejection_reason: Optional[str] = None
     processing_time_ms: int
+    contraindications: List[str] = []
+    interactions: List[str] = []
+    nursing_notes: List[str] = []
+    safety_alerts: List[str] = []
 
 
 class AuditLogEntry(BaseModel):
