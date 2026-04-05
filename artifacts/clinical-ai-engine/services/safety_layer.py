@@ -9,7 +9,7 @@ import re
 from typing import List
 from models.schemas import SafetyCheckResult, Citation
 
-CONFIDENCE_THRESHOLD = 0.30  # Minimum cosine similarity to accept
+CONFIDENCE_THRESHOLD = 0.05  # Minimum hybrid score to accept (TF-IDF/BM25 scores are lower than dense embeddings)
 
 UNSAFE_PATTERNS = [
     r"i think|i believe|in my opinion|probably|maybe|perhaps",

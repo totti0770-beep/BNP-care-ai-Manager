@@ -18,7 +18,10 @@ import faiss
 
 logger = logging.getLogger(__name__)
 
-INDEX_DIR = Path("data/faiss_index")
+# Always resolve relative to THIS file's directory so the path is correct
+# regardless of where uvicorn is launched from
+_HERE = Path(__file__).parent.parent  # artifacts/clinical-ai-engine/
+INDEX_DIR = _HERE / "data" / "faiss_index"
 INDEX_DIR.mkdir(parents=True, exist_ok=True)
 
 FAISS_INDEX_PATH = INDEX_DIR / "index.faiss"
@@ -162,6 +165,7 @@ class HybridRetriever:
 
         # ── Keyword (BM25) ───────────────────────────────────────────────────
         bm25_scores = np.array(self.bm25.get_scores(query.lower().split()), dtype=float)
+        bm25_scores = np.clip(bm25_scores, 0, None)   # BM25 can be negative — clip to 0
         bm25_max = bm25_scores.max()
         if bm25_max > 0:
             bm25_scores /= bm25_max
