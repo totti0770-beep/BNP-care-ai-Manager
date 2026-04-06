@@ -25,6 +25,7 @@ import {
   listDocuments as apiListDocs,
   deleteDocument as apiDeleteDoc,
   type EngineDocument,
+  type QueryOptions,
 } from "@/services/clinicalApi";
 
 // ── Weight extraction helper (mirrors engine logic) ───────────────────────────
@@ -101,7 +102,7 @@ interface BackendContextType {
   indexedChunks: number;
   openaiEnabled: boolean;
   engineDocuments: EngineDocument[];
-  sendQuery: (question: string) => Promise<BNPResponse | null>;
+  sendQuery: (question: string, opts?: QueryOptions) => Promise<BNPResponse | null>;
   uploadToEngine: (file: File) => Promise<{ filename: string; chunks: number } | null>;
   removeFromEngine: (documentId: string) => Promise<boolean>;
   refreshDocuments: () => Promise<void>;
@@ -144,10 +145,10 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [refreshDocuments]);
 
   const sendQuery = useCallback(
-    async (question: string): Promise<BNPResponse | null> => {
+    async (question: string, opts: QueryOptions = {}): Promise<BNPResponse | null> => {
       if (!isEngineAvailable) return null;
-      const weight = extractWeight(question);
-      const result = await apiQuery(question, weight);
+      const weight = opts.patientWeightKg ?? extractWeight(question);
+      const result = await apiQuery(question, { ...opts, patientWeightKg: weight });
       return mapToBNP(result);
     },
     [isEngineAvailable]

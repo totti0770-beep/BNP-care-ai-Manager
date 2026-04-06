@@ -131,10 +131,18 @@ export async function checkHealth(): Promise<EngineHealth | null> {
   }
 }
 
+export interface QueryOptions {
+  patientWeightKg?: number;
+  drugName?: string;
+  otherDrugs?: string[];
+  conditions?: string[];
+  age?: number;
+}
+
 /** Send a clinical query. Returns null on any failure. */
 export async function sendQuery(
   question: string,
-  patientWeightKg?: number
+  opts: QueryOptions = {}
 ): Promise<EngineQueryResponse | null> {
   try {
     const res = await authFetch("/query/", {
@@ -142,7 +150,11 @@ export async function sendQuery(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         question,
-        patient_weight_kg: patientWeightKg ?? null,
+        patient_weight_kg: opts.patientWeightKg ?? null,
+        drug_name: opts.drugName ?? null,
+        other_drugs: opts.otherDrugs ?? [],
+        conditions: opts.conditions ?? [],
+        age: opts.age ?? null,
         top_k: 5,
       }),
     });

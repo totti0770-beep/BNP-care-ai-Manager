@@ -6,10 +6,11 @@ import {
   Send, Bot, User, Shield, AlertTriangle, BookOpen,
   Pill, Activity, ShieldAlert, Info, Zap, ClipboardList,
   XCircle, ArrowLeftRight, CheckCircle2, Stethoscope,
-  BarChart2, AlertCircle,
+  BarChart2, AlertCircle, UserCircle, ChevronDown, ChevronUp, X, Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { QueryOptions } from '@/services/clinicalApi';
 
 interface Message {
   id: string;
@@ -250,6 +251,131 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
   );
 }
 
+// ── Patient context panel ─────────────────────────────────────────────────────
+function PatientContextPanel({
+  opts, onChange,
+}: {
+  opts: QueryOptions;
+  onChange: (o: QueryOptions) => void;
+}) {
+  const [conditionInput, setConditionInput] = useState('');
+  const [drugInput, setDrugInput] = useState('');
+
+  const addCondition = () => {
+    const v = conditionInput.trim();
+    if (!v) return;
+    onChange({ ...opts, conditions: [...(opts.conditions ?? []), v] });
+    setConditionInput('');
+  };
+
+  const addDrug = () => {
+    const v = drugInput.trim();
+    if (!v) return;
+    onChange({ ...opts, otherDrugs: [...(opts.otherDrugs ?? []), v] });
+    setDrugInput('');
+  };
+
+  const removeCondition = (i: number) =>
+    onChange({ ...opts, conditions: opts.conditions?.filter((_, idx) => idx !== i) });
+
+  const removeDrug = (i: number) =>
+    onChange({ ...opts, otherDrugs: opts.otherDrugs?.filter((_, idx) => idx !== i) });
+
+  return (
+    <div className="border border-purple-500/20 rounded-xl p-4 bg-[#12122a] space-y-4">
+      <p className="text-purple-300 text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
+        <UserCircle className="w-3.5 h-3.5" /> Patient Context (optional — enables safety checks)
+      </p>
+
+      {/* Weight + Age */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-gray-400 text-xs mb-1 block">Weight (kg)</label>
+          <Input
+            type="number"
+            min={1} max={300}
+            placeholder="e.g. 70"
+            value={opts.patientWeightKg ?? ''}
+            onChange={e => onChange({ ...opts, patientWeightKg: e.target.value ? Number(e.target.value) : undefined })}
+            className="bg-[#0f0f1a] border-purple-500/30 text-white text-sm h-8"
+          />
+        </div>
+        <div>
+          <label className="text-gray-400 text-xs mb-1 block">Age (years)</label>
+          <Input
+            type="number"
+            min={0} max={120}
+            placeholder="e.g. 45"
+            value={opts.age ?? ''}
+            onChange={e => onChange({ ...opts, age: e.target.value ? Number(e.target.value) : undefined })}
+            className="bg-[#0f0f1a] border-purple-500/30 text-white text-sm h-8"
+          />
+        </div>
+      </div>
+
+      {/* Conditions */}
+      <div>
+        <label className="text-gray-400 text-xs mb-1 block">Patient Conditions (for contraindication check)</label>
+        <div className="flex gap-2">
+          <Input
+            placeholder="e.g. severe liver disease"
+            value={conditionInput}
+            onChange={e => setConditionInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCondition(); } }}
+            className="bg-[#0f0f1a] border-purple-500/30 text-white text-sm h-8 flex-1"
+          />
+          <button
+            onClick={addCondition}
+            className="w-8 h-8 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 flex items-center justify-center transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {(opts.conditions ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {opts.conditions!.map((c, i) => (
+              <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-600/20 border border-yellow-500/30 text-yellow-300 text-xs">
+                {c}
+                <button onClick={() => removeCondition(i)}><X className="w-3 h-3" /></button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Other drugs */}
+      <div>
+        <label className="text-gray-400 text-xs mb-1 block">Other Medications (for interaction check)</label>
+        <div className="flex gap-2">
+          <Input
+            placeholder="e.g. warfarin, aspirin"
+            value={drugInput}
+            onChange={e => setDrugInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDrug(); } }}
+            className="bg-[#0f0f1a] border-purple-500/30 text-white text-sm h-8 flex-1"
+          />
+          <button
+            onClick={addDrug}
+            className="w-8 h-8 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 flex items-center justify-center transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {(opts.otherDrugs ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {opts.otherDrugs!.map((d, i) => (
+              <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-600/20 border border-orange-500/30 text-orange-300 text-xs">
+                {d}
+                <button onClick={() => removeDrug(i)}><X className="w-3 h-3" /></button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 const ChatPage: React.FC = () => {
   const { t } = useTranslation();
@@ -259,11 +385,18 @@ const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showPatientCtx, setShowPatientCtx] = useState(false);
+  const [patientOpts, setPatientOpts] = useState<QueryOptions>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const hasPatientCtx =
+    !!(patientOpts.patientWeightKg || patientOpts.age ||
+       (patientOpts.conditions ?? []).length ||
+       (patientOpts.otherDrugs ?? []).length);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isTyping) return;
@@ -282,17 +415,15 @@ const ChatPage: React.FC = () => {
     let fromEngine = false;
 
     if (isEngineAvailable) {
-      // Use real Clinical AI Engine
-      const engineResult = await sendQuery(text.trim());
+      // Use real Clinical AI Engine with patient context
+      const engineResult = await sendQuery(text.trim(), patientOpts);
       if (engineResult) {
         bnp = engineResult;
         fromEngine = true;
       } else {
-        // Engine call failed — fall back to local
         bnp = generateResponse(text.trim());
       }
     } else {
-      // Local demo fallback
       await new Promise(resolve => setTimeout(resolve, 1200 + Math.random() * 600));
       bnp = generateResponse(text.trim());
     }
@@ -442,13 +573,40 @@ const ChatPage: React.FC = () => {
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-purple-500/20">
+      <div className="p-4 border-t border-purple-500/20 space-y-2">
+        {/* Patient context toggle */}
+        {isEngineAvailable && (
+          <button
+            onClick={() => setShowPatientCtx(v => !v)}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
+              hasPatientCtx
+                ? 'border-purple-500/60 bg-purple-600/15 text-purple-300'
+                : 'border-purple-500/20 bg-transparent text-gray-500 hover:text-gray-300 hover:border-purple-500/40'
+            }`}
+          >
+            <UserCircle className="w-3.5 h-3.5" />
+            Patient Context
+            {hasPatientCtx && (
+              <span className="bg-purple-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
+                {(patientOpts.conditions?.length ?? 0) + (patientOpts.otherDrugs?.length ?? 0) +
+                  (patientOpts.patientWeightKg ? 1 : 0) + (patientOpts.age ? 1 : 0)}
+              </span>
+            )}
+            {showPatientCtx ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
+          </button>
+        )}
+
+        {/* Expandable patient panel */}
+        {showPatientCtx && isEngineAvailable && (
+          <PatientContextPanel opts={patientOpts} onChange={setPatientOpts} />
+        )}
+
         <div className="flex items-center gap-2 bg-[#1a1a2e] rounded-xl border border-purple-500/30 p-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a clinical question... (include patient weight for dose calculation)"
+            placeholder="Ask a clinical question... (include drug name for safety checks)"
             className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-500 focus-visible:ring-0 shadow-none text-sm"
             disabled={isTyping}
           />
@@ -460,7 +618,7 @@ const ChatPage: React.FC = () => {
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <p className="text-center text-gray-600 text-xs mt-2">
+        <p className="text-center text-gray-600 text-xs">
           {SYSTEM_NAME} · RAG-Only · No Hallucination · Sources Always Cited
         </p>
       </div>
