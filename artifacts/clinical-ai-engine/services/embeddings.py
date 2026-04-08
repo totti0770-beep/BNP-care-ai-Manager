@@ -91,6 +91,62 @@ class HybridRetriever:
         self.bm25 = None
         self._vectorstore = None
 
+    def sync_from_db(self):
+        """
+        Rebuild FAISS from PostgreSQL if the DB has more chunks than in-memory index.
+        Called on startup to recover from filesystem resets.
+        """
+        try:
+            from models.database import db_cursor, DATABASE_URL
+            if not DATABASE_URL:
+                return
+
+            with db_cursor() as (cur, _):
+                cur.execute("""
+                    SELECT c.chunk_id, c.content, c.page_number, c.chunk_index,
+                           c.document_id, d.filename
+                    FROM bnp_chunks c
+                    JOIN bnp_documents d ON c.document_id = d.id
+                    ORDER BY d.upload_date ASC, c.chunk_index ASC
+                """)
+                rows = cur.fetchall()
+
+            if not rows:
+                return
+
+            db_chunk_count = len(rows)
+            if db_chunk_count == self.chunk_count:
+                logger.info(f"✅ FAISS in sync with DB ({db_chunk_count} chunks)")
+                return
+
+            logger.warning(
+                f"⚠️  FAISS has {self.chunk_count} chunks but DB has {db_chunk_count} — rebuilding index…"
+            )
+
+            from langchain_community.vectorstores import FAISS
+            from langchain_core.documents import Document
+
+            self._reset()
+            lc_docs = []
+            for row in rows:
+                meta = {
+                    "chunk_id":      row["chunk_id"],
+                    "document_id":   row["document_id"],
+                    "document_name": row["filename"],
+                    "page_number":   row["page_number"],
+                    "chunk_index":   row["chunk_index"],
+                }
+                lc_docs.append(Document(page_content=row["content"], metadata=meta))
+                self.chunks.append({"content": row["content"], **meta})
+
+            self._vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
+            self._rebuild_bm25()
+            self._save_state()
+            logger.info(f"✅ FAISS rebuilt from DB: {len(self.chunks)} chunks")
+
+        except Exception as e:
+            logger.error(f"sync_from_db error: {e}")
+
     def _save_state(self):
         try:
             if self._vectorstore:

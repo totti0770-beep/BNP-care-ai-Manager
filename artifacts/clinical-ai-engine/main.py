@@ -36,9 +36,11 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("🏥 BNP Clinical AI Engine starting…")
     init_db()
-    # Pre-load retriever to avoid cold-start on first query
+    # Pre-load retriever, then sync FAISS with DB to recover any lost documents
     from services.embeddings import get_retriever
     r = get_retriever()
+    logger.info(f"   FAISS on-disk: {r.chunk_count} chunks")
+    r.sync_from_db()
     logger.info(f"✅ Retriever ready — {r.chunk_count} chunks indexed")
 
     openai_key = os.environ.get("OPENAI_API_KEY", "")
