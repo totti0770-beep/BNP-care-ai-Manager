@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useClosedLoopRAG, BNPResponse, SYSTEM_NAME } from '@/contexts/ClosedLoopRAGContext';
 import { useBackend } from '@/contexts/BackendContext';
@@ -7,10 +7,62 @@ import {
   Pill, Activity, ShieldAlert, Info, Zap, ClipboardList,
   XCircle, ArrowLeftRight, CheckCircle2, Stethoscope,
   BarChart2, AlertCircle, UserCircle, ChevronDown, ChevronUp, X, Plus,
+  Mic, MicOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { QueryOptions } from '@/services/clinicalApi';
+
+// ── Voice Input Hook ──────────────────────────────────────────────────────────
+interface SpeechRec {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onresult: ((e: any) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+function useVoiceInput(onTranscript: (text: string) => void) {
+  const [isListening, setIsListening] = useState(false);
+  const [isSupported] = useState(() =>
+    typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+  );
+  const recognitionRef = useRef<SpeechRec | null>(null);
+
+  const start = useCallback(() => {
+    if (!isSupported || isListening) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    const rec: SpeechRec = new SR();
+    rec.lang = 'ar-SA';
+    rec.interimResults = true;
+    rec.continuous = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      const transcript = Array.from(e.results as ArrayLike<{ [i: number]: { transcript: string } }>)
+        .map((r) => r[0].transcript)
+        .join('');
+      onTranscript(transcript);
+    };
+    rec.onend = () => setIsListening(false);
+    rec.onerror = () => setIsListening(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setIsListening(true);
+  }, [isSupported, isListening, onTranscript]);
+
+  const stop = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  }, []);
+
+  return { isListening, isSupported, start, stop };
+}
 
 interface Message {
   id: string;
@@ -22,12 +74,12 @@ interface Message {
 }
 
 const SUGGESTED = [
-  'What is the hand hygiene protocol?',
-  'Paracetamol dose for 70 kg adult',
-  'ICU vital signs monitoring protocol',
-  'Insulin double-check procedure',
-  'Fall prevention assessment steps',
-  'Morphine overdose antidote',
+  { en: 'Paracetamol dose for 70 kg adult', ar: 'جرعة الباراسيتامول لمريض 70 كجم' },
+  { en: 'Morphine overdose antidote', ar: 'ترياق جرعة المورفين الزائدة' },
+  { en: 'Vancomycin loading dose', ar: 'جرعة التحميل للفانكومايسين' },
+  { en: 'Hand hygiene protocol steps', ar: 'خطوات بروتوكول نظافة اليدين' },
+  { en: 'Insulin double-check procedure', ar: 'إجراء التحقق المزدوج للإنسولين' },
+  { en: 'Fall prevention assessment', ar: 'تقييم الوقاية من السقوط' },
 ];
 
 // ── BNP structured response renderer ─────────────────────────────────────────
@@ -389,6 +441,9 @@ const ChatPage: React.FC = () => {
   const [patientOpts, setPatientOpts] = useState<QueryOptions>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const { isListening, isSupported: voiceSupported, start: startVoice, stop: stopVoice } =
+    useVoiceInput((transcript) => setInput(transcript));
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -398,8 +453,18 @@ const ChatPage: React.FC = () => {
        (patientOpts.conditions ?? []).length ||
        (patientOpts.otherDrugs ?? []).length);
 
+  const handleMicClick = () => {
+    if (isListening) {
+      stopVoice();
+    } else {
+      setInput('');
+      startVoice();
+    }
+  };
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isTyping) return;
+    if (isListening) stopVoice();
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -489,27 +554,34 @@ const ChatPage: React.FC = () => {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center mb-4">
+          <div className="flex flex-col items-center justify-center h-full text-center px-2">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center mb-4 shadow-lg shadow-purple-500/20">
               <Bot className="w-10 h-10 text-white" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-1">{SYSTEM_NAME}</h3>
             <p className="text-gray-400 text-sm mb-1">
               {isEngineAvailable
-                ? `Connected to Clinical AI Engine · ${indexedChunks} chunks indexed`
-                : 'Answers sourced exclusively from approved clinical documents'}
+                ? `متصل بالمحرك السريري · ${indexedChunks} مقطع مفهرس`
+                : 'الإجابات مستندة حصراً إلى الوثائق الطبية المعتمدة'}
             </p>
-            <p className="text-gray-600 text-xs mb-6">
-              Includes dose calculation · Safety warnings · Citation references
+            <p className="text-gray-600 text-xs mb-4">
+              حساب الجرعات · تحذيرات السلامة · مراجع موثّقة
             </p>
-            <div className="flex flex-wrap justify-center gap-2 max-w-lg">
+            {voiceSupported && (
+              <div className="flex items-center gap-1.5 text-xs text-purple-400/70 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1.5 mb-5">
+                <Mic className="w-3 h-3" />
+                يمكنك التحدث بسؤالك بالضغط على زر الميكروفون
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
               {SUGGESTED.map((s) => (
                 <button
-                  key={s}
-                  onClick={() => sendMessage(s)}
-                  className="px-3 py-1.5 rounded-full bg-[#1a1a2e] border border-purple-500/30 text-gray-400 text-sm hover:border-purple-500/60 hover:text-gray-200 transition-all"
+                  key={s.en}
+                  onClick={() => sendMessage(s.en)}
+                  className="flex flex-col items-start px-3 py-2.5 rounded-xl bg-[#1a1a2e] border border-purple-500/20 hover:border-purple-500/50 hover:bg-[#1f1f35] transition-all text-left"
                 >
-                  {s}
+                  <span className="text-gray-300 text-xs leading-snug">{s.ar}</span>
+                  <span className="text-gray-600 text-[10px] mt-0.5 leading-snug">{s.en}</span>
                 </button>
               ))}
             </div>
@@ -601,12 +673,29 @@ const ChatPage: React.FC = () => {
           <PatientContextPanel opts={patientOpts} onChange={setPatientOpts} />
         )}
 
-        <div className="flex items-center gap-2 bg-[#1a1a2e] rounded-xl border border-purple-500/30 p-2">
+        <div className={`flex items-center gap-2 bg-[#1a1a2e] rounded-xl border p-2 transition-all duration-300 ${
+          isListening ? 'border-red-500/60 shadow-[0_0_12px_rgba(239,68,68,0.2)]' : 'border-purple-500/30'
+        }`}>
+          {/* Mic button */}
+          {voiceSupported && (
+            <button
+              onClick={handleMicClick}
+              disabled={isTyping}
+              title={isListening ? 'إيقاف التسجيل' : 'تحدّث بسؤالك'}
+              className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                isListening
+                  ? 'bg-red-500/20 text-red-400 animate-pulse hover:bg-red-500/30'
+                  : 'bg-purple-600/20 text-purple-400 hover:bg-purple-600/30'
+              } disabled:opacity-40`}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+          )}
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a clinical question... (include drug name for safety checks)"
+            placeholder={isListening ? '🎤 جارٍ الاستماع...' : 'Ask a clinical question... (include drug name for safety checks)'}
             className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-500 focus-visible:ring-0 shadow-none text-sm"
             disabled={isTyping}
           />
