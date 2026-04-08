@@ -22,9 +22,9 @@ import { toast } from 'sonner';
 
 const SecureUploadPage: React.FC = () => {
   const { t } = useTranslation();
-  const { verifyDocument, officialSources, verifiedDocuments, removeDocument, downloadDocument } = useDocumentVerification();
+  const { verifyDocument, officialSources } = useDocumentVerification();
   const { hasPermission } = useAuth();
-  const { isEngineAvailable, uploadToEngine } = useBackend();
+  const { isEngineAvailable, uploadToEngine, engineDocuments, removeFromEngine, refreshDocuments } = useBackend();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -215,43 +215,34 @@ const SecureUploadPage: React.FC = () => {
         </div>
       )}
 
-      {/* Uploaded documents list */}
-      {verifiedDocuments.length > 0 && (
+      {/* Uploaded documents list — from engine DB (persistent) */}
+      {engineDocuments.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-white mb-3">الوثائق المرفوعة</h3>
+          <h3 className="text-lg font-semibold text-white mb-3">
+            الوثائق المفهرسة في قاعدة البيانات
+            <span className="text-sm text-gray-400 font-normal ml-2">({engineDocuments.length})</span>
+          </h3>
           <div className="space-y-2">
-            {verifiedDocuments.map((doc) => (
+            {engineDocuments.map((doc) => (
               <div
                 key={doc.id}
-                className={`flex items-center gap-3 p-3 rounded-xl border ${
-                  doc.status === 'verified'
-                    ? 'bg-green-900/10 border-green-500/20'
-                    : 'bg-red-900/10 border-red-500/20'
-                }`}
+                className="flex items-center gap-3 p-3 rounded-xl border bg-green-900/10 border-green-500/20"
               >
-                <FileText className={`w-5 h-5 flex-shrink-0 ${doc.status === 'verified' ? 'text-green-400' : 'text-red-400'}`} />
+                <FileText className="w-5 h-5 flex-shrink-0 text-green-400" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{doc.name}</p>
+                  <p className="text-white text-sm font-medium truncate">{doc.filename}</p>
                   <p className="text-gray-400 text-xs">
-                    {doc.size} · {doc.verifiedAt.toLocaleDateString()} ·{' '}
-                    <span className={doc.status === 'verified' ? 'text-green-400' : 'text-red-400'}>
-                      {doc.status === 'verified' ? '✓ موثق' : '✗ مرفوض'}
-                    </span>
+                    {doc.chunk_count} مقطع ·{' '}
+                    {new Date(doc.upload_date).toLocaleDateString('ar-SA')} ·{' '}
+                    <span className="text-green-400">✓ مفهرس ودائم</span>
                   </p>
                 </div>
-                {doc.status === 'verified' && (
-                  <button
-                    onClick={() => downloadDocument(doc)}
-                    className="p-1.5 hover:bg-green-500/20 rounded-lg transition-colors text-green-400"
-                    title="تحميل"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  </button>
-                )}
                 <button
-                  onClick={() => removeDocument(doc.id)}
+                  onClick={async () => {
+                    const ok = await removeFromEngine(doc.id);
+                    if (ok) toast.success('تم حذف المستند من قاعدة البيانات');
+                    else toast.error('فشل الحذف');
+                  }}
                   className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors text-gray-500 hover:text-red-400"
                   title="حذف"
                 >

@@ -1,22 +1,40 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Upload, Search, Download, Trash2, Eye, CheckCircle, XCircle, Zap } from 'lucide-react';
+import {
+  FileText,
+  Upload,
+  Search,
+  Trash2,
+  AlertTriangle,
+  Zap,
+  Database,
+  RefreshCw,
+  X,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { useDocumentVerification } from '@/contexts/DocumentVerificationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBackend } from '@/contexts/BackendContext';
 
 const DocumentsPage: React.FC = () => {
   const { t } = useTranslation();
-  const { verifiedDocuments, removeDocument, downloadDocument, verifyDocument } = useDocumentVerification();
   const { hasPermission } = useAuth();
-  const { isEngineAvailable, uploadToEngine, engineDocuments, removeFromEngine, indexedChunks } = useBackend();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    isEngineAvailable,
+    engineDocuments,
+    uploadToEngine,
+    removeFromEngine,
+    refreshDocuments,
+    indexedChunks,
+  } = useBackend();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const canUpload = hasPermission('documents.manage');
 
@@ -31,27 +49,43 @@ const DocumentsPage: React.FC = () => {
     }
 
     setIsUploading(true);
-
-    // Upload to engine if available
-    if (isEngineAvailable) {
-      const result = await uploadToEngine(file);
-      if (result) {
-        toast.success(`Indexed ${result.chunks} chunks into Clinical AI Engine`);
-      } else {
-        toast.error('Engine upload failed — saved locally only');
-      }
+    const result = await uploadToEngine(file);
+    if (result) {
+      toast.success(`تم فهرسة ${result.chunks} مقطعاً في قاعدة البيانات`);
+    } else {
+      toast.error('فشل رفع الملف — تأكد من تشغيل المحرك');
     }
-
-    await verifyDocument(file);
     setIsUploading(false);
   };
 
-  const filteredDocuments = verifiedDocuments.filter(doc =>
-    doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshDocuments();
+    setIsRefreshing(false);
+    toast.success('تم تحديث القائمة');
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDeleteId) return;
+    setIsDeleting(true);
+    const ok = await removeFromEngine(confirmDeleteId);
+    if (ok) {
+      toast.success('تم حذف المستند من قاعدة البيانات');
+    } else {
+      toast.error('فشل الحذف — تحقق من الصلاحيات');
+    }
+    setConfirmDeleteId(null);
+    setIsDeleting(false);
+  };
+
+  const filteredDocuments = engineDocuments.filter(doc =>
+    doc.filename.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const formatDate = (date: Date) =>
-    new Date(date).toLocaleDateString('ar-SA', {
+  const confirmDoc = engineDocuments.find(d => d.id === confirmDeleteId);
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString('ar-SA', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -60,27 +94,90 @@ const DocumentsPage: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen p-6">
 
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteId && confirmDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#1a1a2e] border border-red-500/40 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-start gap-4 mb-5">
+              <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-lg mb-1">تأكيد الحذف</h3>
+                <p className="text-gray-400 text-sm">
+                  سيتم حذف المستند وجميع مقاطعه ({confirmDoc.chunk_count} مقطع) من قاعدة البيانات نهائياً.
+                </p>
+                <p className="text-red-400 text-sm font-medium mt-2 break-all">
+                  "{confirmDoc.filename}"
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setConfirmDeleteId(null)}
+                variant="outline"
+                className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
+                disabled={isDeleting}
+              >
+                <X className="w-4 h-4 mr-2" />
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeleting ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    حذف نهائي
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-white">{t('documents')}</h2>
-          <p className="text-gray-400 text-sm mt-1">
-            {verifiedDocuments.length} {t('documentCount', { count: verifiedDocuments.length }).replace(/^\d+\s*/, '')}
-            {verifiedDocuments.length === 0 && ' — لا توجد وثائق'}
-          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-gray-400 text-sm">
+              {engineDocuments.length} مستند
+            </p>
+            {isEngineAvailable && (
+              <span className="flex items-center gap-1.5 text-xs text-purple-400">
+                <Database className="w-3 h-3" />
+                {indexedChunks.toLocaleString()} مقطع مفهرس
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            variant="outline"
+            size="sm"
+            className="border-purple-500/30 text-gray-300 hover:bg-purple-600/10"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
           <input
             ref={fileInputRef}
             type="file"
             accept=".pdf"
             onChange={handleFileSelect}
             className="hidden"
-            disabled={!canUpload || isUploading}
+            disabled={!canUpload || isUploading || !isEngineAvailable}
           />
           <Button
             onClick={() => fileInputRef.current?.click()}
-            disabled={!canUpload || isUploading}
+            disabled={!canUpload || isUploading || !isEngineAvailable}
             className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 flex items-center gap-2"
           >
             {isUploading ? (
@@ -98,16 +195,28 @@ const DocumentsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Engine offline warning */}
+      {!isEngineAvailable && (
+        <div className="mb-6 p-4 rounded-xl bg-yellow-600/10 border border-yellow-500/30 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+          <p className="text-yellow-400 text-sm">
+            المحرك غير متصل — لا يمكن عرض المستندات أو رفعها حالياً
+          </p>
+        </div>
+      )}
+
       {/* Search */}
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-        <Input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={t('search')}
-          className="pl-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
-        />
-      </div>
+      {engineDocuments.length > 0 && (
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('search')}
+            className="pl-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
+          />
+        </div>
+      )}
 
       {/* Documents list */}
       {filteredDocuments.length === 0 ? (
@@ -116,8 +225,10 @@ const DocumentsPage: React.FC = () => {
             <FileText className="w-10 h-10 text-gray-500" />
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">{t('noDocuments')}</h3>
-          <p className="text-gray-400 mb-6">ارفع وثيقة PDF للبدء</p>
-          {canUpload && (
+          <p className="text-gray-400 mb-6">
+            {searchQuery ? 'لا توجد نتائج لهذا البحث' : 'ارفع وثيقة PDF للبدء'}
+          </p>
+          {canUpload && isEngineAvailable && !searchQuery && (
             <Button
               onClick={() => fileInputRef.current?.click()}
               className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500"
@@ -132,70 +243,41 @@ const DocumentsPage: React.FC = () => {
           {filteredDocuments.map((doc) => (
             <div
               key={doc.id}
-              className={`flex items-center gap-4 p-4 rounded-xl border transition-colors ${
-                doc.status === 'verified'
-                  ? 'bg-[#1a1a2e] border-purple-500/20 hover:border-purple-500/40'
-                  : 'bg-red-900/10 border-red-500/20 hover:border-red-500/30'
-              }`}
+              className="flex items-center gap-4 p-4 rounded-xl border bg-[#1a1a2e] border-purple-500/20 hover:border-purple-500/40 transition-colors"
             >
               {/* Icon */}
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                doc.status === 'verified'
-                  ? 'bg-gradient-to-br from-red-500 to-red-600'
-                  : 'bg-gray-700'
-              }`}>
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0">
                 <FileText className="w-6 h-6 text-white" />
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <h4 className="text-white font-medium truncate">{doc.name}</h4>
+                <h4 className="text-white font-medium truncate">{doc.filename}</h4>
                 <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  <span className="text-gray-400 text-xs">{doc.size}</span>
+                  <span className="text-xs flex items-center gap-1 text-purple-400">
+                    <Zap className="w-3 h-3" />
+                    {doc.chunk_count} مقطع
+                  </span>
                   <span className="text-gray-600 text-xs">·</span>
-                  <span className="text-gray-400 text-xs">{formatDate(doc.verifiedAt)}</span>
+                  <span className="text-gray-400 text-xs">{formatDate(doc.upload_date)}</span>
                   <span className="text-gray-600 text-xs">·</span>
-                  <span className={`text-xs flex items-center gap-1 ${
-                    doc.status === 'verified' ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {doc.status === 'verified'
-                      ? <><CheckCircle className="w-3 h-3" /> موثق</>
-                      : <><XCircle className="w-3 h-3" /> مرفوض</>
-                    }
+                  <span className="text-xs text-green-400 flex items-center gap-1">
+                    <Database className="w-3 h-3" />
+                    مفهرس في قاعدة البيانات
                   </span>
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {doc.status === 'verified' && (
-                  <button
-                    onClick={() => downloadDocument(doc)}
-                    className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors group"
-                    title="تحميل الملف"
-                  >
-                    <Download className="w-5 h-5 text-gray-400 group-hover:text-purple-400" />
-                  </button>
-                )}
-                {doc.fileUrl && (
-                  <a
-                    href={doc.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors group"
-                    title="فتح الملف"
-                  >
-                    <Eye className="w-5 h-5 text-gray-400 group-hover:text-purple-400" />
-                  </a>
-                )}
+              {/* Delete action */}
+              {canUpload && (
                 <button
-                  onClick={() => removeDocument(doc.id)}
-                  className="p-2 hover:bg-red-500/20 rounded-lg transition-colors group"
-                  title="حذف الملف"
+                  onClick={() => setConfirmDeleteId(doc.id)}
+                  className="p-2 hover:bg-red-500/20 rounded-lg transition-colors group flex-shrink-0"
+                  title="حذف المستند"
                 >
-                  <Trash2 className="w-5 h-5 text-gray-400 group-hover:text-red-400" />
+                  <Trash2 className="w-5 h-5 text-gray-500 group-hover:text-red-400 transition-colors" />
                 </button>
-              </div>
+              )}
             </div>
           ))}
         </div>

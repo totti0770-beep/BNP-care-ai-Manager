@@ -54,3 +54,6 @@ packages = ["cargo", "freetype", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec"
 
 [userenv.shared]
 JWT_SECRET = "a7e539d7cfaa76152e8d5d72e9abb1a6e8d064c232ce40a142e5cd1a197388d1"
+
+[[ports]]
+localPort = 8000
