@@ -134,19 +134,6 @@ const LoginScreen: React.FC = () => {
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-purple-500/20">
-            <p className="text-gray-500 text-sm text-center mb-3">Demo Credentials:</p>
-            <div className="space-y-2 text-xs text-gray-400">
-              <div className="flex justify-between bg-[#0f0f1a] rounded-lg p-3">
-                <span>Admin:</span>
-                <span className="font-mono">admin@bestnursing.ai / admin123</span>
-              </div>
-              <div className="flex justify-between bg-[#0f0f1a] rounded-lg p-3">
-                <span>User:</span>
-                <span className="font-mono">user@bestnursing.ai / user123</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
