@@ -8,6 +8,7 @@ import React, {
 } from "react";
 
 export type Category = "pharmacy" | "policies" | "quality";
+export type ThemeMode = "auto" | "light" | "dark";
 
 export interface Document {
   id: string;
@@ -50,6 +51,8 @@ interface AppContextValue extends AppState {
   addMessage: (category: Category, message: Message) => void;
   clearChat: (category: Category) => void;
   setAdminAuth: (authenticated: boolean) => void;
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
 }
 
 const STORAGE_KEY = "nursing_ai_app_state";
@@ -116,18 +119,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     quality: [],
   });
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>("auto");
 
   useEffect(() => {
     const loadState = async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         if (stored) {
-          const parsed = JSON.parse(stored) as Partial<AppState>;
+          const parsed = JSON.parse(stored) as Partial<AppState> & { themeMode?: ThemeMode };
           if (parsed.documents) setDocuments(parsed.documents);
+          if (parsed.themeMode) setThemeModeState(parsed.themeMode);
         }
       } catch {}
     };
     loadState();
+  }, []);
+
+  const setThemeMode = useCallback(async (mode: ThemeMode) => {
+    setThemeModeState(mode);
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      const current = stored ? JSON.parse(stored) : {};
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, themeMode: mode }));
+    } catch {}
   }, []);
 
   const persistDocuments = useCallback(
@@ -196,6 +210,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addMessage,
         clearChat,
         setAdminAuth,
+        themeMode,
+        setThemeMode,
       }}
     >
       {children}

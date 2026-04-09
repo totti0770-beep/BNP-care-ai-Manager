@@ -18,6 +18,7 @@ import AuditLogPage from '@/components/AuditLogPage';
 import RAGSettingsPage from '@/components/RAGSettingsPage';
 import SecureUploadPage from '@/components/SecureUploadPage';
 import '@/i18n';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
@@ -71,6 +72,7 @@ function AppContent() {
 
 function App() {
   return (
+    <ThemeProvider>
     <LanguageProvider>
       <AuditLogProvider>
         <DocumentVerificationProvider>
@@ -92,6 +94,7 @@ function App() {
         </DocumentVerificationProvider>
       </AuditLogProvider>
     </LanguageProvider>
+    </ThemeProvider>
   );
 }
 

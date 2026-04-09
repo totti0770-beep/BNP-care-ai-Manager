@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CategoryCard } from "@/components/CategoryCard";
 import { useApp } from "@/contexts/AppContext";
+import { useColors } from "@/hooks/useColors";
 
 const CATEGORIES = [
   {
@@ -41,32 +42,62 @@ const CATEGORIES = [
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { documents } = useApp();
+  const { documents, themeMode, setThemeMode } = useApp();
+  const colors = useColors();
 
-  const topPad =
-    Platform.OS === "web" ? 67 : insets.top;
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const isDark = colors.isDark;
+
+  const cycleTheme = () => {
+    if (themeMode === "auto") setThemeMode("light");
+    else if (themeMode === "light") setThemeMode("dark");
+    else setThemeMode("auto");
+  };
+
+  const themeIcon = themeMode === "light" ? "sunny" : themeMode === "dark" ? "moon" : "phone-portrait-outline";
+  const themeLabel = themeMode === "light" ? "نهاري" : themeMode === "dark" ? "ليلي" : "تلقائي";
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A0A0F" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={colors.background}
+      />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 16 }]}>
+      <View style={[styles.header, { paddingTop: topPad + 16, borderBottomColor: colors.border }]}>
         <Pressable
-          style={styles.adminButton}
+          style={[styles.iconButton, { backgroundColor: colors.card }]}
           onPress={() => router.push("/admin")}
           testID="admin-button"
         >
-          <Ionicons name="settings-outline" size={22} color="#94A3B8" />
+          <Ionicons name="settings-outline" size={22} color={colors.mutedForeground} />
         </Pressable>
+
         <View style={styles.headerCenter}>
-          <View style={styles.logoRow}>
-            <Ionicons name="hardware-chip" size={20} color="#8B5CF6" />
+          <View style={[styles.logoRow, { backgroundColor: colors.primary + "22" }]}>
+            <Ionicons name="hardware-chip" size={20} color={colors.primary} />
           </View>
-          <Text style={styles.headerTitle}>مساعد التمريض الذكي</Text>
-          <Text style={styles.headerSubtitle}>نظام الاستفسار الطبي</Text>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>مساعد التمريض الذكي</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>نظام الاستفسار الطبي</Text>
         </View>
-        <View style={styles.placeholderButton} />
+
+        {/* Theme toggle */}
+        <Pressable
+          style={[styles.iconButton, { backgroundColor: colors.card }]}
+          onPress={cycleTheme}
+          testID="theme-button"
+        >
+          <Ionicons name={themeIcon as any} size={20} color={colors.primary} />
+        </Pressable>
+      </View>
+
+      {/* Theme mode label */}
+      <View style={[styles.themeBadgeRow]}>
+        <View style={[styles.themeBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Ionicons name={themeIcon as any} size={12} color={colors.primary} />
+          <Text style={[styles.themeBadgeText, { color: colors.mutedForeground }]}>{themeLabel}</Text>
+        </View>
       </View>
 
       {/* Content */}
@@ -77,15 +108,15 @@ export default function HomeScreen() {
       >
         {/* Drug Assistant — featured card */}
         <Pressable
-          style={styles.drugAssistantCard}
+          style={[styles.drugAssistantCard, { backgroundColor: isDark ? "#1A1208" : "#FFF7ED", borderColor: "#F9731633" }]}
           onPress={() => router.push("/drug-assistant")}
         >
           <View style={styles.drugAssistantLeft}>
-            <View style={styles.drugAssistantIcon}>
+            <View style={[styles.drugAssistantIcon, { backgroundColor: "#F9731622" }]}>
               <Ionicons name="medical" size={24} color="#F97316" />
             </View>
             <View>
-              <Text style={styles.drugAssistantTitle}>حاسبة الجرعات</Text>
+              <Text style={[styles.drugAssistantTitle, { color: isDark ? "#F8FAFC" : "#1E1B4B" }]}>حاسبة الجرعات</Text>
               <Text style={styles.drugAssistantSub}>Drug Dose Calculator</Text>
             </View>
           </View>
@@ -95,8 +126,8 @@ export default function HomeScreen() {
           </View>
         </Pressable>
 
-        <Text style={styles.sectionTitle}>اختر التصنيف</Text>
-        <Text style={styles.sectionSubtitle}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>اختر التصنيف</Text>
+        <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
           اختر الفئة للحصول على إجابات مستندة إلى مصادر معتمدة
         </Text>
 
@@ -119,9 +150,9 @@ export default function HomeScreen() {
         ))}
 
         {/* Info card */}
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, { backgroundColor: isDark ? "#0D0820" : "#F5F3FF", borderColor: "#8B5CF630" }]}>
           <Ionicons name="information-circle-outline" size={18} color="#8B5CF6" />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
             الإجابات مستندة إلى الوثائق المرفوعة. تواصل مع الطاقم الطبي للقرارات الحرجة.
           </Text>
         </View>
@@ -133,27 +164,20 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0A0A0F",
   },
   header: {
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#2D1B4E",
   },
-  adminButton: {
+  iconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#1A1A2E",
     alignItems: "center",
     justifyContent: "center",
-  },
-  placeholderButton: {
-    width: 40,
-    height: 40,
   },
   headerCenter: {
     flex: 1,
@@ -163,7 +187,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#8B5CF622",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 6,
@@ -171,16 +194,31 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#F8FAFC",
     fontFamily: "Inter_700Bold",
     textAlign: "center",
   },
   headerSubtitle: {
     fontSize: 12,
-    color: "#94A3B8",
     fontFamily: "Inter_400Regular",
     textAlign: "center",
     marginTop: 2,
+  },
+  themeBadgeRow: {
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  themeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  themeBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
   },
   scrollView: {
     flex: 1,
@@ -192,14 +230,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#F8FAFC",
     textAlign: "right",
     fontFamily: "Inter_700Bold",
     marginBottom: 6,
   },
   sectionSubtitle: {
     fontSize: 14,
-    color: "#94A3B8",
     textAlign: "right",
     fontFamily: "Inter_400Regular",
     marginBottom: 24,
@@ -209,11 +245,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#1A1208",
     borderRadius: 18,
     padding: 18,
     borderWidth: 1,
-    borderColor: "#F9731633",
     marginBottom: 24,
   },
   drugAssistantLeft: {
@@ -225,14 +259,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#F9731622",
     alignItems: "center",
     justifyContent: "center",
   },
   drugAssistantTitle: {
     fontSize: 16,
     fontFamily: "Inter_700Bold",
-    color: "#F8FAFC",
     textAlign: "right",
   },
   drugAssistantSub: {
@@ -261,17 +293,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    backgroundColor: "#0D0820",
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#8B5CF630",
     marginTop: 8,
   },
   infoText: {
     flex: 1,
     fontSize: 12,
-    color: "#94A3B8",
     textAlign: "right",
     fontFamily: "Inter_400Regular",
     lineHeight: 18,

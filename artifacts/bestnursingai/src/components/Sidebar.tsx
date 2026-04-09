@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   Stethoscope,
   Plus,
@@ -36,8 +37,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
   const { t } = useTranslation();
   const { user, logout, hasPermission } = useAuth();
   const { currentLanguage, changeLanguage, isRTL } = useLanguage();
+  const { isDark, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isDark, setIsDark] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const canManageSettings = hasPermission('settings.manage');
@@ -61,10 +62,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
   const handleLogout = () => {
     logout();
     toast.success(t('logout'));
-  };
-
-  const toggleTheme = () => {
-    setIsDark(!isDark);
   };
 
   const toggleLanguage = () => {
