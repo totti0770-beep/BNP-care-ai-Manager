@@ -30,6 +30,7 @@ from services.response_generator import (
     parse_contraindications_list,
 )
 from routers.auth import get_current_user
+from services.arabic_translator import translate_for_search, DRUG_MAP
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -50,9 +51,17 @@ def query(
     query_type = classify_query(question)
     logger.info(f"[{session_id}] Query type: {query_type} | Q: {question[:80]}")
 
+    # ── Step 1b: Translate Arabic query for FAISS/BM25 search ────────────────
+    # Documents are in English — Arabic embeddings won't match English content.
+    # We translate drug names and clinical terms to English for retrieval only;
+    # the ORIGINAL question is preserved for GPT-4o (so the response is in Arabic).
+    search_query = translate_for_search(question)
+    if search_query != question:
+        logger.info(f"[{session_id}] Arabic→English search query: {search_query[:100]}")
+
     # ── Step 2: Hybrid retrieval ──────────────────────────────────────────────
     retriever = get_retriever()
-    chunks = retriever.hybrid_search(question, top_k=body.top_k)
+    chunks = retriever.hybrid_search(search_query, top_k=body.top_k)
 
     citations = [
         Citation(
@@ -130,14 +139,24 @@ def query(
     if query_type == QueryType.DRUG:
         drug_name_raw = (body.drug_name or "").strip().lower()
         if not drug_name_raw:
+            # Search in the (possibly translated) English query for drug names in DRUG_DB
+            q_for_drug_detect = search_query.lower()
             for dn in DRUG_DB:
-                if dn in question.lower():
+                if dn in q_for_drug_detect:
                     drug_name_raw = dn
                     break
                 for alias in DRUG_DB[dn].get("aliases", []):
-                    if alias in question.lower():
+                    if alias in q_for_drug_detect:
                         drug_name_raw = dn
                         break
+            # Also check Arabic drug names in original question → map to English
+            if not drug_name_raw:
+                for ar_name, en_name in DRUG_MAP.items():
+                    if ar_name in question:
+                        en_lower = en_name.lower()
+                        if en_lower in DRUG_DB:
+                            drug_name_raw = en_lower
+                            break
 
         weight = body.patient_weight_kg or extract_weight(question)
 
