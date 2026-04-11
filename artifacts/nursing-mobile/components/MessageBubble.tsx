@@ -1,11 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
+import { Citation } from "@/contexts/AppContext";
 
 interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
   citation?: { source: string; page: number };
+  citations?: Citation[];
   accentColor: string;
   dose?: string;
   indication?: string;
@@ -19,10 +27,17 @@ interface MessageBubbleProps {
   interactions?: string[];
 }
 
+function relevanceBar(score: number) {
+  const pct = Math.round(score * 100);
+  const color = pct >= 70 ? "#4ADE80" : pct >= 45 ? "#FBBF24" : "#F87171";
+  return { pct, color };
+}
+
 export function MessageBubble({
   role,
   content,
   citation,
+  citations,
   accentColor,
   dose,
   indication,
@@ -37,13 +52,9 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const isUser = role === "user";
   const isAI = role === "assistant";
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
-  const hasSafetyData =
-    isAI &&
-    (safetyAlerts?.length ||
-      nursingNotes?.length ||
-      contraindications?.length ||
-      interactions?.length);
+  const allSources = citations && citations.length > 0 ? citations : [];
 
   return (
     <View style={[styles.container, isUser ? styles.userContainer : styles.aiContainer]}>
@@ -89,10 +100,7 @@ export function MessageBubble({
             styles.bubble,
             isUser
               ? [styles.userBubble, { backgroundColor: accentColor }]
-              : [
-                  styles.aiBubble,
-                  rejected && styles.rejectedBubble,
-                ],
+              : [styles.aiBubble, rejected && styles.rejectedBubble],
           ]}
         >
           <Text style={[styles.text, isUser ? styles.userText : styles.aiText]}>
@@ -102,22 +110,45 @@ export function MessageBubble({
 
         {/* Confidence label badge */}
         {isAI && confidenceLabel && (
-          <View style={[
-            styles.confidenceBadge,
-            confidenceLabel === "High" ? styles.confidenceHigh
-              : confidenceLabel === "Medium" ? styles.confidenceMedium
-              : styles.confidenceLow,
-          ]}>
+          <View
+            style={[
+              styles.confidenceBadge,
+              confidenceLabel === "High"
+                ? styles.confidenceHigh
+                : confidenceLabel === "Medium"
+                ? styles.confidenceMedium
+                : styles.confidenceLow,
+            ]}
+          >
             <Ionicons
               name="bar-chart-outline"
               size={10}
-              color={confidenceLabel === "High" ? "#4ADE80" : confidenceLabel === "Medium" ? "#FBBF24" : "#F87171"}
+              color={
+                confidenceLabel === "High"
+                  ? "#4ADE80"
+                  : confidenceLabel === "Medium"
+                  ? "#FBBF24"
+                  : "#F87171"
+              }
             />
-            <Text style={[
-              styles.confidenceText,
-              { color: confidenceLabel === "High" ? "#4ADE80" : confidenceLabel === "Medium" ? "#FBBF24" : "#F87171" }
-            ]}>
-              {confidenceLabel === "High" ? "ثقة عالية" : confidenceLabel === "Medium" ? "ثقة متوسطة" : "ثقة منخفضة"}
+            <Text
+              style={[
+                styles.confidenceText,
+                {
+                  color:
+                    confidenceLabel === "High"
+                      ? "#4ADE80"
+                      : confidenceLabel === "Medium"
+                      ? "#FBBF24"
+                      : "#F87171",
+                },
+              ]}
+            >
+              {confidenceLabel === "High"
+                ? "ثقة عالية"
+                : confidenceLabel === "Medium"
+                ? "ثقة متوسطة"
+                : "ثقة منخفضة"}
             </Text>
           </View>
         )}
@@ -207,8 +238,71 @@ export function MessageBubble({
           </View>
         )}
 
-        {/* Citation */}
-        {citation && !isUser && (
+        {/* ── Sources & Files Section ── */}
+        {isAI && allSources.length > 0 && (
+          <View style={styles.sourcesContainer}>
+            {/* Header toggle */}
+            <Pressable style={styles.sourcesToggle} onPress={() => setSourcesOpen((o) => !o)}>
+              <Ionicons name="library-outline" size={13} color="#8B5CF6" />
+              <Text style={styles.sourcesToggleLabel}>
+                المصادر والملفات ({allSources.length})
+              </Text>
+              <Ionicons
+                name={sourcesOpen ? "chevron-up" : "chevron-down"}
+                size={13}
+                color="#8B5CF6"
+              />
+            </Pressable>
+
+            {sourcesOpen && (
+              <View style={styles.sourcesList}>
+                {allSources.map((src, i) => {
+                  const { pct, color } = relevanceBar(src.relevance);
+                  return (
+                    <View key={i} style={styles.sourceCard}>
+                      {/* Source title row */}
+                      <View style={styles.sourceTitleRow}>
+                        <Ionicons name="document-text-outline" size={12} color="#8B5CF6" />
+                        <Text style={styles.sourceTitle} numberOfLines={2}>
+                          {src.source}
+                        </Text>
+                      </View>
+
+                      {/* Page + relevance row */}
+                      <View style={styles.sourceMeta}>
+                        <View style={styles.sourcePageBadge}>
+                          <Ionicons name="bookmark-outline" size={10} color="#64748B" />
+                          <Text style={styles.sourcePageText}>ص {src.page}</Text>
+                        </View>
+                        <View style={styles.relevanceRow}>
+                          <View style={styles.relevanceTrack}>
+                            <View
+                              style={[
+                                styles.relevanceFill,
+                                { width: `${pct}%` as any, backgroundColor: color },
+                              ]}
+                            />
+                          </View>
+                          <Text style={[styles.relevancePct, { color }]}>{pct}%</Text>
+                        </View>
+                      </View>
+
+                      {/* Excerpt */}
+                      {src.excerpt ? (
+                        <Text style={styles.sourceExcerpt} numberOfLines={3}>
+                          "{src.excerpt.trim()}"
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Legacy single citation (fallback when no full citations) */}
+        {citation && !isUser && allSources.length === 0 && (
           <View style={styles.citation}>
             <Ionicons name="document-text-outline" size={12} color="#64748B" />
             <Text style={styles.citationText}>
@@ -473,5 +567,103 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
     lineHeight: 18,
+  },
+
+  /* ── Sources section ── */
+  sourcesContainer: {
+    width: "100%",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#8B5CF633",
+    overflow: "hidden",
+  },
+  sourcesToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#120D1E",
+  },
+  sourcesToggleLabel: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: "#8B5CF6",
+    textAlign: "right",
+  },
+  sourcesList: {
+    gap: 1,
+  },
+  sourceCard: {
+    backgroundColor: "#0F0A1A",
+    padding: 10,
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: "#8B5CF622",
+  },
+  sourceTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 5,
+  },
+  sourceTitle: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: "#C4B5FD",
+    textAlign: "right",
+    writingDirection: "rtl",
+    lineHeight: 16,
+  },
+  sourceMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sourcePageBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#1A1A2E",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  sourcePageText: {
+    fontSize: 10,
+    color: "#64748B",
+    fontFamily: "Inter_400Regular",
+  },
+  relevanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  relevanceTrack: {
+    width: 50,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#2D1B4E",
+    overflow: "hidden",
+  },
+  relevanceFill: {
+    height: 4,
+    borderRadius: 2,
+  },
+  relevancePct: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    minWidth: 28,
+    textAlign: "right",
+  },
+  sourceExcerpt: {
+    fontSize: 10,
+    color: "#64748B",
+    fontFamily: "Inter_400Regular",
+    textAlign: "right",
+    writingDirection: "rtl",
+    lineHeight: 15,
+    fontStyle: "italic",
   },
 });

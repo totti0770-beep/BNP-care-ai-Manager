@@ -18,6 +18,13 @@ export interface Document {
   pages: number;
 }
 
+export interface Citation {
+  source: string;
+  page: number;
+  relevance: number;
+  excerpt: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -26,6 +33,7 @@ export interface Message {
     source: string;
     page: number;
   };
+  citations?: Citation[];
   timestamp: string;
   dose?: string;
   indication?: string;

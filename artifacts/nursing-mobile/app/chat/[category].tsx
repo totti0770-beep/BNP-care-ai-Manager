@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ChatInput } from "@/components/ChatInput";
 import { MessageBubble } from "@/components/MessageBubble";
-import { Category, Message, useApp } from "@/contexts/AppContext";
+import { Category, Citation, Message, useApp } from "@/contexts/AppContext";
 import { queryEngine } from "@/services/clinicalApi";
 
 const CATEGORY_CONFIG: Record<
@@ -102,7 +102,13 @@ export default function ChatScreen() {
             safetyAlerts: result.safety_alerts,
           };
         } else {
-          const firstCitation = result.citations[0];
+          const allCitations: Citation[] = (result.citations ?? []).map((c) => ({
+            source: c.document_name,
+            page: c.page_number,
+            relevance: c.relevance_score,
+            excerpt: c.excerpt,
+          }));
+          const firstCitation = allCitations[0];
           aiMsg = {
             id: generateId(),
             role: "assistant",
@@ -121,11 +127,9 @@ export default function ChatScreen() {
               : undefined,
             interactions: result.interactions?.length ? result.interactions : undefined,
             citation: firstCitation
-              ? {
-                  source: firstCitation.document_name,
-                  page: firstCitation.page_number,
-                }
+              ? { source: firstCitation.source, page: firstCitation.page }
               : undefined,
+            citations: allCitations.length > 0 ? allCitations : undefined,
           };
         }
 
@@ -158,6 +162,7 @@ export default function ChatScreen() {
         role={item.role}
         content={item.content}
         citation={item.citation}
+        citations={item.citations}
         accentColor={config.accentColor}
         dose={item.dose}
         indication={item.indication}
