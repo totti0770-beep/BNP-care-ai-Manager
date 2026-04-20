@@ -1,0 +1,146 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "Camera Plain Variable",
+      "count": 17
+    },
+    {
+      "family": "ui-sans-serif",
+      "count": 17
+    },
+    {
+      "family": "system-ui",
+      "count": 17
+    },
+    {
+      "family": "sans-serif",
+      "count": 17
+    }
+  ],
+  "colors": {
+    "primary": "#4B73FF",
+    "secondary": "#FF66F4",
+    "accent": "#1E1E1E",
+    "background": "#FCFBF8",
+    "textPrimary": "#1E1E1E",
+    "link": "#9CA3AF"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Camera Plain Variable",
+      "heading": "Camera Plain Variable"
+    },
+    "fontStacks": {
+      "body": [
+        "Camera Plain Variable",
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif"
+      ],
+      "heading": [
+        "Camera Plain Variable",
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "Camera Plain Variable",
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "30px",
+      "h2": "30px",
+      "body": "14px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "7px"
+  },
+  "components": {
+    "input": {
+      "background": "transparent",
+      "textColor": "#1C1C1C",
+      "borderColor": "#ECEAE4",
+      "borderRadius": "6px",
+      "borderRadiusCorners": {
+        "topLeft": "6px",
+        "topRight": "6px",
+        "bottomRight": "6px",
+        "bottomLeft": "6px"
+      },
+      "shadow": "none"
+    },
+    "buttonPrimary": {
+      "background": "#1E1E1E",
+      "textColor": "#FAFAFA",
+      "borderRadius": "8px",
+      "borderRadiusCorners": {
+        "topLeft": "8px",
+        "topRight": "8px",
+        "bottomRight": "8px",
+        "bottomLeft": "8px"
+      },
+      "shadow": "rgba(0, 0, 0, 0.08) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.16) 0px -1px 0px 0px inset, rgb(0, 0, 0) 0px 0px 0px 1px inset, rgba(255, 255, 255, 0.24) 0px 1px 0px 0px inset, rgba(255, 255, 255, 0.16) 0px -1px 0px 0px inset, rgba(0, 0, 0, 0.12) 0px 2px 2px -1px, rgba(0, 0, 0, 0.12) 0px 4px 4px -2px"
+    },
+    "buttonSecondary": {
+      "background": "#FEFEFE",
+      "textColor": "#030303",
+      "borderRadius": "8px",
+      "borderRadiusCorners": {
+        "topLeft": "8px",
+        "topRight": "8px",
+        "bottomRight": "8px",
+        "bottomLeft": "8px"
+      },
+      "shadow": "none"
+    }
+  },
+  "images": {
+    "logo": null,
+    "favicon": "File saved at: attached_assets/favicon.svg",
+    "ogImage": "File saved at: attached_assets/ogImage.png"
+  },
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": 0,
+      "text": "Continue",
+      "reasoning": "Button #0 ('Continue') is likely the primary CTA due to its action-oriented text and dark background color, which stands out against the page's light background."
+    },
+    "secondary": {
+      "index": 2,
+      "text": "Manage preferences",
+      "reasoning": "Button #2 ('Manage preferences') is selected as secondary because it has a different background color (#FEFEFE) and serves a supportive function."
+    },
+    "confidence": 0.95
+  },
+  "personality": {
+    "tone": "modern",
+    "energy": "medium",
+    "targetAudience": "developers and tech-savvy users"
+  },
+  "designSystem": {
+    "framework": "tailwind",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0.95,
+    "colors": 0.9,
+    "overall": 0.925
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": false,
+      "llmSucceeded": false,
+      "finalSource": "none"
+    },
+    "buttonClassification": {
+      "llmCalled": true,
+      "llmSucceeded": true
+    }
+  }
+}
