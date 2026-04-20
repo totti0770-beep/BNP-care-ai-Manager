@@ -35,6 +35,16 @@ from services.arabic_translator import translate_for_search, DRUG_MAP
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+import re as _re
+_ARABIC_RE = _re.compile(r'[\u0600-\u06FF]')
+
+def _is_arabic(text: str) -> bool:
+    """Return True if the text contains Arabic characters."""
+    return bool(_ARABIC_RE.search(text))
+
+def _msg(arabic: str, english: str, question: str) -> str:
+    return arabic if _is_arabic(question) else english
+
 
 @router.post("/", response_model=QueryResponse)
 def query(
@@ -93,10 +103,13 @@ def query(
         return QueryResponse(
             session_id=session_id,
             query_type=query_type,
-            answer=(
+            answer=_msg(
+                "لم يُعثر على معلومات كافية في قاعدة المعرفة للإجابة على هذا السؤال. "
+                "يرجى رفع البروتوكول السريري أو الوثيقة الدوائية المناسبة.",
                 "Insufficient clinical data — the knowledge base does not contain "
                 "reliable information to answer this question. "
-                "Please upload the relevant clinical protocol or pharmacology document."
+                "Please upload the relevant clinical protocol or pharmacology document.",
+                question,
             ),
             citations=[],
             confidence=top_confidence,
@@ -116,12 +129,20 @@ def query(
         return QueryResponse(
             session_id=session_id,
             query_type=query_type,
-            answer="Not found in provided medical sources.",
+            answer=_msg(
+                "لم يُعثر على المعلومات في المصادر الطبية المتاحة.",
+                "Not found in provided medical sources.",
+                question,
+            ),
             citations=[],
             confidence=top_confidence,
             confidence_label=confidence_label,
             rejected=True,
-            rejection_reason=safety.rejection_reason,
+            rejection_reason=_msg(
+                "لم يُعثر على مصادر طبية كافية للإجابة على هذا الاستعلام.",
+                safety.rejection_reason or "Not found in provided medical sources.",
+                question,
+            ),
             safety_alert=False,
             processing_time_ms=elapsed,
         )
@@ -197,9 +218,12 @@ def query(
 
     # ── Step 6: GPT-4o response generation ───────────────────────────────────
     if hard_blocked:
-        answer = (
+        answer = _msg(
+            "❌ تم اكتشاف جرعة غير آمنة — تم إيقاف الصرف. "
+            "الجرعة المحسوبة تتجاوز الحد الأقصى الآمن. تواصل فوراً مع الطبيب المعالج.",
             "❌ Unsafe dosage detected. Administration blocked. "
-            "Calculated dose exceeds maximum safe limit — contact the prescribing physician immediately."
+            "Calculated dose exceeds maximum safe limit — contact the prescribing physician immediately.",
+            question,
         )
         logger.warning(f"[{session_id}] HARD BLOCK: Overdose detected for: {question[:80]}")
     else:
