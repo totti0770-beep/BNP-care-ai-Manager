@@ -1,0 +1,95 @@
+Create a premium React + TypeScript single-page healthcare web app named 'CliNurse AI v2.1' that visually and functionally resembles a real production nursing assistant dashboard. This is not a generic AI app. It is a closed-loop RAG nursing assistant that only answers from official uploaded documents, with strong trust, governance, traceability, and refusal UX. The app must look excellent on mobile and desktop.
+
+VISUAL DIRECTION:
+
+Arabic-first RTL by default, with English toggle.
+Dark theme default, with optional light mode.
+Premium violet/purple gradient medical SaaS style with clean glassy cards, subtle glows, strong contrast, and polished typography.
+Elegant hospital-grade interface suitable for executive demos.
+Sidebar-based layout with responsive mobile drawer.
+Use modern iconography and smooth transitions.
+Include a thin top demo banner: 'Demo Clinical Environment'.
+CORE BRANDING:
+
+Main brand: 'CliNurse AI'
+Subtitle: 'Closed-Loop RAG Clinical Assistant for Nursing'
+Trust labels shown across the UI: 'Official Sources Only', 'Closed-Loop RAG', 'Insufficient Evidence = No Answer'
+APP STRUCTURE: A) AUTH
+
+Login screen with polished card, logo area, Arabic and English text, email/username and password fields, remember me, and sign in CTA.
+Add a short note that this environment is for authorized clinical/demo access.
+B) MAIN SHELL
+
+Collapsible sidebar with sections and icons.
+Primary menu items: Home, New Chat, Chat, Secure Upload, Documents, Citations, Settings.
+Advanced/Admin group: Official Sources, Audit Log, RAG Settings.
+Top bar with page title, search box, language toggle, theme toggle, notification icon, and user avatar menu.
+On mobile, use bottom-safe spacing and a slide-out menu.
+C) HOME PAGE
+
+Hero section centered with medical/AI icon motif.
+Strong product headline and short description emphasizing safe, evidence-based nursing assistance from official documents only.
+Three prominent capability cards:
+Medication Protocols & Dose Guidance
+Nursing Policies & Procedures
+Quality & Safety Standards
+Add small status widgets: verified sources count, indexed chunks, last sync, confidence threshold, system health.
+Include feature chips such as evidence-based, secure, real-time citations, governed AI.
+D) NEW CHAT / CHAT EXPERIENCE
+
+Specialized clinical chat interface, not consumer-chat style.
+Message list with distinct user and assistant bubbles/cards.
+Input area with question box, send button, and optional structured clinical helper fields like patient weight.
+Assistant responses must display:
+answer text
+confidence level
+cited sources with document name and page number
+relevance score/similarity badge
+explicit refusal banner if evidence is missing
+Include a medication answer card pattern for sample data showing preparation, compatibility, stability, infusion rate, and references.
+Add side panel or expandable drawer for evidence traceability and related sources.
+Include sample empty state text encouraging clinically framed questions.
+E) SECURE UPLOAD PAGE
+
+Admin-oriented document intake screen.
+Inputs for admin signature/admin key.
+Drag-and-drop area for PDF/DOCX.
+Verification flow UI with checksum/hash display, validation status, indexing progress, and chunk count.
+Show upload queue/history with statuses like verified, indexed, rejected.
+Add governance warning text that only official approved documents should be uploaded.
+F) DOCUMENTS PAGE
+
+Searchable, filterable documents table/grid.
+Each row/card should show title, type, verification status, indexed status, upload date, owner, and pages/chunks metadata.
+Include quick actions like view metadata and see citations.
+G) CITATIONS PAGE
+
+Evidence explorer layout.
+Cards or rows with source title, page number, excerpt preview, relevance/similarity, verification badge, and traceability controls.
+Make this page feel like a trust center for clinical evidence.
+H) OFFICIAL SOURCES PAGE
+
+Registry of trusted institutional sources.
+Show source name, category, approval status, last review date, and owner.
+Add clear verified/unverified styling.
+I) AUDIT LOG PAGE
+
+Timeline or table of governance events.
+Include actions such as login, upload, verify, index, query, settings change.
+Show actor, timestamp, action type, and result.
+J) RAG SETTINGS PAGE
+
+Friendly admin control panel for confidence threshold, retrieval depth, answer refusal behavior, citation strictness, and demo toggles.
+Include sliders, switches, and explanatory helper text.
+K) SETTINGS PAGE
+
+Language, theme, profile, notifications, demo mode, and interface preferences.
+UX RULES:
+
+Always emphasize safety, trust, and evidence.
+Never imply the assistant can answer from general knowledge.
+Show a clear insufficient-evidence state instead of fabricated responses.
+Use realistic mock data across all pages.
+Ensure all text and layout work beautifully in Arabic RTL and English.
+Optimize spacing and controls for mobile use.
+The final result should feel like a deployable hospital-grade nursing assistant dashboard, visually refined, deeply trustworthy, and much closer to a real clinical product than a generic AI website.
