@@ -76,6 +76,7 @@
   },
   "dependencies": {
     "@types/crypto-js": "^4.2.2",
+    "@workspace/replit-auth-web": "workspace:*",
     "crypto-js": "^4.2.0",
     "i18next": "^26.0.3",
     "i18next-browser-languagedetector": "^8.2.1",

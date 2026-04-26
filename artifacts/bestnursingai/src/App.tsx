@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { DocumentVerificationProvider } from '@/contexts/DocumentVerificationContext';
 import { AuditLogProvider } from '@/contexts/AuditLogContext';
@@ -21,9 +22,17 @@ import '@/i18n';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <LoginScreen />;
@@ -72,6 +81,7 @@ function AppContent() {
 
 function App() {
   return (
+    <AuthProvider>
     <ThemeProvider>
     <LanguageProvider>
       <AuditLogProvider>
@@ -95,6 +105,7 @@ function App() {
       </AuditLogProvider>
     </LanguageProvider>
     </ThemeProvider>
+    </AuthProvider>
   );
 }
 

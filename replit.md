@@ -4,6 +4,25 @@
 
 Full-stack clinical AI platform for nurses — pnpm monorepo (TypeScript + Python FastAPI). Three production artifacts: web app, mobile app, and clinical AI engine backend.
 
+## Authentication — Replit Auth (OIDC)
+
+Web app uses Replit Auth (OpenID Connect/PKCE) via the Express API server.
+
+**Flow:** Browser → `/api/login` → Replit OIDC → `/api/callback` → session cookie set → app unlocked.
+
+**Key files:**
+- `artifacts/api-server/src/lib/auth.ts` — OIDC config, session CRUD, user upsert
+- `artifacts/api-server/src/middlewares/authMiddleware.ts` — loads user from session on every request
+- `artifacts/api-server/src/routes/auth.ts` — login, callback, logout, mobile token-exchange routes
+- `lib/replit-auth-web/` — `useAuth()` hook for React web app
+- `artifacts/bestnursingai/src/contexts/AuthContext.tsx` — wraps `useReplitAuth()`, maps to app User type
+
+**DB tables (PostgreSQL):** `sessions` (session storage), `users` (Replit user profiles).
+
+**Ports:** API server runs on port 8080 (Replit-assigned). Vite proxy forwards `/api` → `http://localhost:8080`.
+
+**User shape from Replit:** `{ id, name, profileImage, roles }`. Mapped to app `User`: `role='admin'` if `roles` includes `'admin'`, else `role='user'`.
+
 ## SafetyEngine (Clinical AI Engine)
 
 Rule-based medication safety layer integrated into query pipeline (`services/drug_calculator.py`):
