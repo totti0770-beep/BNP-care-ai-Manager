@@ -136,14 +136,18 @@ These are deliberate and should survive refactoring:
 1. **Fail closed.** When retrieval, the database, or the audit log is unavailable, the system
    refuses to answer. There is no client-side or offline path that produces clinical guidance.
 2. **The audit write precedes the answer.** If it fails, the request fails. An unrecorded
-   clinical recommendation is worse than no recommendation.
-3. **Deterministic rules override the model.** An overdose detected by `SafetyEngine` blocks
+   clinical recommendation is worse than no recommendation. Rows are hash-chained, so an
+   edited or deleted entry is detectable — `GET /auth/audit-log/verify`.
+3. **Deletion is retirement.** Retiring a document stops it being retrieved but preserves its
+   text, so the passage behind a past recommendation stays recoverable via
+   `GET /documents/chunks/{chunk_id}`.
+4. **Deterministic rules override the model.** An overdose detected by `SafetyEngine` blocks
    the answer before generation; the model cannot talk its way past it.
-4. **Roles never come from the client.** They are derived server-side from `ADMIN_EMAILS`,
+5. **Roles never come from the client.** They are derived server-side from `ADMIN_EMAILS`,
    never from request bodies or OIDC claims.
-5. **Units are explicit.** Every `DRUG_DB` entry declares `mg` or `unit`; drugs dosed in
+6. **Units are explicit.** Every `DRUG_DB` entry declares `mg` or `unit`; drugs dosed in
    international units set `auto_calculate: False` and no number is computed for them.
-6. **Age gates the pediatric range.** Weight alone never selects it — an adult and a child can
+7. **Age gates the pediatric range.** Weight alone never selects it — an adult and a child can
    weigh the same.
 
 ## Before a pilot
@@ -172,6 +176,9 @@ Engineering work is not the remaining blocker. These are:
 - The FAISS index is rebuilt in full on every document upload, and re-embedded from the
   database when it and the `bnp_chunks` table disagree on count.
 - Rate limiting is per-process and in-memory; a multi-instance deployment needs a shared store.
+- The audit hash chain is computed by the application, so it detects tampering by anyone
+  without database write access at the moment of writing. A fully independent guarantee needs
+  append-only storage or external anchoring.
 - Document "verification" in the web app records a checksum but does **not** validate any
   signature. Uploads are marked unverified, and no document is attributed to an official source.
 - Retrieved source text is fenced and the model is told to treat it as data, but that is a

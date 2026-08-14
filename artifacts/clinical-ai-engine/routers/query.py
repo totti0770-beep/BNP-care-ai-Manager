@@ -49,6 +49,55 @@ router = APIRouter()
 ENGINE_VERSION = "1.0.0"
 RESPONSE_MODEL = "gpt-4o"
 
+# Anchors the first row so an attacker cannot truncate the log to nothing and
+# start a fresh, internally consistent chain.
+GENESIS_HASH = "bnp-audit-genesis"
+
+
+def canonical_json(value) -> str:
+    """
+    Stable serialisation for hashing.
+
+    Citations are stored in a JSONB column, which preserves neither key order
+    nor whitespace, so re-serialising a row read back from the database would
+    not reproduce the string that was hashed on write. Both sides canonicalise
+    instead.
+    """
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError):
+            return value
+    return json.dumps(value or [], sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def compute_chain_hash(
+    *,
+    prev_hash: str,
+    session_id: str,
+    username: str,
+    query: str,
+    answer: str,
+    rejected: bool,
+    citations,
+) -> str:
+    """
+    sha256 over the previous chain hash and this row's clinically meaningful
+    content. Editing any covered field, or removing a row, breaks every hash
+    after it — which is what makes tampering detectable rather than merely
+    discouraged.
+    """
+    payload = "\x1f".join([
+        prev_hash,
+        session_id,
+        username or "",
+        query,
+        answer or "",
+        "1" if rejected else "0",
+        canonical_json(citations),
+    ])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
 import re as _re
 _ARABIC_RE = _re.compile(r'[\u0600-\u06FF]')
 
@@ -469,20 +518,42 @@ def _log_query(
         ]
     )
 
+    alerts_json = json.dumps(safety_alerts or [])
+
     with db_cursor() as (cur, _):
+        # Lock the tail of the chain so two concurrent writes cannot both build
+        # on the same predecessor and fork it.
+        cur.execute(
+            "SELECT chain_hash FROM bnp_audit_log ORDER BY id DESC LIMIT 1 FOR UPDATE"
+        )
+        row = cur.fetchone()
+        prev_hash = (row["chain_hash"] if row else None) or GENESIS_HASH
+
+        chain_hash = compute_chain_hash(
+            prev_hash=prev_hash,
+            session_id=session_id,
+            username=username,
+            query=query,
+            answer=answer,
+            rejected=rejected,
+            citations=citation_json,
+        )
+
         cur.execute(
             """
             INSERT INTO bnp_audit_log
               (session_id, user_id, username, query, query_type, confidence,
                rejected, answer_text, answer_hash, dose_text, citations,
                safety_alerts, confidence_label, rejection_reason,
-               client_ip, user_agent, model, drug_db_version, engine_version)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               client_ip, user_agent, model, drug_db_version, engine_version,
+               prev_hash, chain_hash)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 session_id, user_id, username, query, query_type.value, confidence,
                 rejected, answer or None, answer_hash, dose, citation_json,
-                json.dumps(safety_alerts or []), confidence_label, rejection_reason,
+                alerts_json, confidence_label, rejection_reason,
                 client_ip, user_agent, RESPONSE_MODEL, DRUG_DB_VERSION, ENGINE_VERSION,
+                prev_hash, chain_hash,
             ),
         )

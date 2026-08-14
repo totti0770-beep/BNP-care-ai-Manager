@@ -201,3 +201,25 @@ export async function listAuditLog(
     return [];
   }
 }
+
+export interface AuditChainStatus {
+  valid: boolean;
+  reason?: string;
+  broken_at_id?: number;
+  rows_checked: number;
+  unchained_legacy_rows?: number;
+}
+
+/**
+ * Verify that the audit trail has not been altered since it was written.
+ * Admin-only; returns null when unavailable.
+ */
+export async function verifyAuditChain(): Promise<AuditChainStatus | null> {
+  try {
+    const res = await authFetch("/auth/audit-log/verify");
+    if (!res || !res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}

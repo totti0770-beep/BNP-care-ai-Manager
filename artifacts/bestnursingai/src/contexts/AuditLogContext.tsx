@@ -5,7 +5,12 @@ import React, {
   useEffect,
   useState,
 } from 'react';
-import { listAuditLog, type EngineAuditEntry } from '@/services/clinicalApi';
+import {
+  listAuditLog,
+  verifyAuditChain,
+  type AuditChainStatus,
+  type EngineAuditEntry,
+} from '@/services/clinicalApi';
 
 /**
  * Read-only view of the clinical engine's audit log.
@@ -43,6 +48,8 @@ export interface AuditLogEntry {
 interface AuditLogContextType {
   logs: AuditLogEntry[];
   isLoading: boolean;
+  /** Whether the trail verifies as unaltered. null while unknown. */
+  chainStatus: AuditChainStatus | null;
   refresh: () => Promise<void>;
   exportLogs: () => string;
 }
@@ -77,11 +84,13 @@ export const AuditLogProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [chainStatus, setChainStatus] = useState<AuditChainStatus | null>(null);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
-    const rows = await listAuditLog();
+    const [rows, chain] = await Promise.all([listAuditLog(), verifyAuditChain()]);
     setLogs(rows.map(toEntry));
+    setChainStatus(chain);
     setIsLoading(false);
   }, []);
 
@@ -94,7 +103,7 @@ export const AuditLogProvider: React.FC<{ children: React.ReactNode }> = ({
   const exportLogs = useCallback(() => JSON.stringify(logs, null, 2), [logs]);
 
   return (
-    <AuditLogContext.Provider value={{ logs, isLoading, refresh, exportLogs }}>
+    <AuditLogContext.Provider value={{ logs, isLoading, chainStatus, refresh, exportLogs }}>
       {children}
     </AuditLogContext.Provider>
   );

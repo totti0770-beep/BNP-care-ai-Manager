@@ -108,6 +108,7 @@ def list_documents(current_user: dict = Depends(get_current_user)):
                    u.username as uploaded_by
             FROM bnp_documents d
             LEFT JOIN bnp_users u ON d.uploaded_by = u.id
+            WHERE d.deleted_at IS NULL
             ORDER BY d.upload_date DESC
             """,
         )
@@ -119,12 +120,70 @@ def delete_document(
     document_id: str,
     _admin: dict = Depends(require_admin),
 ):
-    """Delete a document and remove its chunks from the index."""
+    """
+    Retire a document: it stops being retrievable, and its text is preserved.
+
+    This used to hard-delete, cascading to bnp_chunks — so the passage a past
+    clinical recommendation was generated from disappeared, while the audit row
+    still cited it by name and page. An audit trail that cannot produce its own
+    evidence is not an audit trail.
+    """
     with db_cursor() as (cur, _):
-        cur.execute("DELETE FROM bnp_documents WHERE id = %s", (document_id,))
+        cur.execute(
+            """
+            UPDATE bnp_documents
+               SET deleted_at = NOW()
+             WHERE id = %s AND deleted_at IS NULL
+            """,
+            (document_id,),
+        )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Document not found")
+        cur.execute(
+            "UPDATE bnp_chunks SET deleted_at = NOW() WHERE document_id = %s AND deleted_at IS NULL",
+            (document_id,),
+        )
 
     retriever = get_retriever()
     retriever.remove_document(document_id)
+    logger.info(f"Retired document {document_id} (text preserved for audit)")
     return None
+
+
+@router.get("/chunks/{chunk_id}")
+def get_chunk(
+    chunk_id: str,
+    _admin: dict = Depends(require_admin),
+):
+    """
+    Return the exact passage behind a citation.
+
+    This is the point of recording chunk_id on every citation: an incident
+    review can ask "what text produced this recommendation?" and get the answer,
+    including for documents that have since been retired — which is why deletion
+    is soft.
+    """
+    with db_cursor() as (cur, _):
+        cur.execute(
+            """
+            SELECT c.chunk_id, c.content, c.page_number, c.chunk_index,
+                   c.document_id, c.deleted_at AS chunk_retired_at,
+                   d.filename, d.deleted_at AS document_retired_at
+            FROM bnp_chunks c
+            JOIN bnp_documents d ON c.document_id = d.id
+            WHERE c.chunk_id = %s
+            """,
+            (chunk_id,),
+        )
+        row = cur.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Chunk not found")
+
+    return {
+        **row,
+        # A retired source is still valid evidence for a past answer; it is just
+        # no longer used for new ones.
+        "retired": row["document_retired_at"] is not None
+        or row["chunk_retired_at"] is not None,
+    }

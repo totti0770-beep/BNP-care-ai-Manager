@@ -167,6 +167,9 @@ class HybridRetriever:
                            c.document_id, d.filename
                     FROM bnp_chunks c
                     JOIN bnp_documents d ON c.document_id = d.id
+                    -- Retired documents keep their text for the audit trail but
+                    -- must never be retrievable again.
+                    WHERE c.deleted_at IS NULL AND d.deleted_at IS NULL
                     ORDER BY d.upload_date ASC, c.chunk_index ASC
                 """)
                 rows = cur.fetchall()

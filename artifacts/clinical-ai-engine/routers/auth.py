@@ -1,5 +1,6 @@
 """JWT Authentication router."""
 import os
+import json
 import jwt
 import logging
 from datetime import datetime, timedelta, timezone
@@ -192,3 +193,81 @@ def audit_log(
             (limit, offset),
         )
         return cur.fetchall()
+
+
+@router.get("/audit-log/verify")
+def verify_audit_chain(
+    limit: int = Query(default=5000, ge=1, le=100000),
+    _admin: dict = Depends(require_admin),
+):
+    """
+    Walk the audit hash chain and report the first row that does not verify.
+
+    Each row's chain_hash covers the previous row's chain_hash plus this row's
+    clinically meaningful content, so editing a past answer or deleting a row
+    invalidates every hash after it. This endpoint is what turns that property
+    into something an auditor can actually check.
+
+    Rows written before the chain was introduced have no chain_hash and are
+    reported as unchained rather than as failures.
+    """
+    from routers.query import GENESIS_HASH, compute_chain_hash
+
+    with db_cursor() as (cur, _):
+        cur.execute(
+            """
+            SELECT id, session_id, username, query, answer_text, rejected,
+                   citations, prev_hash, chain_hash, timestamp
+            FROM bnp_audit_log
+            ORDER BY id ASC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+
+    checked = 0
+    unchained = 0
+    expected_prev = GENESIS_HASH
+
+    for row in rows:
+        if not row["chain_hash"]:
+            unchained += 1
+            continue
+
+        actual = compute_chain_hash(
+            prev_hash=row["prev_hash"] or GENESIS_HASH,
+            session_id=row["session_id"],
+            username=row["username"],
+            query=row["query"],
+            answer=row["answer_text"] or "",
+            rejected=bool(row["rejected"]),
+            citations=row["citations"],
+        )
+
+        if actual != row["chain_hash"]:
+            return {
+                "valid": False,
+                "reason": "content does not match its recorded hash",
+                "broken_at_id": row["id"],
+                "timestamp": row["timestamp"],
+                "rows_checked": checked,
+            }
+
+        if row["prev_hash"] != expected_prev:
+            return {
+                "valid": False,
+                "reason": "chain is discontinuous — a preceding row was altered or removed",
+                "broken_at_id": row["id"],
+                "timestamp": row["timestamp"],
+                "rows_checked": checked,
+            }
+
+        expected_prev = row["chain_hash"]
+        checked += 1
+
+    return {
+        "valid": True,
+        "rows_checked": checked,
+        "unchained_legacy_rows": unchained,
+    }

@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Search,
   ShieldAlert,
+  ShieldCheck,
   CheckCircle,
   XCircle,
   FileText,
@@ -21,7 +22,7 @@ import { toast } from 'sonner';
  */
 const AuditLogPage: React.FC = () => {
   const { t } = useTranslation();
-  const { logs, isLoading, refresh, exportLogs } = useAuditLog();
+  const { logs, isLoading, chainStatus, refresh, exportLogs } = useAuditLog();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'rejected' | 'alerts'>('all');
 
@@ -85,6 +86,46 @@ const AuditLogPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Integrity: whether the trail verifies as unaltered since it was
+          written. Each row's hash covers the previous row's, so an edited or
+          removed entry breaks every hash after it. */}
+      {chainStatus && (
+        <div
+          className={`flex items-start gap-3 p-4 mb-4 rounded-xl border ${
+            chainStatus.valid
+              ? 'bg-green-600/10 border-green-500/30'
+              : 'bg-red-600/15 border-red-500/40'
+          }`}
+        >
+          {chainStatus.valid ? (
+            <ShieldCheck className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+          ) : (
+            <ShieldAlert className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          )}
+          <div className="text-sm">
+            <p
+              className={`font-medium ${
+                chainStatus.valid ? 'text-green-200' : 'text-red-200'
+              }`}
+            >
+              {chainStatus.valid
+                ? t('auditIntact', { count: chainStatus.rows_checked })
+                : t('auditTampered')}
+            </p>
+            {!chainStatus.valid && (
+              <p className="text-red-200/80 mt-1">
+                {chainStatus.reason} (entry #{chainStatus.broken_at_id})
+              </p>
+            )}
+            {chainStatus.valid && !!chainStatus.unchained_legacy_rows && (
+              <p className="text-green-200/70 mt-1">
+                {t('auditLegacyRows', { count: chainStatus.unchained_legacy_rows })}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
