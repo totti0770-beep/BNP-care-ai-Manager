@@ -4,6 +4,7 @@ import { useAuth as useReplitAuth } from '@workspace/replit-auth-web';
 interface User {
   id: string;
   name: string;
+  email?: string;
   role: 'admin' | 'user';
   permissions: string[];
 }
@@ -26,6 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ? {
         id: replitUser.id,
         name: replitUser.name,
+        email: replitUser.email,
         role: replitUser.roles?.includes('admin') ? 'admin' : 'user',
         permissions: replitUser.roles?.includes('admin')
           ? ['all', 'users.manage', 'settings.manage', 'documents.manage', 'chat.access']

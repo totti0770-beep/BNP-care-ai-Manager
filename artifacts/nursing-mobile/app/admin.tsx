@@ -58,8 +58,7 @@ export default function AdminScreen() {
   const { documents, addDocument, removeDocument, isAdminAuthenticated, setAdminAuth } = useApp();
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [webPin, setWebPin] = useState("");
-  const [webPinVisible, setWebPinVisible] = useState(false);
+  const [accessDenied, setAccessDenied] = useState<string | null>(null);
   const [addingFor, setAddingFor] = useState<Category | null>(null);
   const [newDocName, setNewDocName] = useState("");
   const [newDocPages, setNewDocPages] = useState("");
@@ -74,9 +73,15 @@ export default function AdminScreen() {
     }
   }, []);
 
+  // Biometric authentication is mandatory. There is deliberately no PIN or
+  // passcode fallback: a shared fallback secret would defeat the point of
+  // gating the clinical document surface at all.
   const authenticateAdmin = useCallback(async () => {
-    if (Platform.OS === "web") {
-      setWebPinVisible(true);
+    const isWeb = Platform.OS === ("web" as typeof Platform.OS);
+    if (isWeb) {
+      setAccessDenied(
+        "لوحة الإدارة غير متاحة على المتصفح. استخدم تطبيق الجوال مع التحقق البيومتري.",
+      );
       return;
     }
 
@@ -85,41 +90,31 @@ export default function AdminScreen() {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
-      if (hasHardware && isEnrolled) {
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: "تحقق من هويتك للوصول إلى لوحة الإدارة",
-          fallbackLabel: "استخدم رمز المرور",
-          cancelLabel: "إلغاء",
-        });
+      if (!hasHardware || !isEnrolled) {
+        setAccessDenied(
+          "يتطلب الوصول إلى لوحة الإدارة تسجيل بصمة أو بصمة وجه على هذا الجهاز.",
+        );
+        return;
+      }
 
-        if (result.success) {
-          setAdminAuth(true);
-          if (Platform.OS !== "web") {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        } else {
-          router.back();
-        }
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "تحقق من هويتك للوصول إلى لوحة الإدارة",
+        disableDeviceFallback: true,
+        cancelLabel: "إلغاء",
+      });
+
+      if (result.success) {
+        setAdminAuth(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        setWebPinVisible(true);
+        router.back();
       }
     } catch {
-      setWebPinVisible(true);
+      setAccessDenied("تعذّر التحقق من الهوية. حاول مرة أخرى.");
     } finally {
       setIsAuthenticating(false);
     }
   }, [setAdminAuth]);
-
-  const handleWebPin = useCallback(() => {
-    if (webPin === "1234") {
-      setAdminAuth(true);
-      setWebPinVisible(false);
-      setWebPin("");
-    } else {
-      Alert.alert("خطأ", "رمز المرور غير صحيح. استخدم: 1234");
-      setWebPin("");
-    }
-  }, [webPin, setAdminAuth]);
 
   const handleAddDocument = useCallback(() => {
     if (!addingFor || !newDocName.trim()) return;
@@ -163,32 +158,17 @@ export default function AdminScreen() {
     );
   }
 
-  if (webPinVisible && !isAdminAuthenticated) {
+  if (accessDenied && !isAdminAuthenticated) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <View style={styles.pinCard}>
           <View style={styles.pinIconContainer}>
             <Ionicons name="lock-closed" size={32} color="#8B5CF6" />
           </View>
-          <Text style={styles.pinTitle}>لوحة الإدارة</Text>
-          <Text style={styles.pinSubtitle}>أدخل رمز المرور للمتابعة</Text>
-          <TextInput
-            style={styles.pinInput}
-            value={webPin}
-            onChangeText={setWebPin}
-            placeholder="رمز المرور"
-            placeholderTextColor="#475569"
-            secureTextEntry
-            keyboardType="number-pad"
-            maxLength={4}
-            textAlign="center"
-          />
-          <Text style={styles.pinHint}>تلميح: الرمز هو 1234</Text>
-          <Pressable style={styles.pinButton} onPress={handleWebPin}>
-            <Text style={styles.pinButtonText}>دخول</Text>
-          </Pressable>
+          <Text style={styles.pinTitle}>الوصول مرفوض</Text>
+          <Text style={styles.pinSubtitle}>{accessDenied}</Text>
           <Pressable onPress={() => router.back()}>
-            <Text style={styles.cancelText}>إلغاء</Text>
+            <Text style={styles.cancelText}>رجوع</Text>
           </Pressable>
         </View>
       </View>

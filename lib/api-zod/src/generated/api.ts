@@ -31,9 +31,16 @@ export const GetCurrentAuthUserResponse = zod.object({
   user: zod
     .object({
       id: zod.string(),
-      name: zod.string(),
-      profileImage: zod.string().optional(),
-      roles: zod.array(zod.string()),
+      name: zod
+        .string()
+        .describe(
+          "Display name derived from the OIDC profile, falling back to email then id.",
+        ),
+      email: zod.string().optional(),
+      profileImageUrl: zod.string().optional(),
+      roles: zod
+        .array(zod.string())
+        .describe('Authorization roles. Every user has at least \"user\".'),
     })
     .nullable(),
 });

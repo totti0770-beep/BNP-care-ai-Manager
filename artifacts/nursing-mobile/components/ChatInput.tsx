@@ -36,7 +36,12 @@ function useVoiceInput(onTranscript: (t: string) => void) {
     rec.lang = "ar-SA";
     rec.interimResults = true;
     rec.continuous = false;
-    rec.onresult = (e: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => {
+    rec.onresult = (e: {
+      results: {
+        length: number;
+        [i: number]: { [j: number]: { transcript: string } };
+      };
+    }) => {
       const text = Array.from({ length: e.results.length }, (_, i) =>
         e.results[i][0].transcript
       ).join("");
@@ -145,7 +150,11 @@ export function ChatInput({ onSend, isSending, accentColor }: ChatInputProps) {
         )}
 
         <TextInput
-          style={[styles.input, isListening && styles.inputListening]}
+          style={[
+            styles.input,
+            { writingDirection: "rtl" as const },
+            isListening && styles.inputListening,
+          ]}
           value={text}
           onChangeText={setText}
           placeholder={isListening ? "🎤 استمع..." : "اكتب سؤالك هنا..."}
@@ -155,7 +164,6 @@ export function ChatInput({ onSend, isSending, accentColor }: ChatInputProps) {
           onSubmitEditing={handleSend}
           textAlign="right"
           textAlignVertical="center"
-          writingDirection="rtl"
           editable={!isSending}
           testID="chat-input"
         />

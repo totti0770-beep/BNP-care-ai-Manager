@@ -7,6 +7,7 @@ import {
   LogoutMobileSessionResponse,
 } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
+import type { AuthUser } from "@workspace/api-zod";
 import {
   clearSession,
   getOidcConfig,
@@ -57,15 +58,51 @@ function getSafeReturnTo(value: unknown): string {
   return value;
 }
 
+/**
+ * Roles are never taken from client input or from OIDC claims. The only way to
+ * become an admin is to be listed in ADMIN_EMAILS, which is operator-controlled.
+ */
+function grantRolesFor(email: string | null): string[] {
+  const admins = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (email && admins.includes(email.toLowerCase())) {
+    return ["user", "admin"];
+  }
+  return ["user"];
+}
+
+function toAuthUser(user: typeof usersTable.$inferSelect): AuthUser {
+  const name =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    user.email ||
+    user.id;
+
+  return {
+    id: user.id,
+    name,
+    roles: user.roles,
+    // These are optional in the contract, so omit rather than send null.
+    ...(user.email ? { email: user.email } : {}),
+    ...(user.profileImageUrl
+      ? { profileImageUrl: user.profileImageUrl }
+      : {}),
+  };
+}
+
 async function upsertUser(claims: Record<string, unknown>) {
+  const email = (claims.email as string) || null;
   const userData = {
     id: claims.sub as string,
-    email: (claims.email as string) || null,
+    email,
     firstName: (claims.first_name as string) || null,
     lastName: (claims.last_name as string) || null,
     profileImageUrl: (claims.profile_image_url || claims.picture) as
       | string
       | null,
+    roles: grantRolesFor(email),
   };
 
   const [user] = await db
@@ -170,13 +207,7 @@ router.get("/callback", async (req: Request, res: Response) => {
 
   const now = Math.floor(Date.now() / 1000);
   const sessionData: SessionData = {
-    user: {
-      id: dbUser.id,
-      email: dbUser.email,
-      firstName: dbUser.firstName,
-      lastName: dbUser.lastName,
-      profileImageUrl: dbUser.profileImageUrl,
-    },
+    user: toAuthUser(dbUser),
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
     expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
@@ -240,13 +271,7 @@ router.post(
 
       const now = Math.floor(Date.now() / 1000);
       const sessionData: SessionData = {
-        user: {
-          id: dbUser.id,
-          email: dbUser.email,
-          firstName: dbUser.firstName,
-          lastName: dbUser.lastName,
-          profileImageUrl: dbUser.profileImageUrl,
-        },
+        user: toAuthUser(dbUser),
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
