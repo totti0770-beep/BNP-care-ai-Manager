@@ -138,7 +138,14 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only)
 
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
+Schema changes are versioned SQL in `lib/db/drizzle/`. Generate one with
+`pnpm --filter @workspace/db run generate` after editing the schema, review the
+SQL, and commit it. `pnpm --filter @workspace/db run migrate` applies pending
+migrations; the merge hook and the Docker `migrate` service both run it.
+
+`push` remains for throwaway local iteration only. `push-force` has been removed
+— it applied destructive statements unattended, against a live database, with no
+artifact to review or roll back.
 
 ### `lib/api-spec` (`@workspace/api-spec`)
 

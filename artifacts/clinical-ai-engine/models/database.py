@@ -36,10 +36,6 @@ def _get_pool() -> "pg_pool.ThreadedConnectionPool":
     return _pool
 
 
-def get_connection():
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-
-
 @contextmanager
 def db_cursor():
     pool = _get_pool()
@@ -134,8 +130,16 @@ def init_db():
     ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS drug_db_version  VARCHAR(50);
     ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS engine_version   VARCHAR(50);
 
+    -- Re-uploading the same PDF used to create a full duplicate chunk set with
+    -- nothing to detect it; retrieval then returned the same document twice as
+    -- two "independent" sources, which inflates the confidence label.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_doc_index
+        ON bnp_chunks(document_id, chunk_index);
+
     CREATE INDEX IF NOT EXISTS idx_audit_user ON bnp_audit_log(user_id);
     CREATE INDEX IF NOT EXISTS idx_audit_session ON bnp_audit_log(session_id);
+    -- Every audit query filters by time; this was a sequential scan.
+    CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON bnp_audit_log(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_chunks_doc ON bnp_chunks(document_id);
     """
 

@@ -9,6 +9,7 @@ import os
 import uuid
 import logging
 import pickle
+import threading
 import numpy as np
 from pathlib import Path
 from typing import List, Optional
@@ -83,6 +84,11 @@ class HybridRetriever:
         self._vectorstore = None
         self._embeddings = None
         self.degraded_reason: Optional[str] = None
+        # Guards every mutation of (chunks, bm25, _vectorstore) as one unit.
+        # Without it, a rebuild could renumber the corpus midway through a
+        # search and BM25 scores would be attributed to the wrong chunks —
+        # wrong citations on a clinical answer, not merely a crash.
+        self._lock = threading.RLock()
 
         try:
             self._embeddings = _get_embeddings()
@@ -180,8 +186,14 @@ class HybridRetriever:
             from langchain_community.vectorstores import FAISS
             from langchain_core.documents import Document
 
-            self._reset()
+            # Build into locals first and only publish on success. Mutating
+            # self.chunks before the embedding call meant that a transient
+            # OpenAI error left chunks populated with no vectorstore: every
+            # search then returned [] (so every clinical question answered
+            # "insufficient data"), while /health still reported ok because
+            # chunk_count was non-zero. A degraded engine must look degraded.
             lc_docs = []
+            new_chunks = []
             for row in rows:
                 meta = {
                     "chunk_id":      row["chunk_id"],
@@ -191,15 +203,26 @@ class HybridRetriever:
                     "chunk_index":   row["chunk_index"],
                 }
                 lc_docs.append(Document(page_content=row["content"], metadata=meta))
-                self.chunks.append({"content": row["content"], **meta})
+                new_chunks.append({"content": row["content"], **meta})
 
-            self._vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
-            self._rebuild_bm25()
-            self._save_state()
+            vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
+
+            with self._lock:
+                self.chunks = new_chunks
+                self._vectorstore = vectorstore
+                self._rebuild_bm25()
+                self._save_state()
             logger.info(f"✅ FAISS rebuilt from DB: {len(self.chunks)} chunks")
 
         except Exception as e:
+            # Leave the previously loaded index in place if there was one; if
+            # there wasn't, mark the retriever degraded so /health fails and
+            # queries are refused rather than silently answered from nothing.
             logger.error(f"sync_from_db error: {e}")
+            if self._vectorstore is None:
+                self.degraded_reason = (
+                    f"Could not build the search index from the database: {e}"
+                )
 
     def _save_state(self):
         try:
@@ -217,13 +240,25 @@ class HybridRetriever:
 
     # ── Indexing ──────────────────────────────────────────────────────────────
     def add_chunks(self, chunks: List[dict], document_id: str, document_name: str):
-        """Add chunks to FAISS index and BM25. Rebuilds both indices."""
+        """
+        Add chunks to the FAISS and BM25 indexes.
+
+        Each chunk must carry the `chunk_id` that was stored in bnp_chunks. The
+        index used to mint its own uuid4 here, so the same physical chunk had two
+        different identifiers and a citation could never be traced back to its
+        database row.
+        """
         from langchain_community.vectorstores import FAISS
         from langchain_core.documents import Document
 
         lc_docs = []
+        new_chunks = []
         for chunk in chunks:
-            chunk_id = str(uuid.uuid4())
+            chunk_id = chunk.get("chunk_id")
+            if not chunk_id:
+                raise ValueError(
+                    "add_chunks requires a chunk_id matching the bnp_chunks row"
+                )
             meta = {
                 "chunk_id": chunk_id,
                 "document_id": document_id,
@@ -232,16 +267,20 @@ class HybridRetriever:
                 "chunk_index": chunk.get("chunk_index", 0),
             }
             lc_docs.append(Document(page_content=chunk["content"], metadata=meta))
-            self.chunks.append({"content": chunk["content"], **meta})
+            new_chunks.append({"content": chunk["content"], **meta})
 
-        # Add to or create FAISS vector store
+        # Embed outside the lock — it is a network call — then publish atomically.
         if self._vectorstore is None:
-            self._vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
+            vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
         else:
             self._vectorstore.add_documents(lc_docs)
+            vectorstore = self._vectorstore
 
-        self._rebuild_bm25()
-        self._save_state()
+        with self._lock:
+            self._vectorstore = vectorstore
+            self.chunks.extend(new_chunks)
+            self._rebuild_bm25()
+            self._save_state()
         logger.info(f"Indexed {len(chunks)} chunks for '{document_name}'")
 
     def remove_document(self, document_id: str):
@@ -251,9 +290,7 @@ class HybridRetriever:
         if len(remaining) == before:
             return  # Nothing to remove
 
-        self.chunks = remaining
-        self._vectorstore = None
-
+        vectorstore = None
         if remaining:
             from langchain_community.vectorstores import FAISS
             from langchain_core.documents import Document
@@ -264,10 +301,16 @@ class HybridRetriever:
                 )
                 for c in remaining
             ]
-            self._vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
+            # NOTE: this re-embeds every remaining chunk, so deleting one
+            # document costs a full-corpus embedding pass. Acceptable while
+            # corpora are small; externalising the index (pgvector) is the fix.
+            vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
 
-        self._rebuild_bm25()
-        self._save_state()
+        with self._lock:
+            self.chunks = remaining
+            self._vectorstore = vectorstore
+            self._rebuild_bm25()
+            self._save_state()
         logger.info(f"Removed document {document_id}. Remaining chunks: {len(remaining)}")
 
     # ── Search ────────────────────────────────────────────────────────────────
@@ -281,25 +324,34 @@ class HybridRetriever:
                 self.degraded_reason or "Retrieval backend unavailable"
             )
 
-        if not self.chunks or self._vectorstore is None:
+        # Take one consistent snapshot of (chunks, vectorstore, bm25). An upload
+        # or delete running concurrently renumbers the corpus, and scoring
+        # against a half-updated view attributes keyword scores to the wrong
+        # chunks — i.e. wrong citations on a clinical answer.
+        with self._lock:
+            chunks = self.chunks
+            vectorstore = self._vectorstore
+            bm25 = self.bm25
+
+        if not chunks or vectorstore is None:
             return []
 
-        n = len(self.chunks)
+        n = len(chunks)
         k = min(top_k, n)
+
+        # chunk_id -> position, so scoring is O(k) rather than a linear scan per hit.
+        index_of = {c.get("chunk_id"): i for i, c in enumerate(chunks)}
 
         # ── Semantic (FAISS similarity scores) ───────────────────────────────
         sem_scores = np.zeros(n, dtype=float)
         try:
-            results_with_scores = self._vectorstore.similarity_search_with_score(query, k=k)
+            results_with_scores = vectorstore.similarity_search_with_score(query, k=k)
             # LangChain FAISS returns L2 distance (lower = better) — convert to similarity
             for doc, dist in results_with_scores:
-                # Find matching chunk index by chunk_id
-                cid = doc.metadata.get("chunk_id")
-                for i, c in enumerate(self.chunks):
-                    if c.get("chunk_id") == cid:
-                        # Convert L2 distance to similarity: 1 / (1 + dist)
-                        sem_scores[i] = 1.0 / (1.0 + float(dist))
-                        break
+                i = index_of.get(doc.metadata.get("chunk_id"))
+                if i is not None:
+                    # Convert L2 distance to similarity: 1 / (1 + dist)
+                    sem_scores[i] = 1.0 / (1.0 + float(dist))
         except Exception as e:
             logger.error(f"FAISS search error: {e}")
 
@@ -311,12 +363,22 @@ class HybridRetriever:
 
         # ── Keyword (BM25) ───────────────────────────────────────────────────
         bm25_scores = np.zeros(n, dtype=float)
-        if self.bm25:
-            raw = np.array(self.bm25.get_scores(query.lower().split()), dtype=float)
-            # BM25 is unbounded; map to (0, 1] with a fixed saturation constant
-            # so the value means the same thing across queries.
-            bm25_scores = np.clip(raw, 0, None)
-            bm25_scores = bm25_scores / (bm25_scores + BM25_SATURATION)
+        if bm25 is not None:
+            raw = np.array(bm25.get_scores(query.lower().split()), dtype=float)
+            if raw.shape[0] != n:
+                # Should be impossible now that chunks and bm25 are snapshotted
+                # together, but scoring a mismatched vector would silently pair
+                # each score with the wrong chunk. Drop the keyword signal
+                # rather than cite the wrong source.
+                logger.error(
+                    f"BM25 length {raw.shape[0]} != corpus size {n}; "
+                    "ignoring keyword scores for this query"
+                )
+            else:
+                # BM25 is unbounded; map to (0, 1] with a fixed saturation
+                # constant so the value means the same thing across queries.
+                bm25_scores = np.clip(raw, 0, None)
+                bm25_scores = bm25_scores / (bm25_scores + BM25_SATURATION)
 
         # ── Hybrid combination ────────────────────────────────────────────────
         combined = 0.6 * sem_scores + 0.4 * bm25_scores
@@ -327,7 +389,7 @@ class HybridRetriever:
             score = float(combined[idx])
             if score < 0.01:
                 continue
-            result = self.chunks[idx].copy()
+            result = chunks[idx].copy()
             result["relevance_score"] = round(score, 4)
             results.append(result)
 

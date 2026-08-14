@@ -95,6 +95,15 @@ pnpm --filter @workspace/bestnursingai run dev
 pnpm run typecheck                              # whole workspace
 pnpm run build                                  # all artifacts
 cd artifacts/clinical-ai-engine && pytest       # safety-layer regression tests
+pnpm run test                                   # TypeScript unit tests
+```
+
+### Schema changes
+
+```bash
+# after editing lib/db/src/schema/
+pnpm --filter @workspace/db run generate        # writes SQL to lib/db/drizzle/
+pnpm --filter @workspace/db run migrate         # applies pending migrations
 ```
 
 ## Configuration
@@ -148,9 +157,10 @@ Engineering work is not the remaining blocker. These are:
 
 - The engine runs single-worker. The retriever is a process-global singleton with no
   cross-process locking, so `--workers > 1` will diverge.
-- No schema migrations. The engine uses idempotent `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN
-  IF NOT EXISTS`; the TypeScript side uses `drizzle-kit push`. Neither can safely alter or drop
-  a column.
+- The TypeScript schema has versioned migrations (`lib/db/drizzle/`), applied by the `migrate`
+  service before the API server starts. The **Python engine does not**: it still uses idempotent
+  `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`, which cannot change a column type,
+  drop a column, alter a constraint, or backfill. Alembic is the next step there.
 - The FAISS index is rebuilt in full on every document upload, and re-embedded from the
   database when it and the `bnp_chunks` table disagree on count.
 - Rate limiting is per-process and in-memory; a multi-instance deployment needs a shared store.

@@ -113,6 +113,8 @@ def query(
             page_number=c["page_number"],
             relevance_score=c["relevance_score"],
             excerpt=c["content"][:200] + ("…" if len(c["content"]) > 200 else ""),
+            chunk_id=c.get("chunk_id"),
+            document_id=c.get("document_id"),
         )
         for c in chunks
     ]
@@ -454,6 +456,10 @@ def _log_query(
                 "document_name": c.document_name,
                 "page_number": c.page_number,
                 "relevance_score": c.relevance_score,
+                # Recorded so an incident review can retrieve the exact passage
+                # the recommendation was generated from.
+                "chunk_id": c.chunk_id,
+                "document_id": c.document_id,
             }
             for c in (citations or [])
         ]

@@ -65,6 +65,11 @@ class Citation(BaseModel):
     page_number: int
     relevance_score: float
     excerpt: str
+    # Resolve a cited passage back to its bnp_chunks row. Without these, an
+    # audit entry records only "file X, page N" — and filenames are not unique,
+    # so the exact text behind a recommendation could not be recovered.
+    chunk_id: Optional[str] = None
+    document_id: Optional[str] = None
 
 
 class DrugDoseResult(BaseModel):

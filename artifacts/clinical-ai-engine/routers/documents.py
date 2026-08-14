@@ -72,10 +72,13 @@ async def upload_document(
                 (document_id, file.filename, user_id, len(chunks)),
             )
             for chunk in chunks:
-                chunk_id = str(uuid.uuid4())
+                # Minted once and carried into the index, so a citation can be
+                # joined back to this row. The index used to generate its own
+                # separate uuid4 for the same chunk.
+                chunk["chunk_id"] = str(uuid.uuid4())
                 cur.execute(
                     "INSERT INTO bnp_chunks (chunk_id, document_id, content, page_number, chunk_index) VALUES (%s,%s,%s,%s,%s)",
-                    (chunk_id, document_id, chunk["content"], chunk["page_number"], chunk["chunk_index"]),
+                    (chunk["chunk_id"], document_id, chunk["content"], chunk["page_number"], chunk["chunk_index"]),
                 )
     except Exception as e:
         logger.error(f"DB error: {e}")

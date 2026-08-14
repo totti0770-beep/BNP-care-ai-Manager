@@ -43,6 +43,18 @@ services:
     # No published ports: gateway-only access.
     restart: unless-stopped
 
+  migrate:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    command: ["node", "./dist/migrate.mjs"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bnp}:${POSTGRES_PASSWORD:-bnp}@postgres:5432/${POSTGRES_DB:-bnp}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api-server:
     build:
       context: .
@@ -60,6 +72,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   web:
