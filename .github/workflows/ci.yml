@@ -56,7 +56,9 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -r requirements.txt pytest
+        # httpx backs fastapi's TestClient, which the query-pipeline
+        # integration tests use.
+        run: pip install -r requirements.txt pytest httpx
 
       - name: Safety-layer tests
         # These regression-lock defects that produced clinically unsafe dose

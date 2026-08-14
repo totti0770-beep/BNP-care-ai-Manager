@@ -177,8 +177,11 @@ def query(
             "Please upload the relevant clinical protocol or pharmacology document.",
             question,
         )
-        audit(answer=insufficient_msg, rejected=False, label="Low",
-              rejection_reason=context_validation_msg)
+        # This is a refusal: no answer, no citations. It previously recorded
+        # rejected=False, so a query for refused requests — the thing an
+        # auditor actually looks for — would not have found it.
+        audit(answer=insufficient_msg, rejected=True, label="Low",
+              rejection_reason=context_validation_msg or "Insufficient clinical data")
         elapsed = int(time.time() * 1000) - start_ms
         return QueryResponse(
             session_id=session_id,
@@ -194,7 +197,8 @@ def query(
             citations=[],
             confidence=top_confidence,
             confidence_label="Low",
-            rejected=False,
+            rejected=True,
+            rejection_reason=context_validation_msg or "Insufficient clinical data",
             context_validation=context_validation_msg,
             processing_time_ms=elapsed,
         )
