@@ -1,16 +1,16 @@
 /**
  * BNP Clinical AI Engine — API Client
- * Proxied via Vite: /bnp-api/* → http://localhost:8000/*
  *
- * Auto-authenticates on first call, caches JWT in sessionStorage.
- * All methods return null on network/auth failure so the UI can fall back gracefully.
+ * Requests go to /bnp-api, which the API server reverse-proxies to the engine.
+ * The API server authenticates each request as the signed-in user from the
+ * server-side session, so no engine credential or token exists in the browser
+ * and the engine's audit log records the individual nurse.
+ *
+ * All methods return null on failure. Callers must surface that as an error —
+ * there is deliberately no local fallback that answers clinical questions.
  */
 
 const BASE = "/bnp-api";
-
-// Engine credentials — maps to the production admin account
-const ENGINE_CREDS = { username: "clinicadmin", password: "Admin@123" };
-const TOKEN_KEY = "bnp_engine_token";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,75 +57,32 @@ export interface EngineHealth {
   database: boolean;
 }
 
-// ── Auth helpers ──────────────────────────────────────────────────────────────
+// ── Transport ─────────────────────────────────────────────────────────────────
 
-function getToken(): string | null {
-  return sessionStorage.getItem(TOKEN_KEY);
-}
-
-function setToken(token: string): void {
-  sessionStorage.setItem(TOKEN_KEY, token);
-}
-
-function clearToken(): void {
-  sessionStorage.removeItem(TOKEN_KEY);
-}
-
-async function authenticate(): Promise<string | null> {
-  try {
-    const res = await fetch(`${BASE}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(ENGINE_CREDS),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const token: string = data.access_token;
-    setToken(token);
-    return token;
-  } catch {
-    return null;
-  }
-}
-
-async function getAuthToken(): Promise<string | null> {
-  return getToken() ?? authenticate();
-}
-
+/** The session cookie is the only credential; the gateway supplies the rest. */
 async function authFetch(
   path: string,
   init: RequestInit = {}
 ): Promise<Response | null> {
-  let token = await getAuthToken();
-  if (!token) return null;
-
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-    ...(init.headers as Record<string, string> | undefined),
-  };
-
-  let res = await fetch(`${BASE}${path}`, { ...init, headers });
-
-  // Token expired — re-auth once
-  if (res.status === 401) {
-    clearToken();
-    token = await authenticate();
-    if (!token) return null;
-    headers.Authorization = `Bearer ${token}`;
-    res = await fetch(`${BASE}${path}`, { ...init, headers });
-  }
-
-  return res;
+  return fetch(`${BASE}${path}`, { ...init, credentials: "include" });
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** Returns null if the engine is unreachable. */
+/**
+ * Returns null if the engine is unreachable or reports itself unhealthy.
+ * A degraded engine (for example, one that cannot reach its embedding model)
+ * reports status !== "ok" and is treated as unavailable.
+ */
 export async function checkHealth(): Promise<EngineHealth | null> {
   try {
-    const res = await fetch(`${BASE}/health`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${BASE}/health`, {
+      credentials: "include",
+      signal: AbortSignal.timeout(5000),
+    });
     if (!res.ok) return null;
-    return res.json();
+    const health: EngineHealth = await res.json();
+    return health.status === "ok" ? health : null;
   } catch {
     return null;
   }

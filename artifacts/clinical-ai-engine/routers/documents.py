@@ -6,7 +6,7 @@ from models.database import db_cursor
 from models.schemas import DocumentMeta
 from services.pdf_processor import process_pdf
 from services.embeddings import get_retriever
-from routers.auth import get_current_user
+from routers.auth import get_current_user, require_admin
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -17,7 +17,7 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 @router.post("/upload", status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     """
     Upload a PDF document:
@@ -25,13 +25,32 @@ async def upload_document(
     2. Chunk into ~500-token segments
     3. Store chunk metadata in PostgreSQL
     4. Add chunks to FAISS + BM25 hybrid index
+
+    Admin-only. Anything indexed here becomes a source that clinical answers are
+    generated from, so upload is as privileged as delete.
     """
-    if not file.filename.lower().endswith(".pdf"):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="File exceeds 50 MB limit.")
+    # Read incrementally so an oversized upload cannot exhaust memory before
+    # the size limit is applied.
+    chunks_read: list[bytes] = []
+    total = 0
+    while True:
+        block = await file.read(1024 * 1024)
+        if not block:
+            break
+        total += len(block)
+        if total > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File exceeds 50 MB limit.")
+        chunks_read.append(block)
+    content = b"".join(chunks_read)
+
+    if not content.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=400,
+            detail="File is not a valid PDF (bad magic bytes).",
+        )
 
     document_id = str(uuid.uuid4())
 
@@ -95,12 +114,9 @@ def list_documents(current_user: dict = Depends(get_current_user)):
 @router.delete("/{document_id}", status_code=204)
 def delete_document(
     document_id: str,
-    current_user: dict = Depends(get_current_user),
+    _admin: dict = Depends(require_admin),
 ):
     """Delete a document and remove its chunks from the index."""
-    if current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-
     with db_cursor() as (cur, _):
         cur.execute("DELETE FROM bnp_documents WHERE id = %s", (document_id,))
         if cur.rowcount == 0:

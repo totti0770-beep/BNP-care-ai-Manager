@@ -10,11 +10,16 @@ class QueryType(str, Enum):
     GENERAL = "general"
 
 
+class UserRole(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
+
+
 class UserRegister(BaseModel):
-    username: str = Field(..., min_length=3)
-    password: str = Field(..., min_length=6)
-    full_name: str
-    role: str = "user"
+    username: str = Field(..., min_length=3, max_length=100)
+    password: str = Field(..., min_length=12, max_length=256)
+    full_name: str = Field(..., max_length=200)
+    role: UserRole = UserRole.USER
 
 
 class UserLogin(BaseModel):
@@ -46,13 +51,13 @@ class DocumentMeta(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    question: str = Field(..., min_length=3)
-    patient_weight_kg: Optional[float] = None
+    question: str = Field(..., min_length=3, max_length=4000)
+    patient_weight_kg: Optional[float] = Field(default=None, gt=0, le=500)
     top_k: int = Field(default=5, ge=1, le=20)
-    drug_name: Optional[str] = None
-    other_drugs: Optional[List[str]] = []
-    conditions: Optional[List[str]] = []
-    age: Optional[int] = None
+    drug_name: Optional[str] = Field(default=None, max_length=100)
+    other_drugs: Optional[List[str]] = Field(default=[], max_length=50)
+    conditions: Optional[List[str]] = Field(default=[], max_length=50)
+    age: Optional[int] = Field(default=None, ge=0, le=120)
 
 
 class Citation(BaseModel):

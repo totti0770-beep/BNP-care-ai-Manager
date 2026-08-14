@@ -40,8 +40,14 @@ def init_db():
         password_hash TEXT NOT NULL,
         full_name   VARCHAR(200),
         role        VARCHAR(50) DEFAULT 'user',
+        external_id VARCHAR(255) UNIQUE,
         created_at  TIMESTAMP DEFAULT NOW()
     );
+
+    -- Added after the table shipped; harmless when the column already exists.
+    ALTER TABLE bnp_users ADD COLUMN IF NOT EXISTS external_id VARCHAR(255);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external
+        ON bnp_users(external_id) WHERE external_id IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS bnp_documents (
         id          VARCHAR(64) PRIMARY KEY,

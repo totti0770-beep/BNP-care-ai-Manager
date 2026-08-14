@@ -1,97 +1,36 @@
 /**
  * Nursing AI Mobile — Clinical Engine API Client
  *
- * Routes through the BestNursingAI Vite proxy (/bnp-api → localhost:8000).
- * Accessible via: https://{REPLIT_DEV_DOMAIN}/bnp-api
- * Falls back to direct localhost on native development.
+ * Requests go to /bnp-api on the API server, which reverse-proxies them to the
+ * clinical engine and authenticates each one as the signed-in nurse. The only
+ * credential the device holds is a session token in the keychain — there is no
+ * shared engine account.
  */
+import { API_ORIGIN, clearSessionToken, getSessionToken } from "./session";
 
-const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost";
-const BASE = `https://${DOMAIN}/bnp-api`;
+const BASE = `${API_ORIGIN}/bnp-api`;
 
-const ENGINE_CREDS = { username: "clinicadmin", password: "Admin@123" };
-const TOKEN_KEY = "bnp_mobile_token";
-
-let cachedToken: string | null = null;
-
-async function storeToken(token: string) {
-  try {
-    const { default: AsyncStorage } = await import(
-      "@react-native-async-storage/async-storage"
-    );
-    await AsyncStorage.setItem(TOKEN_KEY, token);
-    cachedToken = token;
-  } catch {
-    cachedToken = token;
-  }
-}
-
-async function loadToken(): Promise<string | null> {
-  if (cachedToken) return cachedToken;
-  try {
-    const { default: AsyncStorage } = await import(
-      "@react-native-async-storage/async-storage"
-    );
-    const t = await AsyncStorage.getItem(TOKEN_KEY);
-    if (t) cachedToken = t;
-    return t;
-  } catch {
-    return null;
-  }
-}
-
-async function clearToken() {
-  cachedToken = null;
-  try {
-    const { default: AsyncStorage } = await import(
-      "@react-native-async-storage/async-storage"
-    );
-    await AsyncStorage.removeItem(TOKEN_KEY);
-  } catch {}
-}
-
-async function authenticate(): Promise<string | null> {
-  try {
-    const res = await fetch(`${BASE}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(ENGINE_CREDS),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const token: string = data.access_token;
-    await storeToken(token);
-    return token;
-  } catch {
-    return null;
-  }
-}
-
-async function getAuthToken(): Promise<string | null> {
-  const stored = await loadToken();
-  return stored ?? authenticate();
-}
-
+/** Returns null when there is no session, so callers can prompt for sign-in. */
 async function authFetch(
   path: string,
   init: RequestInit = {}
 ): Promise<Response | null> {
-  let token = await getAuthToken();
+  const token = await getSessionToken();
   if (!token) return null;
 
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-    ...(init.headers as Record<string, string> | undefined),
-  };
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init.headers as Record<string, string> | undefined),
+    },
+  });
 
-  let res = await fetch(`${BASE}${path}`, { ...init, headers });
-
+  // The session expired or was revoked server-side; force a fresh sign-in
+  // rather than silently retrying with another identity.
   if (res.status === 401) {
-    await clearToken();
-    token = await authenticate();
-    if (!token) return null;
-    headers.Authorization = `Bearer ${token}`;
-    res = await fetch(`${BASE}${path}`, { ...init, headers });
+    await clearSessionToken();
+    return null;
   }
 
   return res;

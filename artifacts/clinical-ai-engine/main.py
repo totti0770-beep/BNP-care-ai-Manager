@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from models.database import init_db
+from middleware.rate_limit import RateLimitMiddleware
 from routers import auth, documents, query
 
 logging.basicConfig(
@@ -66,14 +67,29 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS — allow frontend origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS — the engine is normally reached through the API server gateway, which is
+# same-origin, so no browser origin is allowed by default. Set CORS_ORIGINS to a
+# comma-separated allowlist only if a browser must call the engine directly.
+# A wildcard is never used: combined with credentials it is both insecure and
+# rejected by browsers.
+_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ORIGINS", "").split(",")
+    if origin.strip() and origin.strip() != "*"
+]
+
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
+else:
+    logger.info("CORS disabled — engine expects same-origin gateway traffic only")
+
+app.add_middleware(RateLimitMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth.router,      prefix="/auth",      tags=["Authentication"])

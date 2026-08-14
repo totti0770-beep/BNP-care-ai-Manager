@@ -52,8 +52,10 @@ packages = ["cargo", "freetype", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec"
 
 [userenv]
 
+# Secrets are NOT stored here — this file is tracked in git. Set JWT_SECRET,
+# ENGINE_JWT_SECRET, DATABASE_URL, OPENAI_API_KEY and ADMIN_EMAILS in Replit
+# Secrets (or a local .env). See .env.example.
 [userenv.shared]
-JWT_SECRET = "a7e539d7cfaa76152e8d5d72e9abb1a6e8d064c232ce40a142e5cd1a197388d1"
 
 [[ports]]
 localPort = 8000

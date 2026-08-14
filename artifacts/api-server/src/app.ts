@@ -8,6 +8,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import gatewayRouter from "./routes/gateway";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
 
@@ -34,9 +35,14 @@ app.use(
 );
 app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
+app.use(authMiddleware);
+
+// Mounted before the body parsers so request bodies (notably multipart PDF
+// uploads) reach the engine as an unbuffered stream.
+app.use("/bnp-api", gatewayRouter);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(authMiddleware);
 
 app.use("/api", router);
 
