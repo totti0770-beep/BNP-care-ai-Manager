@@ -40,12 +40,15 @@ Rule-based medication safety layer integrated into query pipeline (`services/dru
 
 Query response extended fields: `contraindications`, `interactions`, `nursing_notes`, `safety_alerts`, `rejected`, `rejection_reason`.
 
-## Mobile App — Real Backend Connection
+## Mobile App — Backend Connection
 
-`artifacts/nursing-mobile/services/clinicalApi.ts` — full JWT-auth client calling:
+`artifacts/nursing-mobile/services/clinicalApi.ts` — calls the API server's gateway:
 ```
-https://${EXPO_PUBLIC_DOMAIN}/bnp-api → Clinical AI Engine (via Vite proxy)
+https://${EXPO_PUBLIC_DOMAIN}/bnp-api → api-server → Clinical AI Engine
 ```
+This path previously existed only as a Vite **dev** proxy, so the published mobile
+artifact could never reach the engine. It is now a real route on the API server.
+The session token is stored in the device keychain (expo-secure-store).
 - `queryEngine(question, weight?)` → full clinical response with safety fields
 - `checkEngineHealth()` → connectivity check
 - JWT auto-auth + re-auth on 401
@@ -159,7 +162,7 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 BestNursingAI — a full-featured nursing AI assistant web app. React+Vite, dark purple theme.
 
 **Features:**
-- Login screen with demo credentials (admin/user roles)
+- Login via Replit OIDC (no demo credentials; roles come from ADMIN_EMAILS)
 - AI chat connected to the real Clinical AI Engine (with local ClosedLoopRAG fallback)
 - Secure document upload with engine indexing + local verification (SHA-256 checksums)
 - Document management, citations, and official sources whitelist
@@ -172,12 +175,15 @@ BestNursingAI — a full-featured nursing AI assistant web app. React+Vite, dark
 - Vite proxy: `/bnp-api/*` → `http://localhost:8000/*` (Clinical AI Engine)
 - `src/services/clinicalApi.ts` — typed API client with auto JWT auth and token refresh
 - `src/contexts/BackendContext.tsx` — React context providing `sendQuery`, `uploadToEngine`, `engineDocuments`
-- ChatPage uses the real engine when available; falls back to local ClosedLoopRAG automatically
+- ChatPage uses the real engine only. The browser-side ClosedLoopRAG fallback was
+  deleted: it performed weight-based dose arithmetic on hardcoded text and presented it
+  with citations. When the engine is unavailable the app refuses to answer.
 - Upload pages index PDFs into the real FAISS engine + record locally for UI display
 
-**Demo credentials:**
-- Admin: `admin@bestnursing.ai` / `admin123`
-- User: `user@bestnursing.ai` / `user123`
+**Authentication:** Replit OIDC only. The demo credential login was removed when
+Replit Auth landed, and the shared `clinicadmin` engine credential that both clients
+embedded has been removed too — the API server now mints a per-user engine token
+server-side. Admin role is granted from the `ADMIN_EMAILS` environment variable.
 
 **Key packages:** `i18next`, `react-i18next`, `i18next-browser-languagedetector`, `crypto-js`, `lucide-react`, `sonner`, shadcn/ui
 
