@@ -23,13 +23,15 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from models.database import init_db
+from middleware.logging import RequestLoggingMiddleware, configure_logging
 from middleware.rate_limit import RateLimitMiddleware
 from routers import auth, documents, query
 from services.drug_calculator import DRUG_DB_VERSION, DRUG_DB_REVIEW_STATUS
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+# JSON in production so logs are shippable and queryable; human-readable
+# locally. Set LOG_FORMAT=json or LOG_FORMAT=text to override.
+configure_logging(
+    as_json=os.environ.get("LOG_FORMAT", "text").lower() == "json"
 )
 logger = logging.getLogger(__name__)
 
@@ -95,6 +97,7 @@ else:
     logger.info("CORS disabled — engine expects same-origin gateway traffic only")
 
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth.router,      prefix="/auth",      tags=["Authentication"])

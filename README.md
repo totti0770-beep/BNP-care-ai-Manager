@@ -150,8 +150,6 @@ Engineering work is not the remaining blocker. These are:
 - [ ] **Compliance package**: CBAHI/PDPL mapping, an intended-use statement, a clinical
       validation protocol, data retention and residency, and incident response.
 - [ ] **Clinical validation** against a held-out question set, reviewed by clinicians.
-- [ ] Set `"license"` in `package.json`; it currently claims MIT, which is unlikely to be right
-      for a clinical product.
 
 ## Known limitations
 
@@ -166,3 +164,6 @@ Engineering work is not the remaining blocker. These are:
 - Rate limiting is per-process and in-memory; a multi-instance deployment needs a shared store.
 - Document "verification" in the web app records a checksum but does **not** validate any
   signature. Uploads are marked unverified, and no document is attributed to an official source.
+- Retrieved source text is fenced and the model is told to treat it as data, but that is a
+  mitigation, not a guarantee. Upload is admin-only for this reason.
+- `license` is set to UNLICENSED pending a decision; it previously claimed MIT.
