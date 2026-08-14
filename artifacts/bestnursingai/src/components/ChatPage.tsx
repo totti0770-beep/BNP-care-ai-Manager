@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useClosedLoopRAG, BNPResponse, SYSTEM_NAME } from '@/contexts/ClosedLoopRAGContext';
+import { BNPResponse, SYSTEM_NAME } from '@/types/bnp';
 import { useBackend } from '@/contexts/BackendContext';
 import {
   Send, Bot, User, Shield, AlertTriangle, BookOpen,
@@ -431,7 +431,6 @@ function PatientContextPanel({
 // ── Main component ────────────────────────────────────────────────────────────
 const ChatPage: React.FC = () => {
   const { t } = useTranslation();
-  const { generateResponse, confidenceThreshold } = useClosedLoopRAG();
   const { isEngineAvailable, isChecking, indexedChunks, openaiEnabled, sendQuery } = useBackend();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -476,22 +475,21 @@ const ChatPage: React.FC = () => {
     setInput('');
     setIsTyping(true);
 
-    let bnp: BNPResponse;
-    let fromEngine = false;
+    // There is no local fallback. If the engine cannot answer, the app says so
+    // rather than synthesising clinical guidance in the browser.
+    const engineResult = isEngineAvailable
+      ? await sendQuery(text.trim(), patientOpts)
+      : null;
 
-    if (isEngineAvailable) {
-      // Use real Clinical AI Engine with patient context
-      const engineResult = await sendQuery(text.trim(), patientOpts);
-      if (engineResult) {
-        bnp = engineResult;
-        fromEngine = true;
-      } else {
-        bnp = generateResponse(text.trim());
-      }
-    } else {
-      await new Promise(resolve => setTimeout(resolve, 1200 + Math.random() * 600));
-      bnp = generateResponse(text.trim());
-    }
+    const bnp: BNPResponse = engineResult ?? {
+      answer: t('engineUnavailableBody'),
+      safetyAlert: true,
+      sources: [],
+      confidenceLevel: 0,
+      rejected: true,
+      rejectionReason: t('engineUnavailableTitle'),
+      notFound: true,
+    };
 
     const aiMsg: Message = {
       id: (Date.now() + 1).toString(),
@@ -499,7 +497,7 @@ const ChatPage: React.FC = () => {
       sender: 'ai',
       timestamp: new Date(),
       bnp,
-      fromEngine,
+      fromEngine: engineResult !== null,
     };
     setMessages(prev => [...prev, aiMsg]);
     setIsTyping(false);
@@ -542,7 +540,7 @@ const ChatPage: React.FC = () => {
           <div>
             <h2 className="text-white font-semibold">{SYSTEM_NAME}</h2>
             <p className="text-gray-400 text-xs">
-              Hospital-Grade · RAG-Only · Confidence ≥{(confidenceThreshold * 100).toFixed(0)}%
+              {t('engineSubtitle')}
             </p>
           </div>
         </div>

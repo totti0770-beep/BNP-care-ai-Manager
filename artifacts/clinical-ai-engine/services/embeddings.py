@@ -23,32 +23,52 @@ FAISS_LANGCHAIN_PATH = str(INDEX_DIR / "lc_index")
 META_PATH = INDEX_DIR / "meta.pkl"
 
 
+# BM25 scores are unbounded; x/(x+k) maps them to (0, 1] with a stable meaning
+# across queries. k is the score at which a chunk is considered a 50% keyword
+# match.
+BM25_SATURATION = 8.0
+
+EMBEDDING_MODEL = "text-embedding-3-small"
+EMBEDDING_DIMENSIONS = 1536
+
+# Written next to the index so a mismatch is detectable. Vectors embedded by one
+# model are meaningless against another of the same width.
+FINGERPRINT_PATH = INDEX_DIR / "embedding_model.txt"
+
+
+class EmbeddingsUnavailable(RuntimeError):
+    """Raised when no usable embedding backend exists."""
+
+
 # ── Embedding backend ─────────────────────────────────────────────────────────
-def _make_fake_embeddings():
-    from langchain_community.embeddings import FakeEmbeddings
-    return FakeEmbeddings(size=1536)
-
-
 def _get_embeddings():
-    """Return LangChain embeddings object — OpenAI if key valid, else deterministic fallback."""
+    """
+    Return the OpenAI embeddings client, or raise.
+
+    There is deliberately no fallback. The previous FakeEmbeddings fallback
+    produced random vectors of the same width as the real index, so it loaded
+    cleanly and then answered clinical questions from arbitrary chunks — with
+    citations and a confidence score attached. A service that refuses to answer
+    is recoverable; one that answers wrongly and looks right is not.
+    """
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
-        logger.warning("OPENAI_API_KEY not set — using FakeEmbeddings (semantic search degraded)")
-        return _make_fake_embeddings()
+        raise EmbeddingsUnavailable("OPENAI_API_KEY is not set")
 
     try:
         from langchain_openai import OpenAIEmbeddings
         emb = OpenAIEmbeddings(
-            model="text-embedding-3-small",
+            model=EMBEDDING_MODEL,
             openai_api_key=api_key,
         )
-        # Quick connectivity check — embed a single test string
+        # Connectivity check — a key that cannot embed is not a usable key.
         emb.embed_query("test")
-        logger.info("✅ OpenAI embeddings (text-embedding-3-small) verified")
+        logger.info(f"✅ OpenAI embeddings ({EMBEDDING_MODEL}) verified")
         return emb
+    except EmbeddingsUnavailable:
+        raise
     except Exception as e:
-        logger.warning(f"OpenAI embeddings unavailable ({e}) — using FakeEmbeddings fallback")
-        return _make_fake_embeddings()
+        raise EmbeddingsUnavailable(f"OpenAI embeddings unavailable: {e}") from e
 
 
 class HybridRetriever:
@@ -61,13 +81,47 @@ class HybridRetriever:
         self.chunks: List[dict] = []        # metadata for all indexed chunks
         self.bm25 = None
         self._vectorstore = None
-        self._embeddings = _get_embeddings()
+        self._embeddings = None
+        self.degraded_reason: Optional[str] = None
+
+        try:
+            self._embeddings = _get_embeddings()
+        except EmbeddingsUnavailable as e:
+            # Stay up so /health can report why, but answer nothing.
+            self.degraded_reason = str(e)
+            logger.error(f"❌ Retriever degraded — {e}")
+            return
+
         self._load_state()
 
+    @property
+    def is_available(self) -> bool:
+        return self._embeddings is not None and self.degraded_reason is None
+
     # ── Persistence ───────────────────────────────────────────────────────────
+    def _check_fingerprint(self) -> bool:
+        """Refuse an index built by a different embedding model."""
+        if not FINGERPRINT_PATH.exists():
+            # Pre-dates fingerprinting; adopt the current model and record it.
+            FINGERPRINT_PATH.write_text(EMBEDDING_MODEL, encoding="utf-8")
+            return True
+
+        stored = FINGERPRINT_PATH.read_text(encoding="utf-8").strip()
+        if stored != EMBEDDING_MODEL:
+            self.degraded_reason = (
+                f"Index was built with '{stored}' but the service is configured "
+                f"for '{EMBEDDING_MODEL}'. Re-index before serving queries."
+            )
+            logger.error(f"❌ {self.degraded_reason}")
+            return False
+        return True
+
     def _load_state(self):
         lc_path = Path(FAISS_LANGCHAIN_PATH)
         if lc_path.exists() and META_PATH.exists():
+            if not self._check_fingerprint():
+                self._reset()
+                return
             try:
                 from langchain_community.vectorstores import FAISS
                 self._vectorstore = FAISS.load_local(
@@ -222,6 +276,11 @@ class HybridRetriever:
         Hybrid search: 60% semantic (LangChain FAISS) + 40% keyword (BM25).
         Returns list of chunk dicts with 'relevance_score'.
         """
+        if not self.is_available:
+            raise EmbeddingsUnavailable(
+                self.degraded_reason or "Retrieval backend unavailable"
+            )
+
         if not self.chunks or self._vectorstore is None:
             return []
 
@@ -244,18 +303,20 @@ class HybridRetriever:
         except Exception as e:
             logger.error(f"FAISS search error: {e}")
 
-        sem_max = sem_scores.max()
-        if sem_max > 0:
-            sem_scores /= sem_max
+        # Scores are deliberately NOT normalised by the best result in this
+        # query. Dividing by the maximum makes the top chunk score ~1.0 for
+        # every query, however irrelevant, which silently disabled the
+        # confidence thresholds and made every answer read as "High confidence".
+        # sem_scores are already an absolute 1/(1+L2) similarity in (0, 1].
 
         # ── Keyword (BM25) ───────────────────────────────────────────────────
         bm25_scores = np.zeros(n, dtype=float)
         if self.bm25:
             raw = np.array(self.bm25.get_scores(query.lower().split()), dtype=float)
+            # BM25 is unbounded; map to (0, 1] with a fixed saturation constant
+            # so the value means the same thing across queries.
             bm25_scores = np.clip(raw, 0, None)
-            bm25_max = bm25_scores.max()
-            if bm25_max > 0:
-                bm25_scores /= bm25_max
+            bm25_scores = bm25_scores / (bm25_scores + BM25_SATURATION)
 
         # ── Hybrid combination ────────────────────────────────────────────────
         combined = 0.6 * sem_scores + 0.4 * bm25_scores

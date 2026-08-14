@@ -25,6 +25,7 @@ from contextlib import asynccontextmanager
 from models.database import init_db
 from middleware.rate_limit import RateLimitMiddleware
 from routers import auth, documents, query
+from services.drug_calculator import DRUG_DB_VERSION, DRUG_DB_REVIEW_STATUS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,15 +41,19 @@ async def lifespan(app: FastAPI):
     # Pre-load retriever, then sync FAISS with DB to recover any lost documents
     from services.embeddings import get_retriever
     r = get_retriever()
-    logger.info(f"   FAISS on-disk: {r.chunk_count} chunks")
-    r.sync_from_db()
-    logger.info(f"✅ Retriever ready — {r.chunk_count} chunks indexed")
 
-    openai_key = os.environ.get("OPENAI_API_KEY", "")
-    if openai_key:
-        logger.info("✅ OpenAI API key detected — GPT-4o response generation enabled")
+    if r.is_available:
+        logger.info(f"   FAISS on-disk: {r.chunk_count} chunks")
+        r.sync_from_db()
+        logger.info(f"✅ Retriever ready — {r.chunk_count} chunks indexed")
     else:
-        logger.warning("⚠️  OPENAI_API_KEY not set — using RAG-only fallback responses")
+        # Serve /health so an operator can see why, but refuse clinical queries.
+        logger.error(
+            f"❌ Retriever unavailable ({r.degraded_reason}). "
+            "Clinical queries will be refused with 503 until this is fixed."
+        )
+
+    logger.info(f"   Drug safety database {DRUG_DB_VERSION} — {DRUG_DB_REVIEW_STATUS}")
 
     yield
     logger.info("🛑 BNP Clinical AI Engine shutting down…")
@@ -100,16 +105,37 @@ app.include_router(query.router,     prefix="/query",     tags=["Clinical Query"
 # ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/health", tags=["System"])
 def health():
+    """
+    Reports "ok" only when the service can actually answer clinical questions.
+    It previously reported "ok" with no database and with fake embeddings, which
+    made the health check useless as a deployment gate.
+    """
     from services.embeddings import get_retriever
     r = get_retriever()
-    return {
-        "status": "ok",
+
+    database = bool(os.environ.get("DATABASE_URL", ""))
+    problems = []
+    if not database:
+        problems.append("DATABASE_URL is not set")
+    if not r.is_available:
+        problems.append(r.degraded_reason or "retrieval backend unavailable")
+    if r.chunk_count == 0:
+        problems.append("no documents indexed")
+
+    body = {
+        "status": "ok" if not problems else "degraded",
         "service": "BNP Clinical AI Engine",
         "version": "1.0.0",
         "indexed_chunks": r.chunk_count,
         "openai_enabled": bool(os.environ.get("OPENAI_API_KEY", "")),
-        "database": bool(os.environ.get("DATABASE_URL", "")),
+        "database": database,
+        "drug_db_version": DRUG_DB_VERSION,
+        "drug_db_review_status": DRUG_DB_REVIEW_STATUS,
     }
+    if problems:
+        body["problems"] = problems
+        return JSONResponse(status_code=503, content=body)
+    return body
 
 
 @app.get("/", tags=["System"])

@@ -17,7 +17,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import type { BNPResponse } from "@/contexts/ClosedLoopRAGContext";
+import type { BNPResponse } from "@/types/bnp";
 import {
   checkHealth,
   sendQuery as apiQuery,

@@ -3,15 +3,42 @@ Drug Calculation Module + SafetyEngine
 Computes safe dose ranges for common clinical drugs.
 Checks contraindications, drug-drug interactions, high-risk flags, and overdose hard blocks.
 Returns structured output including warnings.
+
+SAFETY CONTRACT — read before editing DRUG_DB:
+
+  * `unit` is mandatory and is the unit the numeric fields are expressed in.
+    Never mix mg and units within an entry. Drugs dosed in international units
+    (heparin, insulin) must set `auto_calculate: False`; this module will not
+    compute a number for them.
+  * `pediatric_mg_per_kg` is only ever applied when an explicit age below
+    PEDIATRIC_AGE_LIMIT is supplied. Weight alone never selects a pediatric
+    range — an adult and a child can weigh the same.
+  * `overdose_threshold_mg_per_kg` is weight-scaled; `overdose_threshold_adult_mg`
+    is an absolute total. An entry must not use the former's value in the
+    latter's field.
+  * Every entry carries provenance. Entries marked UNVERIFIED have not been
+    signed off by a pharmacist and are surfaced to the user as such.
 """
 import re
 from typing import Optional, List, Tuple
 from models.schemas import DrugDoseResult
 
+# Bumped whenever a dose value changes, and recorded on every audit-log row so a
+# past recommendation can be reproduced.
+DRUG_DB_VERSION = "2026-08-14.1"
+
+# Entries have not been reviewed by a licensed pharmacist. Until they are, the
+# API reports this to callers, which display it alongside any dose.
+DRUG_DB_REVIEW_STATUS = "UNVERIFIED — pending pharmacist review"
+
+# Below this age the pediatric range applies, and only when age is known.
+PEDIATRIC_AGE_LIMIT = 18
+
 # Drug database — extended with contraindications, interactions, high_risk flag
 DRUG_DB: dict = {
     "paracetamol": {
         "aliases": ["acetaminophen", "tylenol", "calpol"],
+        "unit": "mg",
         "dose_per_kg": 15,
         "adult_flat_mg": (500, 1000),
         "adult_max_daily_mg": 4000,
@@ -31,13 +58,20 @@ DRUG_DB: dict = {
         ],
     },
     "heparin": {
-        "aliases": ["unfractionated heparin", "uuh", "hep"],
-        "dose_per_kg": 0.7,
+        "aliases": ["unfractionated heparin", "ufh", "hep"],
+        # Heparin is dosed in international units, not milligrams, and the
+        # regimen differs by indication (prophylaxis vs weight-based infusion
+        # with aPTT titration). This module does not compute a number for it.
+        "unit": "unit",
+        "auto_calculate": False,
+        "dose_per_kg": None,
         "adult_flat_mg": None,
-        "adult_max_dose_mg": 350,
-        "adult_max_daily_mg": 5000,
-        "overdose_threshold_adult_mg": 10000,
-        "frequency": "q8-12h",
+        "reference_regimen": (
+            "Prophylaxis: 5000 units SC q8–12h. "
+            "Therapeutic: weight-based IV bolus and infusion per institutional "
+            "protocol, titrated to aPTT. Confirm against the physician order."
+        ),
+        "frequency": "q8-12h (prophylaxis) or continuous infusion",
         "antidote": "Protamine sulfate 1 mg per 100 units heparin (max 50 mg IV slowly)",
         "contraindications": ["active bleeding", "severe thrombocytopenia", "heparin-induced thrombocytopenia", "intracranial hemorrhage"],
         "interactions": ["warfarin", "aspirin", "clopidogrel", "NSAIDs", "thrombolytics"],
@@ -51,6 +85,7 @@ DRUG_DB: dict = {
     },
     "morphine": {
         "aliases": ["morphine sulfate", "ms contin"],
+        "unit": "mg",
         "dose_per_kg": 0.1,
         "adult_flat_mg": (2, 4),
         "route": "IV/SC every 3–4 h (titrate to pain response)",
@@ -72,6 +107,7 @@ DRUG_DB: dict = {
     },
     "ibuprofen": {
         "aliases": ["advil", "nurofen", "brufen"],
+        "unit": "mg",
         "dose_per_kg": 10,
         "adult_flat_mg": (200, 600),
         "adult_max_daily_mg": 2400,
@@ -91,6 +127,7 @@ DRUG_DB: dict = {
     },
     "amoxicillin": {
         "aliases": ["amoxil", "trimox"],
+        "unit": "mg",
         "dose_per_kg": 25,
         "adult_flat_mg": (250, 500),
         "adult_max_daily_mg": 3000,
@@ -109,6 +146,8 @@ DRUG_DB: dict = {
     },
     "insulin": {
         "aliases": ["insulin regular", "novolog", "humalog", "lantus", "glargine"],
+        "unit": "unit",
+        "auto_calculate": False,
         "adult_flat_units": "Individualized — ALWAYS per physician order",
         "frequency": "per sliding scale or physician order",
         "antidote": "Dextrose 50% (D50W) IV for severe hypoglycemia; glucagon 1 mg IM/SC if IV access unavailable",
@@ -127,6 +166,7 @@ DRUG_DB: dict = {
     },
     "metformin": {
         "aliases": ["glucophage"],
+        "unit": "mg",
         "dose_per_kg": None,
         "adult_flat_mg": (500, 1000),
         "adult_max_daily_mg": 3000,
@@ -144,6 +184,7 @@ DRUG_DB: dict = {
     },
     "warfarin": {
         "aliases": ["coumadin"],
+        "unit": "mg",
         "dose_per_kg": None,
         "adult_flat_mg": None,
         "adult_max_daily_mg": 10,
@@ -162,6 +203,7 @@ DRUG_DB: dict = {
     },
     "vancomycin": {
         "aliases": ["vancocin", "vanco"],
+        "unit": "mg",
         "dose_per_kg": 15,
         "adult_flat_mg": (500, 1000),
         "adult_max_dose_mg": 3000,
@@ -183,6 +225,7 @@ DRUG_DB: dict = {
     },
     "gentamicin": {
         "aliases": ["garamycin"],
+        "unit": "mg",
         "dose_per_kg": 1.5,
         "adult_flat_mg": None,
         "adult_max_dose_mg": 160,
@@ -203,6 +246,7 @@ DRUG_DB: dict = {
     },
     "furosemide": {
         "aliases": ["lasix", "frusemide"],
+        "unit": "mg",
         "dose_per_kg": 0.5,
         "adult_flat_mg": (20, 80),
         "adult_max_daily_mg": 600,
@@ -222,6 +266,7 @@ DRUG_DB: dict = {
     },
     "digoxin": {
         "aliases": ["lanoxin"],
+        "unit": "mg",
         "dose_per_kg": None,
         "adult_flat_mg": None,
         "adult_max_daily_mg": 0.25,
@@ -242,10 +287,14 @@ DRUG_DB: dict = {
     },
     "enoxaparin": {
         "aliases": ["clexane", "lovenox", "lmwh"],
+        "unit": "mg",
         "dose_per_kg": 1.0,
         "adult_flat_mg": None,
         "adult_max_daily_mg": 180,
-        "overdose_threshold_adult_mg": 2,  # per kg
+        # Weight-scaled, not an absolute total: 2 mg/kg/day. Previously stored in
+        # the absolute-total field, which reported a normal 70 mg dose as a 35x
+        # overdose requiring protamine.
+        "overdose_threshold_mg_per_kg": 2,
         "frequency": "q12h (prophylaxis: once daily)",
         "antidote": "Protamine sulfate (partial reversal — 60% of anti-Xa activity)",
         "contraindications": ["active major bleeding", "heparin-induced thrombocytopenia", "severe renal failure (CrCl <15)", "prosthetic heart valve"],
@@ -262,6 +311,7 @@ DRUG_DB: dict = {
     },
     "metoprolol": {
         "aliases": ["lopressor", "toprol", "betaloc"],
+        "unit": "mg",
         "dose_per_kg": None,
         "adult_flat_mg": (25, 100),
         "adult_max_daily_mg": 400,
@@ -280,6 +330,7 @@ DRUG_DB: dict = {
     },
     "omeprazole": {
         "aliases": ["losec", "prilosec"],
+        "unit": "mg",
         "dose_per_kg": None,
         "adult_flat_mg": (20, 40),
         "adult_max_daily_mg": 120,
@@ -298,6 +349,7 @@ DRUG_DB: dict = {
     },
     "amiodarone": {
         "aliases": ["cordarone", "pacerone"],
+        "unit": "mg",
         "dose_per_kg": None,
         "adult_flat_mg": (100, 200),
         "adult_max_daily_mg": 400,
@@ -318,6 +370,7 @@ DRUG_DB: dict = {
     },
     "ceftriaxone": {
         "aliases": ["rocephin"],
+        "unit": "mg",
         "dose_per_kg": 50,
         "adult_flat_mg": (1000, 2000),
         "adult_max_daily_mg": 4000,
@@ -337,6 +390,20 @@ DRUG_DB: dict = {
 }
 
 
+_STOPWORDS = {"a", "an", "the", "of", "in", "with", "and", "or", "to"}
+
+
+def _tokenize(text: str) -> frozenset:
+    """Lowercase word set for clinical-phrase comparison, minus filler words."""
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return frozenset(w for w in words if w not in _STOPWORDS)
+
+
+def is_covered(drug: str) -> bool:
+    """Whether the safety database has an entry for this drug at all."""
+    return drug in DRUG_DB
+
+
 class SafetyEngine:
     """
     Rule-based medication safety checks.
@@ -345,40 +412,78 @@ class SafetyEngine:
 
     @staticmethod
     def calculate_dose_kg(drug: str, weight: float) -> Tuple[Optional[float], List[str]]:
-        """Calculate dose by weight and return alerts if overdose detected."""
+        """
+        Calculate a weight-based dose and return alerts if it exceeds a maximum.
+
+        Returns (None, []) for drugs that must not be auto-calculated, so callers
+        never present a computed number for a unit-dosed medication.
+        """
         if drug not in DRUG_DB:
             return None, []
         d = DRUG_DB[drug]
+        if d.get("auto_calculate") is False:
+            return None, []
+
         dose_per_kg = d.get("dose_per_kg")
         if not dose_per_kg or not weight:
             return None, []
+
+        unit = d.get("unit", "mg")
         dose = round(dose_per_kg * weight, 1)
         alerts = []
-        # Check single-dose maximum first, then fall back to daily max
+
+        # Weight-scaled ceiling, where the entry defines one.
+        per_kg_max = d.get("overdose_threshold_mg_per_kg")
+        if per_kg_max:
+            scaled = round(per_kg_max * weight, 1)
+            if dose > scaled:
+                alerts.append(
+                    f"🚨 OVERDOSE: Calculated {dose} {unit} exceeds "
+                    f"{per_kg_max} {unit}/kg ({scaled} {unit} for {weight} kg)"
+                )
+                return dose, alerts
+
+        # Absolute single-dose maximum first, then the daily maximum.
         max_single = d.get("adult_max_dose_mg")
         max_daily = d.get("adult_max_daily_mg")
         if max_single and dose > max_single:
             alerts.append(
-                f"🚨 OVERDOSE: Calculated {dose} mg exceeds maximum single dose of {max_single} mg"
+                f"🚨 OVERDOSE: Calculated {dose} {unit} exceeds maximum single dose of {max_single} {unit}"
             )
         elif max_daily and dose > max_daily:
             alerts.append(
-                f"🚨 OVERDOSE: Calculated {dose} mg exceeds maximum daily dose of {max_daily} mg"
+                f"🚨 OVERDOSE: Calculated {dose} {unit} exceeds maximum daily dose of {max_daily} {unit}"
             )
         return dose, alerts
 
     @staticmethod
     def check_contraindications(drug: str, conditions: List[str]) -> List[str]:
-        """Return alerts for any patient condition matching drug contraindications."""
+        """
+        Return alerts for any patient condition matching a drug contraindication.
+
+        Matching is on whole words rather than raw substrings: the previous
+        bidirectional `in` test matched any condition that happened to be a
+        substring of a contraindication (and vice versa), producing both false
+        alarms and silent misses.
+        """
         alerts = []
         if drug not in DRUG_DB or not conditions:
             return alerts
-        drug_contras = [c.lower() for c in DRUG_DB[drug].get("contraindications", [])]
+
         for condition in conditions:
-            c_lower = condition.lower()
-            for contra in drug_contras:
-                if c_lower in contra or contra in c_lower:
-                    alerts.append(f"⚠️ Contraindication: Patient has '{condition}' — use of {drug.title()} is contraindicated")
+            condition_tokens = _tokenize(condition)
+            if not condition_tokens:
+                continue
+            for contra in DRUG_DB[drug].get("contraindications", []):
+                contra_tokens = _tokenize(contra)
+                if not contra_tokens:
+                    continue
+                # One is a phrase contained in the other, token-wise.
+                if condition_tokens <= contra_tokens or contra_tokens <= condition_tokens:
+                    alerts.append(
+                        f"⚠️ Contraindication: Patient has '{condition}' — "
+                        f"use of {drug.title()} is contraindicated ({contra})"
+                    )
                     break
         return alerts
 
@@ -425,14 +530,19 @@ class SafetyEngine:
         return DRUG_DB.get(drug, {}).get("interactions", [])
 
 
+def _mentions(text: str, term: str) -> bool:
+    """Whole-word (or whole-phrase) match, so 'hep' does not match 'hepatic'."""
+    return re.search(rf"\b{re.escape(term)}\b", text) is not None
+
+
 def _find_drug(query: str) -> Optional[tuple]:
     """Return (drug_name, drug_data) or None."""
     q = query.lower()
     for drug_name, data in DRUG_DB.items():
-        if drug_name in q:
+        if _mentions(q, drug_name):
             return drug_name, data
         for alias in data.get("aliases", []):
-            if alias in q:
+            if _mentions(q, alias):
                 return drug_name, data
     return None
 
@@ -452,9 +562,35 @@ def extract_weight(query: str) -> Optional[float]:
     return None
 
 
-def calculate_dose(query: str, weight_kg: Optional[float] = None) -> Optional[DrugDoseResult]:
+def extract_age(query: str) -> Optional[int]:
+    """Extract patient age in years from a query string, if stated."""
+    patterns = [
+        r"(\d{1,3})\s*(?:-|\s)?\s*year[s]?[\s-]*old",
+        r"\bage[d]?[:\s]+(\d{1,3})\b",
+        r"(?:عمر[هها]?|السن)[:\s]+(\d{1,3})",
+    ]
+    for pat in patterns:
+        m = re.search(pat, query, re.IGNORECASE)
+        if m:
+            age = int(m.group(1))
+            if 0 <= age <= 120:
+                return age
+    return None
+
+
+def calculate_dose(
+    query: str,
+    weight_kg: Optional[float] = None,
+    age_years: Optional[int] = None,
+) -> Optional[DrugDoseResult]:
     """
     Returns DrugDoseResult if a known drug is detected, else None.
+
+    The pediatric range is used only when an age below PEDIATRIC_AGE_LIMIT is
+    explicitly known. Weight alone never selects it: previously any query with a
+    weight took the pediatric branch, so a 70 kg adult asking about morphine was
+    given the pediatric 0.05–0.1 mg/kg range (3.5–7 mg) instead of the adult
+    2–4 mg in the same record.
     """
     found = _find_drug(query)
     if not found:
@@ -462,53 +598,88 @@ def calculate_dose(query: str, weight_kg: Optional[float] = None) -> Optional[Dr
 
     drug_name, data = found
     weight = weight_kg or extract_weight(query)
-    warnings: List[str] = data.get("warnings", [])
+    age = age_years if age_years is not None else extract_age(query)
+    unit = data.get("unit", "mg")
+    warnings: List[str] = list(data.get("warnings", []))
 
-    # Special case: insulin — no mg/kg calculation
-    if drug_name == "insulin":
+    # Drugs dosed in international units, or otherwise protocol-driven, are
+    # never computed here.
+    if data.get("auto_calculate") is False:
+        reference = data.get("reference_regimen") or data.get(
+            "adult_flat_units", "Per physician order"
+        )
         return DrugDoseResult(
-            drug_name="Insulin",
+            drug_name=drug_name.title(),
             patient_weight_kg=weight,
-            calculated_dose="Per physician order — individualized",
-            safe_range=data.get("adult_flat_units", "Per physician order"),
+            calculated_dose=f"Not calculated — {drug_name} is dosed in {unit}s per protocol",
+            safe_range=reference,
             overdose_threshold=None,
             warnings=warnings,
         )
+
+    is_pediatric = age is not None and age < PEDIATRIC_AGE_LIMIT
+    pediatric_range = data.get("pediatric_mg_per_kg")
+
+    if age is None and weight:
+        warnings = warnings + [
+            "Age was not provided — the ADULT dose range is shown. "
+            "Supply the patient age for a pediatric calculation."
+        ]
 
     # Adult flat dose range — guard against explicit None values in DRUG_DB
     flat_mg = data.get("adult_flat_mg")
     adult_min, adult_max = flat_mg if isinstance(flat_mg, tuple) else (None, None)
 
-    if adult_min is not None and adult_max is not None:
-        safe_range = f"{adult_min}–{adult_max} mg per dose"
+    if is_pediatric and pediatric_range and weight:
+        lo, hi = pediatric_range
+        safe_range = f"{lo}–{hi} {unit}/kg per dose (pediatric)"
+    elif adult_min is not None and adult_max is not None:
+        safe_range = f"{adult_min}–{adult_max} {unit} per dose (adult)"
     elif data.get("dose_per_kg") and weight:
         dpk = data["dose_per_kg"]
-        safe_range = f"{round(dpk * weight, 1)} mg/dose (based on {dpk} mg/kg × {weight} kg)"
+        safe_range = (
+            f"{round(dpk * weight, 1)} {unit}/dose "
+            f"(based on {dpk} {unit}/kg × {weight} kg, adult)"
+        )
     else:
         safe_range = "Dose per physician order"
     if "route" in data:
         safe_range += f" ({data['route']})"
     if "adult_max_daily_mg" in data:
-        safe_range += f"; max {data['adult_max_daily_mg']} mg/day"
+        safe_range += f"; max {data['adult_max_daily_mg']} {unit}/day"
 
     # Calculated dose
     calculated_dose = None
-    if weight and "pediatric_mg_per_kg" in data:
-        lo, hi = data["pediatric_mg_per_kg"]
-        calc_lo = round(lo * weight, 1)
-        calc_hi = round(hi * weight, 1)
-        calculated_dose = f"{calc_lo}–{calc_hi} mg/dose (based on {lo}–{hi} mg/kg × {weight} kg)"
+    if is_pediatric and pediatric_range and weight:
+        lo, hi = pediatric_range
+        calculated_dose = (
+            f"{round(lo * weight, 1)}–{round(hi * weight, 1)} {unit}/dose "
+            f"(pediatric {lo}–{hi} {unit}/kg × {weight} kg, age {age})"
+        )
     elif weight and data.get("dose_per_kg"):
         dpk = data["dose_per_kg"]
-        calculated_dose = f"{round(dpk * weight, 1)} mg/dose (based on {dpk} mg/kg × {weight} kg)"
+        calculated_dose = (
+            f"{round(dpk * weight, 1)} {unit}/dose "
+            f"(adult {dpk} {unit}/kg × {weight} kg)"
+        )
     elif adult_min and adult_max:
-        calculated_dose = f"{adult_min}–{adult_max} mg (standard adult dose)"
+        calculated_dose = f"{adult_min}–{adult_max} {unit} (standard adult dose)"
 
-    # Overdose threshold
-    overdose = data.get("overdose_threshold_adult_mg")
+    # Overdose threshold — absolute, or weight-scaled where the entry says so.
     overdose_str = None
-    if overdose:
-        overdose_str = f">{overdose} mg total — administer antidote: {data.get('antidote', 'supportive care')}"
+    antidote = data.get("antidote", "supportive care")
+    per_kg_max = data.get("overdose_threshold_mg_per_kg")
+    absolute_max = data.get("overdose_threshold_adult_mg")
+
+    if per_kg_max and weight:
+        overdose_str = (
+            f">{round(per_kg_max * weight, 1)} {unit} total "
+            f"({per_kg_max} {unit}/kg × {weight} kg) — administer antidote: {antidote}"
+        )
+    elif per_kg_max:
+        overdose_str = f">{per_kg_max} {unit}/kg — administer antidote: {antidote}"
+    elif absolute_max:
+        overdose_str = f">{absolute_max} {unit} total — administer antidote: {antidote}"
 
     return DrugDoseResult(
         drug_name=drug_name.title(),

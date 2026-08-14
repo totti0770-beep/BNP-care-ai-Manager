@@ -15,13 +15,21 @@ Pipeline:
 import time
 import uuid
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from models.schemas import QueryRequest, QueryResponse, QueryType, Citation
 from models.database import db_cursor
 from services.clinical_router import classify_query
-from services.drug_calculator import calculate_dose, extract_weight, SafetyEngine, DRUG_DB
-from services.safety_layer import check_safety, is_high_risk
-from services.embeddings import get_retriever
+from services.drug_calculator import (
+    calculate_dose,
+    extract_weight,
+    extract_age,
+    SafetyEngine,
+    DRUG_DB,
+    DRUG_DB_VERSION,
+    DRUG_DB_REVIEW_STATUS,
+)
+from services.safety_layer import check_retrieval, check_answer, is_high_risk
+from services.embeddings import get_retriever, EmbeddingsUnavailable
 from services.context_validator import validate_context
 from services.response_generator import (
     generate_response,
@@ -71,7 +79,19 @@ def query(
 
     # ── Step 2: Hybrid retrieval ──────────────────────────────────────────────
     retriever = get_retriever()
-    chunks = retriever.hybrid_search(search_query, top_k=body.top_k)
+    try:
+        chunks = retriever.hybrid_search(search_query, top_k=body.top_k)
+    except EmbeddingsUnavailable as e:
+        # Fail closed: without working retrieval there is no grounded answer to
+        # give, and a plausible ungrounded one is the dangerous outcome.
+        logger.error(f"[{session_id}] Retrieval unavailable: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The clinical knowledge base is unavailable. "
+                "No clinical guidance can be provided until it is restored."
+            ),
+        )
 
     citations = [
         Citation(
@@ -119,8 +139,9 @@ def query(
             processing_time_ms=elapsed,
         )
 
-    # ── Step 4: Safety check (pre-generation) ────────────────────────────────
-    safety = check_safety("", citations, top_confidence, question)
+    # ── Step 4: Safety check (retrieval-only; the answer is re-checked at
+    # step 6b, once it exists) ───────────────────────────────────────────────
+    safety = check_retrieval(citations, top_confidence)
 
     if not safety.is_safe:
         _log_query(user_id, current_user["username"], session_id, question,
@@ -180,6 +201,17 @@ def query(
                             break
 
         weight = body.patient_weight_kg or extract_weight(question)
+        age = body.age if body.age is not None else extract_age(question)
+
+        if drug_name_raw and drug_name_raw not in DRUG_DB:
+            # The drug was named but is outside the safety database. Say so
+            # explicitly: an empty contraindication list reads as "none known",
+            # which is the opposite of the truth.
+            safety_alerts.append(
+                f"⚠️ {drug_name_raw.title()} is not covered by the medication "
+                "safety database — no contraindication, interaction, or dose "
+                "checks were performed. Verify against the formulary."
+            )
 
         if drug_name_raw and drug_name_raw in DRUG_DB:
             safety_alerts += SafetyEngine.high_risk_flag(drug_name_raw)
@@ -203,7 +235,7 @@ def query(
             has_interactions = len([a for a in safety_alerts if "Interaction" in a]) > 0
             nursing_notes = SafetyEngine.get_nursing_notes(drug_name_raw, has_interactions)
 
-        drug_result = calculate_dose(question, weight)
+        drug_result = calculate_dose(question, weight, age)
         if drug_result:
             dose_parts = []
             if drug_result.calculated_dose:
@@ -247,6 +279,31 @@ def query(
         if gpt_notes:
             existing = set(nursing_notes)
             nursing_notes = nursing_notes + [n for n in gpt_notes if n not in existing]
+
+        # ── Step 6b: Validate the generated answer ───────────────────────────
+        answer_check = check_answer(answer, top_confidence)
+        if not answer_check.is_safe:
+            logger.warning(f"[{session_id}] Answer rejected: {answer_check.rejection_reason}")
+            _log_query(user_id, current_user["username"], session_id, question,
+                       query_type, top_confidence, rejected=True)
+            elapsed = int(time.time() * 1000) - start_ms
+            return QueryResponse(
+                session_id=session_id,
+                query_type=query_type,
+                answer=_msg(
+                    "تعذّر التحقق من الإجابة من المصادر الطبية المتاحة.",
+                    "The generated answer could not be verified against the "
+                    "indexed clinical sources.",
+                    question,
+                ),
+                citations=citations,
+                confidence=top_confidence,
+                confidence_label=confidence_label,
+                rejected=True,
+                rejection_reason=answer_check.rejection_reason,
+                safety_alert=True,
+                processing_time_ms=elapsed,
+            )
 
     # ── Step 7: Safety alert detection ───────────────────────────────────────
     safety_alert = hard_blocked or bool(safety_alerts) or is_high_risk(question, answer)

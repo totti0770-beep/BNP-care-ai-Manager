@@ -4,7 +4,6 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { DocumentVerificationProvider } from '@/contexts/DocumentVerificationContext';
 import { AuditLogProvider } from '@/contexts/AuditLogContext';
-import { ClosedLoopRAGProvider } from '@/contexts/ClosedLoopRAGContext';
 import { BackendProvider } from '@/contexts/BackendContext';
 import { Toaster } from '@/components/ui/sonner';
 import LoginScreen from '@/components/LoginScreen';
@@ -86,7 +85,6 @@ function App() {
     <LanguageProvider>
       <AuditLogProvider>
         <DocumentVerificationProvider>
-          <ClosedLoopRAGProvider>
             <BackendProvider>
               <AppContent />
               <Toaster
@@ -100,7 +98,6 @@ function App() {
                 }}
               />
             </BackendProvider>
-          </ClosedLoopRAGProvider>
         </DocumentVerificationProvider>
       </AuditLogProvider>
     </LanguageProvider>
