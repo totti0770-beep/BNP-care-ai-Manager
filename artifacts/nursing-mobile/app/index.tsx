@@ -42,7 +42,7 @@ const CATEGORIES = [
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { documents, themeMode, setThemeMode } = useApp();
+  const { themeMode, setThemeMode } = useApp();
   const colors = useColors();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -137,7 +137,6 @@ export default function HomeScreen() {
             category={cat.id}
             title={cat.title}
             subtitle={cat.subtitle}
-            docCount={documents[cat.id]?.length ?? 0}
             accentColor={cat.accentColor}
             iconName={cat.iconName}
             onPress={() =>

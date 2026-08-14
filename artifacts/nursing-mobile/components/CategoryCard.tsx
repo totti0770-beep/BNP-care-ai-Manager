@@ -22,7 +22,6 @@ interface CategoryCardProps {
   category: Category;
   title: string;
   subtitle: string;
-  docCount: number;
   accentColor: string;
   iconName: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
@@ -31,7 +30,6 @@ interface CategoryCardProps {
 export function CategoryCard({
   title,
   subtitle,
-  docCount,
   accentColor,
   iconName,
   onPress,
@@ -71,9 +69,9 @@ export function CategoryCard({
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
           <View style={styles.footer}>
-            <Text style={[styles.docCount, { color: accentColor }]}>
-              {docCount} وثيقة
-            </Text>
+            {/* The per-category document count was read from a local list that
+                no upload ever reached, and the engine has no per-category
+                concept for documents, so no honest number exists here. */}
             <Ionicons name="chevron-back" size={16} color={accentColor} />
           </View>
         </View>

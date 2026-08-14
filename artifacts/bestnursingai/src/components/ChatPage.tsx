@@ -522,9 +522,9 @@ const ChatPage: React.FC = () => {
       Live Engine · {indexedChunks} chunks{openaiEnabled ? ' · GPT-4o' : ''}
     </span>
   ) : (
-    <span className="px-3 py-1 rounded-full bg-green-600/20 text-green-400 text-xs flex items-center gap-1">
-      <Shield className="w-3 h-3" />
-      {t('offlineOnly')}
+    <span className="px-3 py-1 rounded-full bg-red-600/20 text-red-300 text-xs flex items-center gap-1">
+      <AlertTriangle className="w-3 h-3" />
+      {t('engineUnavailableTitle')}
     </span>
   );
 
@@ -560,7 +560,7 @@ const ChatPage: React.FC = () => {
             <p className="text-gray-400 text-sm mb-1">
               {isEngineAvailable
                 ? `متصل بالمحرك السريري · ${indexedChunks} مقطع مفهرس`
-                : 'الإجابات مستندة حصراً إلى الوثائق الطبية المعتمدة'}
+                : t('engineUnavailableBody')}
             </p>
             <p className="text-gray-600 text-xs mb-4">
               حساب الجرعات · تحذيرات السلامة · مراجع موثّقة

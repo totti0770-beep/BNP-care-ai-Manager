@@ -35,17 +35,16 @@ interface DocumentVerificationContextType {
   verifyDocument: (file: File, signature?: string) => Promise<VerifiedDocument | null>;
   removeDocument: (id: string) => void;
   calculateChecksum: (file: File) => Promise<string>;
-  isSourceWhitelisted: (sourceId: string) => boolean;
   downloadDocument: (doc: VerifiedDocument) => void;
 }
 
 const DocumentVerificationContext = createContext<DocumentVerificationContextType | undefined>(undefined);
 
-const DEMO_SOURCES: OfficialSource[] = [
-  { id: '1', name: 'Saudi Ministry of Health', publicKey: 'MOH-RSA-2048-PUBLIC-KEY', isActive: true },
-  { id: '2', name: 'American Nurses Association', publicKey: 'ANA-Ed25519-PUBLIC-KEY', isActive: true },
-  { id: '3', name: 'WHO Guidelines', publicKey: 'WHO-RSA-2048-PUBLIC-KEY', isActive: true },
-];
+// Seeded empty. This previously shipped three organisations carrying literal
+// placeholder strings ('MOH-RSA-2048-PUBLIC-KEY') in the publicKey field, which
+// rendered as verified trust anchors for the Saudi MOH, WHO and ANA. No key was
+// ever parsed and no signature was ever checked against them.
+const DEMO_SOURCES: OfficialSource[] = [];
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -69,10 +68,6 @@ export const DocumentVerificationProvider: React.FC<{ children: React.ReactNode 
       reader.readAsBinaryString(file);
     });
   }, []);
-
-  const isSourceWhitelisted = useCallback((sourceId: string): boolean => {
-    return officialSources.some(s => s.id === sourceId && s.isActive);
-  }, [officialSources]);
 
   const verifyDocument = useCallback(async (file: File, signature: string = ''): Promise<VerifiedDocument | null> => {
     // This records a local checksum for display. It is NOT a provenance check:
@@ -145,7 +140,6 @@ export const DocumentVerificationProvider: React.FC<{ children: React.ReactNode 
         verifyDocument,
         removeDocument,
         calculateChecksum,
-        isSourceWhitelisted,
         downloadDocument,
       }}
     >

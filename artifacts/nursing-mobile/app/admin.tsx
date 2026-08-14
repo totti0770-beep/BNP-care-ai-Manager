@@ -16,7 +16,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Category, Document, useApp } from "@/contexts/AppContext";
+import { Category, useApp } from "@/contexts/AppContext";
+import { listEngineDocuments, type EngineDocument } from "@/services/clinicalApi";
 
 const CATEGORY_CONFIG: Record<
   Category,
@@ -41,10 +42,6 @@ const CATEGORY_CONFIG: Record<
 
 const CATEGORIES: Category[] = ["pharmacy", "policies", "quality"];
 
-function generateId() {
-  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-}
-
 function formatDate(isoString: string) {
   try {
     return new Date(isoString).toLocaleDateString("ar-SA");
@@ -55,14 +52,13 @@ function formatDate(isoString: string) {
 
 export default function AdminScreen() {
   const insets = useSafeAreaInsets();
-  const { documents, addDocument, removeDocument, isAdminAuthenticated, setAdminAuth } = useApp();
+  const { isAdminAuthenticated, setAdminAuth } = useApp();
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [accessDenied, setAccessDenied] = useState<string | null>(null);
-  const [addingFor, setAddingFor] = useState<Category | null>(null);
-  const [newDocName, setNewDocName] = useState("");
-  const [newDocPages, setNewDocPages] = useState("");
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [engineDocs, setEngineDocs] = useState<EngineDocument[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+  const [docsError, setDocsError] = useState<string | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -116,38 +112,23 @@ export default function AdminScreen() {
     }
   }, [setAdminAuth]);
 
-  const handleAddDocument = useCallback(() => {
-    if (!addingFor || !newDocName.trim()) return;
-    const doc: Document = {
-      id: generateId(),
-      name: newDocName.trim(),
-      category: addingFor,
-      uploadedAt: new Date().toISOString(),
-      pages: parseInt(newDocPages) || 1,
-    };
-    addDocument(doc);
-    setNewDocName("");
-    setNewDocPages("");
-    setShowAddForm(false);
-    setAddingFor(null);
-    if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-  }, [addingFor, newDocName, newDocPages, addDocument]);
+  useEffect(() => {
+    if (!isAdminAuthenticated) return;
+    let cancelled = false;
 
-  const handleRemoveDocument = useCallback(
-    (category: Category, docId: string) => {
-      Alert.alert("حذف الوثيقة", "هل تريد حذف هذه الوثيقة؟", [
-        { text: "إلغاء", style: "cancel" },
-        {
-          text: "حذف",
-          style: "destructive",
-          onPress: () => removeDocument(category, docId),
-        },
-      ]);
-    },
-    [removeDocument]
-  );
+    listEngineDocuments().then((docs) => {
+      if (cancelled) return;
+      setEngineDocs(docs);
+      setDocsError(
+        docs.length === 0 ? "تعذّر تحميل الوثائق أو لا توجد وثائق مفهرسة" : null,
+      );
+      setIsLoadingDocs(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminAuthenticated]);
 
   if (isAuthenticating) {
     return (
@@ -198,69 +179,52 @@ export default function AdminScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad + 20 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Info bar */}
+        {/* This screen is read-only. It previously let an admin type a document
+            name and a page count, stored it in AsyncStorage under a "رفع PDF"
+            button, and never called the engine — so an admin could believe they
+            had curated the corpus that dose answers come from while nothing had
+            changed. Uploading is done from the web app; here we show what is
+            genuinely indexed. */}
         <View style={styles.infoBar}>
-          <Ionicons name="cloud-upload-outline" size={16} color="#8B5CF6" />
+          <Ionicons name="library-outline" size={16} color="#8B5CF6" />
           <Text style={styles.infoBarText}>
-            إدارة الوثائق المرجعية لكل تصنيف طبي
+            الوثائق المفهرسة في المحرك السريري (للعرض فقط)
           </Text>
         </View>
 
-        {/* Category sections */}
-        {CATEGORIES.map((cat) => {
-          const conf = CATEGORY_CONFIG[cat];
-          const docs = documents[cat] ?? [];
-
-          return (
-            <View key={cat} style={styles.categorySection}>
-              <View style={styles.categoryHeader}>
-                <Pressable
-                  style={[styles.uploadButton, { backgroundColor: conf.accentColor + "22", borderColor: conf.accentColor + "44" }]}
-                  onPress={() => {
-                    setAddingFor(cat);
-                    setShowAddForm(true);
-                  }}
-                >
-                  <Ionicons name="add" size={16} color={conf.accentColor} />
-                  <Text style={[styles.uploadButtonText, { color: conf.accentColor }]}>
-                    رفع PDF
+        {isLoadingDocs ? (
+          <View style={styles.emptyDocs}>
+            <ActivityIndicator color="#8B5CF6" />
+          </View>
+        ) : engineDocs.length === 0 ? (
+          <View style={styles.emptyDocs}>
+            <Ionicons name="document-outline" size={24} color="#2D1B4E" />
+            <Text style={styles.emptyDocsText}>
+              {docsError ?? "لا توجد وثائق مفهرسة"}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.categorySection}>
+            {engineDocs.map((doc) => (
+              <View key={doc.id} style={styles.docRow}>
+                <View style={styles.docInfo}>
+                  <Text style={styles.docName}>{doc.filename}</Text>
+                  <Text style={styles.docMeta}>
+                    {doc.chunk_count} مقطع · {formatDate(doc.upload_date)}
                   </Text>
-                </Pressable>
-                <View style={styles.categoryTitle}>
-                  <Text style={styles.categoryTitleText}>{conf.title}</Text>
-                  <View style={[styles.catIconBadge, { backgroundColor: conf.accentColor + "22" }]}>
-                    <Ionicons name={conf.iconName} size={16} color={conf.accentColor} />
-                  </View>
                 </View>
+                <Ionicons name="document-text" size={20} color="#8B5CF6" />
               </View>
+            ))}
+          </View>
+        )}
 
-              {docs.length === 0 ? (
-                <View style={styles.emptyDocs}>
-                  <Ionicons name="document-outline" size={24} color="#2D1B4E" />
-                  <Text style={styles.emptyDocsText}>لا توجد وثائق مرفوعة</Text>
-                </View>
-              ) : (
-                docs.map((doc) => (
-                  <View key={doc.id} style={styles.docRow}>
-                    <Pressable
-                      style={styles.docRemoveBtn}
-                      onPress={() => handleRemoveDocument(cat, doc.id)}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                    </Pressable>
-                    <View style={styles.docInfo}>
-                      <Text style={styles.docName}>{doc.name}</Text>
-                      <Text style={styles.docMeta}>
-                        {doc.pages} صفحة · {formatDate(doc.uploadedAt)}
-                      </Text>
-                    </View>
-                    <Ionicons name="document-text" size={20} color={conf.accentColor} />
-                  </View>
-                ))
-              )}
-            </View>
-          );
-        })}
+        <View style={styles.infoBar}>
+          <Ionicons name="information-circle-outline" size={16} color="#64748B" />
+          <Text style={styles.infoBarText}>
+            لإضافة أو حذف وثيقة، استخدم تطبيق الويب.
+          </Text>
+        </View>
 
         {/* Logout */}
         <Pressable
@@ -275,62 +239,6 @@ export default function AdminScreen() {
         </Pressable>
       </ScrollView>
 
-      {/* Add document modal */}
-      {showAddForm && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>
-              رفع وثيقة · {addingFor ? CATEGORY_CONFIG[addingFor].title : ""}
-            </Text>
-
-            <Text style={styles.modalLabel}>اسم الوثيقة</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={newDocName}
-              onChangeText={setNewDocName}
-              placeholder="مثال: دليل الأدوية السريرية 2024"
-              placeholderTextColor="#475569"
-              textAlign="right"
-            />
-
-            <Text style={styles.modalLabel}>عدد الصفحات</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={newDocPages}
-              onChangeText={setNewDocPages}
-              placeholder="مثال: 120"
-              placeholderTextColor="#475569"
-              keyboardType="number-pad"
-              textAlign="right"
-            />
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={styles.modalCancelBtn}
-                onPress={() => {
-                  setShowAddForm(false);
-                  setAddingFor(null);
-                  setNewDocName("");
-                  setNewDocPages("");
-                }}
-              >
-                <Text style={styles.modalCancelText}>إلغاء</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.modalConfirmBtn,
-                  { opacity: newDocName.trim() ? 1 : 0.5 },
-                ]}
-                onPress={handleAddDocument}
-                disabled={!newDocName.trim()}
-              >
-                <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text style={styles.modalConfirmText}>حفظ</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      )}
     </View>
   );
 }

@@ -155,3 +155,31 @@ export async function checkEngineHealth(): Promise<boolean> {
     return false;
   }
 }
+
+// ── Indexed corpus ────────────────────────────────────────────────────────────
+
+export interface EngineDocument {
+  id: string;
+  filename: string;
+  upload_date: string;
+  chunk_count: number;
+  uploaded_by: string;
+}
+
+/**
+ * The documents actually indexed in the clinical engine — the sources answers
+ * are generated from. Returns [] when unavailable or unauthenticated.
+ *
+ * Mobile is read-only here on purpose. It previously kept its own AsyncStorage
+ * list that no upload ever reached, so an admin could believe they had curated
+ * the corpus when nothing had changed. Uploading is done from the web app.
+ */
+export async function listEngineDocuments(): Promise<EngineDocument[]> {
+  try {
+    const res = await authFetch("/documents/");
+    if (!res || !res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
