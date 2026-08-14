@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 
 import { getSessionToken, isSignInConfigured, signIn } from "@/services/session";
 
@@ -17,6 +18,7 @@ import { getSessionToken, isSignInConfigured, signIn } from "@/services/session"
  * audit log, so there is deliberately no anonymous or guest mode.
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const [checking, setChecking] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -38,14 +40,14 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const handleSignIn = useCallback(async () => {
     setBusy(true);
     setError(null);
-    const failure = await signIn();
+    const failureKey = await signIn();
     setBusy(false);
-    if (failure) {
-      setError(failure);
+    if (failureKey) {
+      setError(t(failureKey));
       return;
     }
     setSignedIn(true);
-  }, []);
+  }, [t]);
 
   if (checking) {
     return (
@@ -63,11 +65,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         <View style={styles.iconWrap}>
           <Ionicons name="shield-checkmark" size={32} color="#8B5CF6" />
         </View>
-        <Text style={styles.title}>تسجيل الدخول مطلوب</Text>
-        <Text style={styles.subtitle}>
-          يجب تسجيل الدخول بحسابك الشخصي. تُسجَّل كل استشارة سريرية باسم
-          المستخدم في سجل التدقيق.
-        </Text>
+        <Text style={styles.title}>{t('signInRequired')}</Text>
+        <Text style={styles.subtitle}>{t('signInBody')}</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -78,13 +77,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             disabled={busy}
           >
             <Text style={styles.buttonText}>
-              {busy ? "جارٍ تسجيل الدخول..." : "تسجيل الدخول"}
+              {busy ? t('signingIn') : t('signIn')}
             </Text>
           </Pressable>
         ) : (
-          <Text style={styles.error}>
-            لم يتم إعداد المصادقة على هذا الإصدار. راجع مسؤول النظام.
-          </Text>
+          <Text style={styles.error}>{t('signInNotConfigured')}</Text>
         )}
       </View>
     </View>

@@ -19,7 +19,7 @@ import os
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from contextlib import asynccontextmanager
 
 from models.database import init_db
@@ -139,6 +139,24 @@ def health():
         body["problems"] = problems
         return JSONResponse(status_code=503, content=body)
     return body
+
+
+@app.get("/metrics", tags=["System"], response_class=PlainTextResponse)
+def prometheus_metrics():
+    """
+    Prometheus text format. Unauthenticated because the engine is not exposed
+    publicly — it is reachable only through the API server gateway — and because
+    a scraper generally cannot present a user credential. It exposes counters
+    only: no questions, no answers, no identifiers.
+    """
+    from services.embeddings import get_retriever
+    from services.metrics import metrics
+
+    r = get_retriever()
+    return metrics.render(
+        indexed_chunks=r.chunk_count,
+        retriever_available=r.is_available,
+    )
 
 
 @app.get("/", tags=["System"])

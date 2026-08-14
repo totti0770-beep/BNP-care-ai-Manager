@@ -66,9 +66,9 @@ const SecureUploadPage: React.FC = () => {
     if (isEngineAvailable) {
       const result = await uploadToEngine(pendingFile);
       if (result) {
-        toast.success(`Indexed ${result.chunks} chunks into Clinical AI Engine`);
+        toast.success(t('indexedSegmentsToast', { count: result.chunks }));
       } else {
-        toast.error('Engine upload failed — document saved locally only');
+        toast.error(t('uploadFailedEngine'));
       }
     }
 
@@ -160,7 +160,7 @@ const SecureUploadPage: React.FC = () => {
           <div>
             <Label className="text-gray-300 mb-1 block text-sm">
               {t('digitalSignature')}
-              <span className="text-gray-500 text-xs ml-2">(اختياري)</span>
+              <span className="text-gray-500 text-xs ml-2">({t('optional')})</span>
             </Label>
             <Input
               value={signature}
@@ -177,7 +177,7 @@ const SecureUploadPage: React.FC = () => {
               variant="outline"
               className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
             >
-              إلغاء
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleUpload}
@@ -187,12 +187,12 @@ const SecureUploadPage: React.FC = () => {
               {isVerifying ? (
                 <span className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  جارٍ الرفع...
+                  {t('uploading')}
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
                   <Upload className="w-4 h-4" />
-                  رفع الملف
+                  {t('upload')}
                 </span>
               )}
             </Button>
@@ -242,7 +242,7 @@ const SecureUploadPage: React.FC = () => {
       {engineDocuments.length > 0 && (
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-white mb-3">
-            الوثائق المفهرسة في قاعدة البيانات
+            {t('indexedDocumentsInDb')}
             <span className="text-sm text-gray-400 font-normal ml-2">({engineDocuments.length})</span>
           </h3>
           <div className="space-y-2">
@@ -255,19 +255,19 @@ const SecureUploadPage: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{doc.filename}</p>
                   <p className="text-gray-400 text-xs">
-                    {doc.chunk_count} مقطع ·{' '}
-                    {new Date(doc.upload_date).toLocaleDateString('ar-SA')} ·{' '}
-                    <span className="text-green-400">✓ مفهرس ودائم</span>
+                    {doc.chunk_count} {t('segments')} ·{' '}
+                    {new Date(doc.upload_date).toLocaleDateString()} ·{' '}
+                    <span className="text-green-400">{t('indexedPermanent')}</span>
                   </p>
                 </div>
                 <button
                   onClick={async () => {
                     const ok = await removeFromEngine(doc.id);
-                    if (ok) toast.success('تم حذف المستند من قاعدة البيانات');
-                    else toast.error('فشل الحذف');
+                    if (ok) toast.success(t('documentDeleted'));
+                    else toast.error(t('documentDeleteFailed'));
                   }}
                   className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors text-gray-500 hover:text-red-400"
-                  title="حذف"
+                  title={t('delete')}
                 >
                   <X className="w-4 h-4" />
                 </button>

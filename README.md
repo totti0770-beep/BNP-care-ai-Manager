@@ -89,6 +89,13 @@ pnpm --filter @workspace/api-server run dev
 pnpm --filter @workspace/bestnursingai run dev
 ```
 
+### Monitoring
+
+`GET /metrics` exposes Prometheus counters — query volume, refusals, overdose blocks, audit
+write failures, latency, and retriever state. Refusal rate is the number worth alerting on: it
+is how a knowledge-base gap shows up, and a system refusing everything otherwise looks quiet.
+It exposes counters only, never questions or answers.
+
 ### Checks
 
 ```bash
@@ -175,7 +182,8 @@ Engineering work is not the remaining blocker. These are:
   migration with an explicit backfill.
 - The FAISS index is rebuilt in full on every document upload, and re-embedded from the
   database when it and the `bnp_chunks` table disagree on count.
-- Rate limiting is per-process and in-memory; a multi-instance deployment needs a shared store.
+- Rate limiting and metrics are per-process and in-memory; a multi-instance deployment needs
+  a shared store for both.
 - The audit hash chain is computed by the application, so it detects tampering by anyone
   without database write access at the moment of writing. A fully independent guarantee needs
   append-only storage or external anchoring.

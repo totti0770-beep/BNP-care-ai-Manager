@@ -108,7 +108,7 @@ export const DocumentVerificationProvider: React.FC<{ children: React.ReactNode 
 
   const downloadDocument = useCallback((doc: VerifiedDocument) => {
     if (!doc.fileUrl) {
-      toast.error('File not available for download');
+      toast.error(t('fileNotAvailable'));
       return;
     }
     const a = document.createElement('a');
@@ -117,8 +117,8 @@ export const DocumentVerificationProvider: React.FC<{ children: React.ReactNode 
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    toast.success(`Downloading: ${doc.name}`);
-  }, []);
+    toast.success(t('downloadingFile', { name: doc.name }));
+  }, [t]);
 
   const addOfficialSource = useCallback((source: Omit<OfficialSource, 'id'>) => {
     setOfficialSources(prev => [...prev, { ...source, id: Date.now().toString() }]);

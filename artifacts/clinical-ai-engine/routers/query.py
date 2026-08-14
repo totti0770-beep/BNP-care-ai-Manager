@@ -33,6 +33,7 @@ from services.drug_calculator import (
 )
 from services.safety_layer import check_retrieval, check_answer, is_high_risk
 from services.embeddings import get_retriever, EmbeddingsUnavailable
+from services.metrics import metrics
 from services.context_validator import validate_context
 from services.response_generator import (
     generate_response,
@@ -119,6 +120,7 @@ def query(
     session_id = f"bnp-{uuid.uuid4().hex[:12]}"
     user_id = int(current_user["sub"])
 
+    metrics.incr("bnp_queries_total")
     question = body.question.strip()
     client_ip = (
         request.headers.get("x-forwarded-for", "").split(",")[0].strip()
@@ -148,6 +150,8 @@ def query(
         # Fail closed: without working retrieval there is no grounded answer to
         # give, and a plausible ungrounded one is the dangerous outcome.
         logger.error(f"[{session_id}] Retrieval unavailable: {e}")
+        metrics.incr("bnp_retrieval_unavailable_total")
+        metrics.incr("bnp_queries_refused_total")
         raise HTTPException(
             status_code=503,
             detail=(
@@ -198,6 +202,8 @@ def query(
             )
         except Exception as e:
             logger.error(f"[{session_id}] AUDIT WRITE FAILED: {e}")
+            metrics.incr("bnp_audit_write_failures_total")
+            metrics.incr("bnp_queries_refused_total")
             raise HTTPException(
                 status_code=503,
                 detail=(
@@ -352,6 +358,7 @@ def query(
                 if overdose_alerts:
                     safety_alerts += overdose_alerts
                     hard_blocked = True
+                    metrics.incr("bnp_overdose_blocks_total")
 
             has_interactions = len([a for a in safety_alerts if "Interaction" in a]) > 0
             nursing_notes = SafetyEngine.get_nursing_notes(drug_name_raw, has_interactions)
@@ -448,6 +455,10 @@ def query(
     )
 
     elapsed = int(time.time() * 1000) - start_ms
+    metrics.observe_latency(elapsed / 1000)
+    metrics.incr("bnp_queries_refused_total" if hard_blocked else "bnp_queries_answered_total")
+    if safety_alerts:
+        metrics.incr("bnp_safety_alerts_total", len(safety_alerts))
     logger.info(
         f"[{session_id}] Done in {elapsed}ms | confidence={top_confidence:.3f} "
         f"({confidence_label}) | safety_alerts={len(safety_alerts)} "

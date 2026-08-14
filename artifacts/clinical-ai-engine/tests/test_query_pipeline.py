@@ -178,3 +178,61 @@ def test_implausible_age_is_rejected(engine):
     client, _ = engine()
     res = client.post("/query/", json={"question": "paracetamol dose", "age": 500})
     assert res.status_code == 422
+
+
+# ── Metrics ───────────────────────────────────────────────────────────────────
+
+def test_refusals_are_counted_separately_from_answers(engine):
+    """
+    Refusal rate is the signal that tells an operator the knowledge base has a
+    gap. Without it, a system that refuses everything looks like a quiet one.
+    """
+    from services.metrics import metrics
+
+    client, _ = engine()
+    before_answered = metrics._counters.get("bnp_queries_answered_total", 0)
+    before_refused = metrics._counters.get("bnp_queries_refused_total", 0)
+
+    client.post("/query/", json=QUESTION)
+    client.post(
+        "/query/",
+        json={
+            "question": "gentamicin dose",
+            "drug_name": "gentamicin",
+            "patient_weight_kg": 200,
+        },
+    )
+
+    assert metrics._counters["bnp_queries_answered_total"] == before_answered + 1
+    assert metrics._counters["bnp_queries_refused_total"] == before_refused + 1
+
+
+def test_overdose_blocks_are_counted(engine):
+    from services.metrics import metrics
+
+    client, _ = engine()
+    before = metrics._counters.get("bnp_overdose_blocks_total", 0)
+
+    client.post(
+        "/query/",
+        json={
+            "question": "gentamicin dose",
+            "drug_name": "gentamicin",
+            "patient_weight_kg": 200,
+        },
+    )
+
+    assert metrics._counters["bnp_overdose_blocks_total"] == before + 1
+
+
+def test_metrics_endpoint_exposes_no_clinical_content(engine):
+    """Counters only — a scrape must never leak a question or an answer."""
+    from services.metrics import metrics
+
+    client, _ = engine()
+    client.post("/query/", json=QUESTION)
+
+    body = client.get("/metrics").text
+    assert "bnp_queries_total" in body
+    assert "paracetamol" not in body.lower()
+    assert "500-1000" not in body

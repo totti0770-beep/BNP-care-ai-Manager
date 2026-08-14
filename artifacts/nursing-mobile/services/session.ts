@@ -52,12 +52,13 @@ export function isSignInConfigured(): boolean {
 }
 
 /**
- * Runs the interactive sign-in. Returns an error message on failure, or null
- * once a session token has been stored.
+ * Runs the interactive sign-in. Returns an i18n key describing the failure, or
+ * null once a session token has been stored. Keys rather than messages, so the
+ * caller renders them in the nurse's language.
  */
 export async function signIn(): Promise<string | null> {
   if (!CLIENT_ID) {
-    return "لم يتم إعداد تسجيل الدخول (EXPO_PUBLIC_REPL_ID مفقود).";
+    return "signInNotConfigured";
   }
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "nursingai" });
@@ -74,7 +75,7 @@ export async function signIn(): Promise<string | null> {
 
     const result = await request.promptAsync(discovery);
     if (result.type !== "success" || !result.params.code) {
-      return "تم إلغاء تسجيل الدخول.";
+      return "signInCancelled";
     }
 
     const res = await fetch(`${API_ORIGIN}/api/mobile-auth/token-exchange`, {
@@ -88,15 +89,15 @@ export async function signIn(): Promise<string | null> {
       }),
     });
 
-    if (!res.ok) return "فشل تبادل رمز الدخول مع الخادم.";
+    if (!res.ok) return "signInFailed";
 
     const data: { token?: string } = await res.json();
-    if (!data.token) return "لم يُصدر الخادم رمز جلسة.";
+    if (!data.token) return "signInNoToken";
 
     await storeSessionToken(data.token);
     return null;
   } catch {
-    return "تعذّر الاتصال بخادم المصادقة.";
+    return "signInUnreachable";
   }
 }
 

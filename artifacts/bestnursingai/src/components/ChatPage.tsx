@@ -84,11 +84,12 @@ const SUGGESTED = [
 
 // ── BNP structured response renderer ─────────────────────────────────────────
 function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: boolean }) {
+  const { t } = useTranslation();
   if (bnp.notFound) {
     return (
       <div className="flex items-start gap-2 mt-1 p-3 rounded-xl bg-yellow-600/10 border border-yellow-500/30">
         <Info className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-        <p className="text-yellow-200 text-sm">Not found in provided medical sources.</p>
+        <p className="text-yellow-200 text-sm">{t('notFoundInSources')}</p>
       </div>
     );
   }
@@ -100,7 +101,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             <Zap className="w-3 h-3 text-violet-400" />
-            <span className="text-violet-400 text-xs font-medium">Live Clinical Engine</span>
+            <span className="text-violet-400 text-xs font-medium">{t('liveEngine')}</span>
           </div>
           {bnp.confidenceLabel && (
             <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
@@ -111,7 +112,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
                 : 'bg-red-600/15 border-red-500/40 text-red-300'
             }`}>
               <BarChart2 className="w-2.5 h-2.5" />
-              {bnp.confidenceLabel} Confidence
+              {bnp.confidenceLabel} {t('confidenceSuffix')}
             </div>
           )}
         </div>
@@ -129,7 +130,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
       {bnp.safetyAlert && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/40">
           <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0" />
-          <span className="text-red-300 text-xs font-semibold uppercase tracking-wide">Safety Alert Active</span>
+          <span className="text-red-300 text-xs font-semibold uppercase tracking-wide">{t('safetyAlertActive')}</span>
         </div>
       )}
 
@@ -137,7 +138,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
       <div className="rounded-xl bg-[#12122a] border border-purple-500/20 overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-2 bg-purple-600/10 border-b border-purple-500/20">
           <Activity className="w-3.5 h-3.5 text-purple-400" />
-          <span className="text-purple-300 text-xs font-semibold uppercase tracking-wide">Answer</span>
+          <span className="text-purple-300 text-xs font-semibold uppercase tracking-wide">{t('secAnswer')}</span>
         </div>
         <div className="px-4 py-3">
           <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line">{bnp.answer}</p>
@@ -149,7 +150,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
         <div className="rounded-xl bg-[#12122a] border border-cyan-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-cyan-600/10 border-b border-cyan-500/20">
             <Pill className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-cyan-300 text-xs font-semibold uppercase tracking-wide">Dose</span>
+            <span className="text-cyan-300 text-xs font-semibold uppercase tracking-wide">{t('secDose')}</span>
           </div>
           <div className="px-4 py-3">
             <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line font-mono">{bnp.dose}</p>
@@ -162,7 +163,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
         <div className="rounded-xl bg-[#12122a] border border-teal-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-teal-600/10 border-b border-teal-500/20">
             <Stethoscope className="w-3.5 h-3.5 text-teal-400" />
-            <span className="text-teal-300 text-xs font-semibold uppercase tracking-wide">Indication</span>
+            <span className="text-teal-300 text-xs font-semibold uppercase tracking-wide">{t('secIndication')}</span>
           </div>
           <div className="px-4 py-3">
             <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line">{bnp.indication}</p>
@@ -175,7 +176,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
         <div className="rounded-xl bg-[#12122a] border border-red-500/30 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-red-600/10 border-b border-red-500/20">
             <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-            <span className="text-red-300 text-xs font-semibold uppercase tracking-wide">Safety Warning</span>
+            <span className="text-red-300 text-xs font-semibold uppercase tracking-wide">{t('secSafetyWarning')}</span>
           </div>
           <div className="px-4 py-3">
             <p className="text-red-200 text-sm leading-relaxed whitespace-pre-line">{bnp.safetyWarning}</p>
@@ -188,7 +189,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
         <div className="rounded-xl bg-[#12122a] border border-orange-500/30 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-orange-600/10 border-b border-orange-500/20">
             <ShieldAlert className="w-3.5 h-3.5 text-orange-400" />
-            <span className="text-orange-300 text-xs font-semibold uppercase tracking-wide">Safety Alerts</span>
+            <span className="text-orange-300 text-xs font-semibold uppercase tracking-wide">{t('secSafetyAlerts')}</span>
           </div>
           <ul className="px-4 py-3 space-y-1.5">
             {bnp.safetyAlerts.map((alert, i) => (
@@ -204,7 +205,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
         <div className="rounded-xl bg-[#12122a] border border-yellow-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-yellow-600/10 border-b border-yellow-500/20">
             <XCircle className="w-3.5 h-3.5 text-yellow-400" />
-            <span className="text-yellow-300 text-xs font-semibold uppercase tracking-wide">Clinical Flags</span>
+            <span className="text-yellow-300 text-xs font-semibold uppercase tracking-wide">{t('secClinicalFlags')}</span>
           </div>
           <div className="px-4 py-3 space-y-3">
             {bnp.contraindications && bnp.contraindications.length > 0 && (
@@ -242,7 +243,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
         <div className="rounded-xl bg-[#12122a] border border-violet-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-violet-600/10 border-b border-violet-500/20">
             <ClipboardList className="w-3.5 h-3.5 text-violet-400" />
-            <span className="text-violet-300 text-xs font-semibold uppercase tracking-wide">Nursing Notes</span>
+            <span className="text-violet-300 text-xs font-semibold uppercase tracking-wide">{t('secNursingNotes')}</span>
           </div>
           <ul className="px-4 py-3 space-y-1.5">
             {bnp.nursingNotes.map((note, i) => (
@@ -260,7 +261,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
         <div className="rounded-xl bg-[#12122a] border border-green-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-green-600/10 border-b border-green-500/20">
             <BookOpen className="w-3.5 h-3.5 text-green-400" />
-            <span className="text-green-300 text-xs font-semibold uppercase tracking-wide">Sources</span>
+            <span className="text-green-300 text-xs font-semibold uppercase tracking-wide">{t('secSources')}</span>
           </div>
           <div className="px-4 py-3 space-y-1.5">
             {bnp.sources.map((src, i) => (

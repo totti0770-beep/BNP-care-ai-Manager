@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import React, { useState } from "react";
 import {
   Pressable,
@@ -50,6 +51,7 @@ export function MessageBubble({
   contraindications,
   interactions,
 }: MessageBubbleProps) {
+  const { t } = useTranslation();
   const isUser = role === "user";
   const isAI = role === "assistant";
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -89,7 +91,7 @@ export function MessageBubble({
               color={rejected ? "#F87171" : "#F97316"}
             />
             <Text style={[styles.alertBannerText, rejected ? styles.rejectedText : styles.warningText]}>
-              {rejected ? "تنبيه: جرعة غير آمنة — تم الإيقاف" : "تنبيه سلامة نشط"}
+              {rejected ? t("doseBlockedShort") : t("safetyAlertShort")}
             </Text>
           </View>
         )}
@@ -145,10 +147,10 @@ export function MessageBubble({
               ]}
             >
               {confidenceLabel === "High"
-                ? "ثقة عالية"
+                ? t("confidenceHigh")
                 : confidenceLabel === "Medium"
-                ? "ثقة متوسطة"
-                : "ثقة منخفضة"}
+                ? t("confidenceMedium")
+                : t("confidenceLow")}
             </Text>
           </View>
         )}
@@ -166,7 +168,7 @@ export function MessageBubble({
           <View style={styles.doseCard}>
             <View style={styles.cardHeader}>
               <Ionicons name="medical" size={12} color="#4CC9F0" />
-              <Text style={[styles.cardTitle, { color: "#4CC9F0" }]}>الجرعة</Text>
+              <Text style={[styles.cardTitle, { color: "#4CC9F0" }]}>{t("dose")}</Text>
             </View>
             <Text style={styles.doseText}>{dose}</Text>
           </View>
@@ -177,7 +179,7 @@ export function MessageBubble({
           <View style={[styles.infoCard, styles.indicationCard]}>
             <View style={styles.cardHeader}>
               <Ionicons name="pulse-outline" size={12} color="#2DD4BF" />
-              <Text style={[styles.cardTitle, { color: "#2DD4BF" }]}>الدواعي السريرية</Text>
+              <Text style={[styles.cardTitle, { color: "#2DD4BF" }]}>{t("indication")}</Text>
             </View>
             <Text style={styles.indicationText}>{indication}</Text>
           </View>
@@ -188,7 +190,7 @@ export function MessageBubble({
           <View style={[styles.infoCard, styles.safetyAlertsCard]}>
             <View style={styles.cardHeader}>
               <Ionicons name="shield-half-outline" size={12} color="#F97316" />
-              <Text style={[styles.cardTitle, { color: "#F97316" }]}>تنبيهات السلامة</Text>
+              <Text style={[styles.cardTitle, { color: "#F97316" }]}>{t("safetyAlerts")}</Text>
             </View>
             {safetyAlerts.map((alert, i) => (
               <Text key={i} style={styles.safetyAlertItem}>{alert}</Text>
@@ -201,7 +203,7 @@ export function MessageBubble({
           <View style={[styles.infoCard, styles.contraCard]}>
             <View style={styles.cardHeader}>
               <Ionicons name="ban-outline" size={12} color="#FBBF24" />
-              <Text style={[styles.cardTitle, { color: "#FBBF24" }]}>موانع الاستخدام</Text>
+              <Text style={[styles.cardTitle, { color: "#FBBF24" }]}>{t("contraindications")}</Text>
             </View>
             {contraindications.map((c, i) => (
               <Text key={i} style={styles.contraItem}>• {c}</Text>
@@ -214,7 +216,7 @@ export function MessageBubble({
           <View style={[styles.infoCard, styles.interactionCard]}>
             <View style={styles.cardHeader}>
               <Ionicons name="git-compare-outline" size={12} color="#FBBF24" />
-              <Text style={[styles.cardTitle, { color: "#FBBF24" }]}>التفاعلات الدوائية</Text>
+              <Text style={[styles.cardTitle, { color: "#FBBF24" }]}>{t("drugInteractions")}</Text>
             </View>
             {interactions.map((d, i) => (
               <Text key={i} style={styles.contraItem}>⇄ {d}</Text>
@@ -227,7 +229,7 @@ export function MessageBubble({
           <View style={[styles.infoCard, styles.nursingCard]}>
             <View style={styles.cardHeader}>
               <Ionicons name="clipboard-outline" size={12} color={accentColor} />
-              <Text style={[styles.cardTitle, { color: accentColor }]}>ملاحظات التمريض</Text>
+              <Text style={[styles.cardTitle, { color: accentColor }]}>{t("nursingNotes")}</Text>
             </View>
             {nursingNotes.map((note, i) => (
               <View key={i} style={styles.nursingNoteRow}>
@@ -245,7 +247,7 @@ export function MessageBubble({
             <Pressable style={styles.sourcesToggle} onPress={() => setSourcesOpen((o) => !o)}>
               <Ionicons name="library-outline" size={13} color="#8B5CF6" />
               <Text style={styles.sourcesToggleLabel}>
-                المصادر والملفات ({allSources.length})
+                {t("sourcesAndFiles")} ({allSources.length})
               </Text>
               <Ionicons
                 name={sourcesOpen ? "chevron-up" : "chevron-down"}
@@ -272,7 +274,7 @@ export function MessageBubble({
                       <View style={styles.sourceMeta}>
                         <View style={styles.sourcePageBadge}>
                           <Ionicons name="bookmark-outline" size={10} color="#64748B" />
-                          <Text style={styles.sourcePageText}>ص {src.page}</Text>
+                          <Text style={styles.sourcePageText}>{t("page")} {src.page}</Text>
                         </View>
                         <View style={styles.relevanceRow}>
                           <View style={styles.relevanceTrack}>
@@ -306,7 +308,7 @@ export function MessageBubble({
           <View style={styles.citation}>
             <Ionicons name="document-text-outline" size={12} color="#64748B" />
             <Text style={styles.citationText}>
-              {citation.source} · ص {citation.page}
+              {citation.source} · {t("page")} {citation.page}
             </Text>
           </View>
         )}

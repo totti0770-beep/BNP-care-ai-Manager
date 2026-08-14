@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as LocalAuthentication from "expo-local-authentication";
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,20 +22,20 @@ import { listEngineDocuments, type EngineDocument } from "@/services/clinicalApi
 
 const CATEGORY_CONFIG: Record<
   Category,
-  { title: string; accentColor: string; iconName: keyof typeof Ionicons.glyphMap }
+  { titleKey: string; accentColor: string; iconName: keyof typeof Ionicons.glyphMap }
 > = {
   pharmacy: {
-    title: "المستحضرات الصيدلانية",
+    titleKey: "catPharmacy",
     accentColor: "#4CC9F0",
     iconName: "medical",
   },
   policies: {
-    title: "سياسات التمريض",
+    titleKey: "catPolicies",
     accentColor: "#8B5CF6",
     iconName: "document-text",
   },
   quality: {
-    title: "الجودة والسباحي",
+    titleKey: "catQuality",
     accentColor: "#7C3AED",
     iconName: "shield-checkmark",
   },
@@ -52,6 +53,7 @@ function formatDate(isoString: string) {
 
 export default function AdminScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { isAdminAuthenticated, setAdminAuth } = useApp();
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -76,7 +78,7 @@ export default function AdminScreen() {
     const isWeb = Platform.OS === ("web" as typeof Platform.OS);
     if (isWeb) {
       setAccessDenied(
-        "لوحة الإدارة غير متاحة على المتصفح. استخدم تطبيق الجوال مع التحقق البيومتري.",
+        t("adminWebBlocked"),
       );
       return;
     }
@@ -88,15 +90,15 @@ export default function AdminScreen() {
 
       if (!hasHardware || !isEnrolled) {
         setAccessDenied(
-          "يتطلب الوصول إلى لوحة الإدارة تسجيل بصمة أو بصمة وجه على هذا الجهاز.",
+          t("adminNoBiometrics"),
         );
         return;
       }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "تحقق من هويتك للوصول إلى لوحة الإدارة",
+        promptMessage: t("adminBiometricPrompt"),
         disableDeviceFallback: true,
-        cancelLabel: "إلغاء",
+        cancelLabel: t("cancel"),
       });
 
       if (result.success) {
@@ -106,11 +108,11 @@ export default function AdminScreen() {
         router.back();
       }
     } catch {
-      setAccessDenied("تعذّر التحقق من الهوية. حاول مرة أخرى.");
+      setAccessDenied(t("adminAuthFailed"));
     } finally {
       setIsAuthenticating(false);
     }
-  }, [setAdminAuth]);
+  }, [setAdminAuth, t]);
 
   useEffect(() => {
     if (!isAdminAuthenticated) return;
@@ -120,7 +122,7 @@ export default function AdminScreen() {
       if (cancelled) return;
       setEngineDocs(docs);
       setDocsError(
-        docs.length === 0 ? "تعذّر تحميل الوثائق أو لا توجد وثائق مفهرسة" : null,
+        docs.length === 0 ? t("documentsLoadFailed") : null,
       );
       setIsLoadingDocs(false);
     });
@@ -128,13 +130,13 @@ export default function AdminScreen() {
     return () => {
       cancelled = true;
     };
-  }, [isAdminAuthenticated]);
+  }, [isAdminAuthenticated, t]);
 
   if (isAuthenticating) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color="#8B5CF6" />
-        <Text style={styles.authText}>جارٍ التحقق من الهوية...</Text>
+        <Text style={styles.authText}>{t("adminVerifying")}</Text>
       </View>
     );
   }
@@ -146,10 +148,10 @@ export default function AdminScreen() {
           <View style={styles.pinIconContainer}>
             <Ionicons name="lock-closed" size={32} color="#8B5CF6" />
           </View>
-          <Text style={styles.pinTitle}>الوصول مرفوض</Text>
+          <Text style={styles.pinTitle}>{t("accessDenied")}</Text>
           <Text style={styles.pinSubtitle}>{accessDenied}</Text>
           <Pressable onPress={() => router.back()}>
-            <Text style={styles.cancelText}>رجوع</Text>
+            <Text style={styles.cancelText}>{t("back")}</Text>
           </Pressable>
         </View>
       </View>
@@ -163,11 +165,11 @@ export default function AdminScreen() {
         <View style={styles.headerLeft}>
           <View style={styles.adminBadge}>
             <Ionicons name="shield-checkmark" size={14} color="#8B5CF6" />
-            <Text style={styles.adminBadgeText}>مدير</Text>
+            <Text style={styles.adminBadgeText}>{t("admin")}</Text>
           </View>
         </View>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>لوحة الإدارة</Text>
+          <Text style={styles.headerTitle}>{t("adminPanel")}</Text>
         </View>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="chevron-forward" size={22} color="#94A3B8" />
@@ -180,7 +182,7 @@ export default function AdminScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* This screen is read-only. It previously let an admin type a document
-            name and a page count, stored it in AsyncStorage under a "رفع PDF"
+            name and a page count, stored it in AsyncStorage under an upload
             button, and never called the engine — so an admin could believe they
             had curated the corpus that dose answers come from while nothing had
             changed. Uploading is done from the web app; here we show what is
@@ -188,7 +190,7 @@ export default function AdminScreen() {
         <View style={styles.infoBar}>
           <Ionicons name="library-outline" size={16} color="#8B5CF6" />
           <Text style={styles.infoBarText}>
-            الوثائق المفهرسة في المحرك السريري (للعرض فقط)
+            {t("indexedDocumentsReadOnly")}
           </Text>
         </View>
 
@@ -200,7 +202,7 @@ export default function AdminScreen() {
           <View style={styles.emptyDocs}>
             <Ionicons name="document-outline" size={24} color="#2D1B4E" />
             <Text style={styles.emptyDocsText}>
-              {docsError ?? "لا توجد وثائق مفهرسة"}
+              {docsError ?? t("noIndexedDocuments")}
             </Text>
           </View>
         ) : (
@@ -210,7 +212,7 @@ export default function AdminScreen() {
                 <View style={styles.docInfo}>
                   <Text style={styles.docName}>{doc.filename}</Text>
                   <Text style={styles.docMeta}>
-                    {doc.chunk_count} مقطع · {formatDate(doc.upload_date)}
+                    {doc.chunk_count} {t("segments")} · {formatDate(doc.upload_date)}
                   </Text>
                 </View>
                 <Ionicons name="document-text" size={20} color="#8B5CF6" />
@@ -222,7 +224,7 @@ export default function AdminScreen() {
         <View style={styles.infoBar}>
           <Ionicons name="information-circle-outline" size={16} color="#64748B" />
           <Text style={styles.infoBarText}>
-            لإضافة أو حذف وثيقة، استخدم تطبيق الويب.
+            {t("useWebToManage")}
           </Text>
         </View>
 
@@ -235,7 +237,7 @@ export default function AdminScreen() {
           }}
         >
           <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-          <Text style={styles.logoutText}>تسجيل الخروج</Text>
+          <Text style={styles.logoutText}>{t("signOut")}</Text>
         </Pressable>
       </ScrollView>
 

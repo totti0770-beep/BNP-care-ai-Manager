@@ -6,6 +6,7 @@ from models.database import db_cursor
 from models.schemas import DocumentMeta
 from services.pdf_processor import process_pdf
 from services.embeddings import get_retriever
+from services.metrics import metrics
 from routers.auth import get_current_user, require_admin
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,7 @@ async def upload_document(
     retriever = get_retriever()
     retriever.add_chunks(chunks, document_id, file.filename)
 
+    metrics.incr("bnp_documents_indexed_total")
     logger.info(f"Uploaded '{file.filename}' → {len(chunks)} chunks by user {user_id}")
 
     return {
@@ -146,6 +148,7 @@ def delete_document(
 
     retriever = get_retriever()
     retriever.remove_document(document_id)
+    metrics.incr("bnp_documents_retired_total")
     logger.info(f"Retired document {document_id} (text preserved for audit)")
     return None
 
