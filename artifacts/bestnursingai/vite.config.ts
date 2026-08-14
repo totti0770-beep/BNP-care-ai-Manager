@@ -4,27 +4,24 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+// These are dev-server concerns, so they default rather than throw. Requiring
+// them at config load made `vite build` fail on any machine that had not
+// exported Replit's environment, which meant the app could only be built there.
+const DEFAULT_PORT = 5173;
+
 const rawPort = process.env.PORT;
+const parsedPort = rawPort ? Number(rawPort) : DEFAULT_PORT;
 
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
+if (Number.isNaN(parsedPort) || parsedPort <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const basePath = process.env.BASE_PATH;
+const port = parsedPort;
+const basePath = process.env.BASE_PATH ?? "/";
 
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
-}
+// The API server hosts both /api and the /bnp-api engine gateway. In production
+// they are same-origin, so only the dev server needs to proxy them.
+const apiTarget = process.env.API_SERVER_URL ?? "http://localhost:8080";
 
 export default defineConfig({
   base: basePath,
@@ -67,13 +64,15 @@ export default defineConfig({
       deny: ["**/.*"],
     },
     proxy: {
+      // Both go to the API server. /bnp-api is a real gateway route there, so
+      // it exists in production too — it used to be a dev-only proxy straight
+      // to the engine, which meant published builds could never reach it.
       "/bnp-api": {
-        target: "http://localhost:8000",
+        target: apiTarget,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/bnp-api/, ""),
       },
       "/api": {
-        target: "http://localhost:8080",
+        target: apiTarget,
         changeOrigin: true,
       },
     },

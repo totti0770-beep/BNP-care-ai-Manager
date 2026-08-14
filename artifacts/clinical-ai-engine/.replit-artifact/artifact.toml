@@ -1,0 +1,35 @@
+kind = "api"
+title = "Clinical AI Engine"
+version = "1.0.0"
+id = "artifacts/clinical-ai-engine"
+
+# Not exposed publicly. All traffic reaches the engine through the API server's
+# /bnp-api gateway, which authenticates each request as an individual user.
+[[services]]
+name = "Clinical AI Engine"
+localPort = 8000
+paths = []
+
+[services.development]
+run = "cd artifacts/clinical-ai-engine && uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
+
+[services.production]
+
+[services.production.build]
+args = ["uv", "sync", "--frozen"]
+
+[services.production.run]
+# No --reload in production: it watches the filesystem and re-imports on every
+# index write, and forces a single worker.
+args = [
+  "uv", "run", "uvicorn", "main:app",
+  "--host", "127.0.0.1",
+  "--port", "8000",
+  "--app-dir", "artifacts/clinical-ai-engine",
+]
+
+[services.production.run.env]
+PORT = "8000"
+
+[services.production.health.startup]
+path = "/health"

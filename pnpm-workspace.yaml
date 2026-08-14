@@ -36,6 +36,12 @@ minimumReleaseAgeExclude:
 
 packages:
   - artifacts/*
+  # The mockup sandbox is a design scaffold with no components to render
+  # (src/components/mockups/ does not exist and its generated module map is
+  # empty). It was nonetheless building and deploying on every publish, and its
+  # vite config fails without Replit's env. Excluded from the workspace; delete
+  # the directory once nobody wants the scaffold back.
+  - '!artifacts/mockup-sandbox'
   - lib/*
   - lib/integrations/*
   - scripts
