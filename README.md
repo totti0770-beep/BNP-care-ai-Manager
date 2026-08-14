@@ -101,10 +101,20 @@ pnpm run test                                   # TypeScript unit tests
 ### Schema changes
 
 ```bash
-# after editing lib/db/src/schema/
+# TypeScript — after editing lib/db/src/schema/
 pnpm --filter @workspace/db run generate        # writes SQL to lib/db/drizzle/
 pnpm --filter @workspace/db run migrate         # applies pending migrations
+
+# Clinical engine
+cd artifacts/clinical-ai-engine
+alembic revision -m "what changed"              # then write the SQL by hand
+alembic upgrade head
 ```
+
+The engine applies migrations itself on startup (`AUTO_MIGRATE=1`, the default) for
+single-instance and Replit deployments. Docker sets `AUTO_MIGRATE=0` and runs a dedicated
+`engine-migrate` job first, so the engine refuses to start against an unmigrated database
+rather than several replicas racing on DDL.
 
 ## Configuration
 
@@ -155,10 +165,10 @@ Engineering work is not the remaining blocker. These are:
 
 - The engine runs single-worker. The retriever is a process-global singleton with no
   cross-process locking, so `--workers > 1` will diverge.
-- The TypeScript schema has versioned migrations (`lib/db/drizzle/`), applied by the `migrate`
-  service before the API server starts. The **Python engine does not**: it still uses idempotent
-  `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`, which cannot change a column type,
-  drop a column, alter a constraint, or backfill. Alembic is the next step there.
+- Both schemas have versioned migrations, applied by one-shot jobs before their services start
+  (`lib/db/drizzle/` via drizzle-kit, `artifacts/clinical-ai-engine/alembic/` via Alembic).
+  The engine still lacks a tenant/facility column, so a multi-hospital deployment needs a
+  migration with an explicit backfill.
 - The FAISS index is rebuilt in full on every document upload, and re-embedded from the
   database when it and the `bnp_chunks` table disagree on count.
 - Rate limiting is per-process and in-memory; a multi-instance deployment needs a shared store.

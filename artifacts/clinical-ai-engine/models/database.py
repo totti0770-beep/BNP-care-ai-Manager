@@ -59,93 +59,68 @@ def close_pool() -> None:
             _pool = None
 
 
+ALEMBIC_HEAD = "0001_baseline"
+
+
+def _alembic_config():
+    from alembic.config import Config
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cfg = Config(os.path.join(here, "alembic.ini"))
+    cfg.set_main_option("script_location", os.path.join(here, "alembic"))
+    return cfg
+
+
+def run_migrations() -> None:
+    """Apply pending migrations. Intended for a one-shot deploy job."""
+    from alembic import command
+    command.upgrade(_alembic_config(), "head")
+    logger.info("✅ Database migrations applied")
+
+
+def current_revision() -> "str | None":
+    with db_cursor() as (cur, _):
+        cur.execute(
+            "SELECT to_regclass('public.alembic_version') IS NOT NULL AS present"
+        )
+        if not cur.fetchone()["present"]:
+            return None
+        cur.execute("SELECT version_num FROM alembic_version LIMIT 1")
+        row = cur.fetchone()
+        return row["version_num"] if row else None
+
+
 def init_db():
-    """Create all required tables if they don't exist."""
+    """
+    Ensure the schema is at the expected revision.
+
+    Schema changes belong in a one-shot migration job, not in every app process:
+    several replicas booting at once would race on DDL, and there would be no
+    ordering between them. AUTO_MIGRATE=1 (the default, for single-instance and
+    Replit deployments) applies migrations here instead; set it to 0 wherever a
+    dedicated migrate step runs first, and the engine will refuse to start
+    against an unmigrated database rather than fail later on a missing column.
+    """
     if not DATABASE_URL:
         raise RuntimeError(
             "DATABASE_URL is required. The engine cannot record an audit trail "
             "without it, and must not answer clinical questions unaudited."
         )
 
-    ddl = """
-    CREATE TABLE IF NOT EXISTS bnp_users (
-        id          SERIAL PRIMARY KEY,
-        username    VARCHAR(100) UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        full_name   VARCHAR(200),
-        role        VARCHAR(50) DEFAULT 'user',
-        external_id VARCHAR(255) UNIQUE,
-        created_at  TIMESTAMP DEFAULT NOW()
-    );
+    auto = os.environ.get("AUTO_MIGRATE", "1").strip().lower() in ("1", "true", "yes")
 
-    -- Added after the table shipped; harmless when the column already exists.
-    ALTER TABLE bnp_users ADD COLUMN IF NOT EXISTS external_id VARCHAR(255);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external
-        ON bnp_users(external_id) WHERE external_id IS NOT NULL;
+    if auto:
+        run_migrations()
+        return
 
-    CREATE TABLE IF NOT EXISTS bnp_documents (
-        id          VARCHAR(64) PRIMARY KEY,
-        filename    TEXT NOT NULL,
-        uploaded_by INTEGER REFERENCES bnp_users(id),
-        upload_date TIMESTAMP DEFAULT NOW(),
-        chunk_count INTEGER DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS bnp_chunks (
-        id          SERIAL PRIMARY KEY,
-        chunk_id    VARCHAR(128) UNIQUE NOT NULL,
-        document_id VARCHAR(64) REFERENCES bnp_documents(id) ON DELETE CASCADE,
-        content     TEXT NOT NULL,
-        page_number INTEGER DEFAULT 1,
-        chunk_index INTEGER DEFAULT 0,
-        created_at  TIMESTAMP DEFAULT NOW()
-    );
-
-    -- The audit log must be able to answer "what did the system tell this nurse,
-    -- from which sources, at this time?" — so the answer itself is recorded, not
-    -- just the question.
-    CREATE TABLE IF NOT EXISTS bnp_audit_log (
-        id          SERIAL PRIMARY KEY,
-        session_id  VARCHAR(128) NOT NULL,
-        user_id     INTEGER REFERENCES bnp_users(id),
-        username    VARCHAR(100),
-        query       TEXT NOT NULL,
-        query_type  VARCHAR(50),
-        confidence  FLOAT DEFAULT 0,
-        rejected    BOOLEAN DEFAULT FALSE,
-        answer_hash TEXT,
-        timestamp   TIMESTAMP DEFAULT NOW()
-    );
-
-    -- Added after the table shipped; each is a no-op when already present.
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS answer_text      TEXT;
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS dose_text        TEXT;
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS citations        JSONB;
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS safety_alerts    JSONB;
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS confidence_label VARCHAR(20);
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS client_ip        VARCHAR(64);
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS user_agent       TEXT;
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS model            VARCHAR(100);
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS drug_db_version  VARCHAR(50);
-    ALTER TABLE bnp_audit_log ADD COLUMN IF NOT EXISTS engine_version   VARCHAR(50);
-
-    -- Re-uploading the same PDF used to create a full duplicate chunk set with
-    -- nothing to detect it; retrieval then returned the same document twice as
-    -- two "independent" sources, which inflates the confidence label.
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_doc_index
-        ON bnp_chunks(document_id, chunk_index);
-
-    CREATE INDEX IF NOT EXISTS idx_audit_user ON bnp_audit_log(user_id);
-    CREATE INDEX IF NOT EXISTS idx_audit_session ON bnp_audit_log(session_id);
-    -- Every audit query filters by time; this was a sequential scan.
-    CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON bnp_audit_log(timestamp DESC);
-    CREATE INDEX IF NOT EXISTS idx_chunks_doc ON bnp_chunks(document_id);
-    """
-
-    # Failing here must be fatal: the previous behaviour logged the error and
-    # let the service boot and report healthy with no tables, so the first
-    # clinical request 500'd instead of the deploy failing.
-    with db_cursor() as (cur, _):
-        cur.execute(ddl)
-    logger.info("✅ Database tables initialized")
+    revision = current_revision()
+    if revision is None:
+        raise RuntimeError(
+            "The database has no migration history. Run `alembic upgrade head` "
+            "before starting the engine, or set AUTO_MIGRATE=1."
+        )
+    if revision != ALEMBIC_HEAD:
+        raise RuntimeError(
+            f"Database is at revision {revision}, but this build expects "
+            f"{ALEMBIC_HEAD}. Run `alembic upgrade head`."
+        )
+    logger.info(f"✅ Schema at expected revision {revision}")

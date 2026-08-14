@@ -23,11 +23,27 @@ services:
       retries: 10
     restart: unless-stopped
 
+  engine-migrate:
+    build:
+      context: .
+      dockerfile: artifacts/clinical-ai-engine/Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bnp}:${POSTGRES_PASSWORD:-bnp}@postgres:5432/${POSTGRES_DB:-bnp}
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required - generate with openssl rand -hex 32}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   clinical-ai-engine:
     build:
       context: .
       dockerfile: artifacts/clinical-ai-engine/Dockerfile
     environment:
+      # Migrations are applied by the engine-migrate job above, so the engine
+      # refuses to start against an unmigrated database instead of racing on DDL.
+      AUTO_MIGRATE: "0"
       DATABASE_URL: postgresql://${POSTGRES_USER:-bnp}:${POSTGRES_PASSWORD:-bnp}@postgres:5432/${POSTGRES_DB:-bnp}
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required - generate with openssl rand -hex 32}"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -41,6 +57,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      engine-migrate:
+        condition: service_completed_successfully
     # No published ports: gateway-only access.
     restart: unless-stopped
 

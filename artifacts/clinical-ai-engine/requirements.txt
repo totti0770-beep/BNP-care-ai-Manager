@@ -9,6 +9,7 @@ uvicorn[standard]>=0.43.0
 python-multipart>=0.0.22
 PyJWT>=2.12.1
 psycopg2-binary>=2.9.11
+alembic>=1.13.0
 passlib[bcrypt]>=1.7.4
 python-dotenv>=1.2.2
 

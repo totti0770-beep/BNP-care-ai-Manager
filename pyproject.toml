@@ -13,6 +13,7 @@ dependencies = [
     "numpy>=2.4.4",
     "openai>=2.30.0",
     "passlib[bcrypt]>=1.7.4",
+    "alembic>=1.13.0",
     "psycopg2-binary>=2.9.11",
     "pyjwt>=2.12.1",
     "pymupdf>=1.27.2.2",
