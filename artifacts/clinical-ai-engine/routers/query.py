@@ -14,7 +14,10 @@ Pipeline:
 """
 import time
 import uuid
+import json
+import hashlib
 import logging
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from models.schemas import QueryRequest, QueryResponse, QueryType, Citation
 from models.database import db_cursor
@@ -43,6 +46,9 @@ from services.arabic_translator import translate_for_search, DRUG_MAP
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+ENGINE_VERSION = "1.0.0"
+RESPONSE_MODEL = "gpt-4o"
+
 import re as _re
 _ARABIC_RE = _re.compile(r'[\u0600-\u06FF]')
 
@@ -57,6 +63,7 @@ def _msg(arabic: str, english: str, question: str) -> str:
 @router.post("/", response_model=QueryResponse)
 def query(
     body: QueryRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ):
     start_ms = int(time.time() * 1000)
@@ -64,10 +71,17 @@ def query(
     user_id = int(current_user["sub"])
 
     question = body.question.strip()
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else None)
+    )
+    user_agent = request.headers.get("user-agent")
 
     # ── Step 1: Clinical classification ──────────────────────────────────────
     query_type = classify_query(question)
-    logger.info(f"[{session_id}] Query type: {query_type} | Q: {question[:80]}")
+    # The question itself is not logged: it may contain patient identifiers.
+    # It is recorded in the audit table, which is access-controlled.
+    logger.info(f"[{session_id}] Query type: {query_type} | chars={len(question)}")
 
     # ── Step 1b: Translate Arabic query for FAISS/BM25 search ────────────────
     # Documents are in English — Arabic embeddings won't match English content.
@@ -75,7 +89,7 @@ def query(
     # the ORIGINAL question is preserved for GPT-4o (so the response is in Arabic).
     search_query = translate_for_search(question)
     if search_query != question:
-        logger.info(f"[{session_id}] Arabic→English search query: {search_query[:100]}")
+        logger.info(f"[{session_id}] Arabic query translated for retrieval")
 
     # ── Step 2: Hybrid retrieval ──────────────────────────────────────────────
     retriever = get_retriever()
@@ -105,6 +119,42 @@ def query(
 
     top_confidence = chunks[0]["relevance_score"] if chunks else 0.0
 
+    def audit(
+        *,
+        answer: str = "",
+        dose: Optional[str] = None,
+        rejected: bool = False,
+        rejection_reason: Optional[str] = None,
+        alerts: Optional[List[str]] = None,
+        label: Optional[str] = None,
+    ) -> None:
+        """
+        Record this exchange, or refuse to answer.
+
+        The audit write used to be best-effort: a failure was logged and the
+        clinical advice returned anyway, leaving no record that it was ever
+        given. In a regulated setting that is the wrong trade — an unrecorded
+        recommendation is worse than no recommendation.
+        """
+        try:
+            _log_query(
+                user_id, current_user["username"], session_id, question,
+                query_type, top_confidence, rejected,
+                answer=answer, dose=dose, citations=citations,
+                safety_alerts=alerts, confidence_label=label,
+                rejection_reason=rejection_reason,
+                client_ip=client_ip, user_agent=user_agent,
+            )
+        except Exception as e:
+            logger.error(f"[{session_id}] AUDIT WRITE FAILED: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "The clinical audit trail could not be recorded, so this "
+                    "request was refused. Contact your system administrator."
+                ),
+            )
+
     # ── Step 3: Context Validation Layer ─────────────────────────────────────
     ctx_validation = validate_context(chunks, question, top_confidence)
     confidence_label = ctx_validation.confidence_label
@@ -117,8 +167,16 @@ def query(
     )
 
     if not ctx_validation.is_valid:
-        _log_query(user_id, current_user["username"], session_id, question,
-                   query_type, top_confidence, rejected=False)
+        insufficient_msg = _msg(
+            "لم يُعثر على معلومات كافية في قاعدة المعرفة للإجابة على هذا السؤال. "
+            "يرجى رفع البروتوكول السريري أو الوثيقة الدوائية المناسبة.",
+            "Insufficient clinical data — the knowledge base does not contain "
+            "reliable information to answer this question. "
+            "Please upload the relevant clinical protocol or pharmacology document.",
+            question,
+        )
+        audit(answer=insufficient_msg, rejected=False, label="Low",
+              rejection_reason=context_validation_msg)
         elapsed = int(time.time() * 1000) - start_ms
         return QueryResponse(
             session_id=session_id,
@@ -144,8 +202,16 @@ def query(
     safety = check_retrieval(citations, top_confidence)
 
     if not safety.is_safe:
-        _log_query(user_id, current_user["username"], session_id, question,
-                   query_type, top_confidence, rejected=True)
+        audit(
+            answer=_msg(
+                "لم يُعثر على المعلومات في المصادر الطبية المتاحة.",
+                "Not found in provided medical sources.",
+                question,
+            ),
+            rejected=True,
+            rejection_reason=safety.rejection_reason,
+            label=confidence_label,
+        )
         elapsed = int(time.time() * 1000) - start_ms
         return QueryResponse(
             session_id=session_id,
@@ -284,8 +350,13 @@ def query(
         answer_check = check_answer(answer, top_confidence)
         if not answer_check.is_safe:
             logger.warning(f"[{session_id}] Answer rejected: {answer_check.rejection_reason}")
-            _log_query(user_id, current_user["username"], session_id, question,
-                       query_type, top_confidence, rejected=True)
+            audit(
+                answer=answer,
+                rejected=True,
+                rejection_reason=answer_check.rejection_reason,
+                alerts=safety_alerts,
+                label=confidence_label,
+            )
             elapsed = int(time.time() * 1000) - start_ms
             return QueryResponse(
                 session_id=session_id,
@@ -309,8 +380,17 @@ def query(
     safety_alert = hard_blocked or bool(safety_alerts) or is_high_risk(question, answer)
 
     # ── Step 8: Audit log ─────────────────────────────────────────────────────
-    _log_query(user_id, current_user["username"], session_id, question,
-               query_type, top_confidence, rejected=hard_blocked)
+    audit(
+        answer=answer,
+        dose=dose_str,
+        rejected=hard_blocked,
+        rejection_reason=(
+            "Overdose detected — dose exceeds maximum safe limit"
+            if hard_blocked else None
+        ),
+        alerts=safety_alerts,
+        label=confidence_label,
+    )
 
     elapsed = int(time.time() * 1000) - start_ms
     logger.info(
@@ -341,17 +421,58 @@ def query(
     )
 
 
-def _log_query(user_id, username, session_id, query, query_type, confidence, rejected):
-    try:
-        with db_cursor() as (cur, _):
-            cur.execute(
-                """
-                INSERT INTO bnp_audit_log
-                  (session_id, user_id, username, query, query_type, confidence, rejected)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """,
-                (session_id, user_id, username, query, query_type.value,
-                 confidence, rejected),
-            )
-    except Exception as e:
-        logger.error(f"Audit log error: {e}")
+def _log_query(
+    user_id,
+    username,
+    session_id,
+    query,
+    query_type,
+    confidence,
+    rejected,
+    *,
+    answer: str = "",
+    dose: Optional[str] = None,
+    citations: Optional[List[Citation]] = None,
+    safety_alerts: Optional[List[str]] = None,
+    confidence_label: Optional[str] = None,
+    rejection_reason: Optional[str] = None,
+    client_ip: Optional[str] = None,
+    user_agent: Optional[str] = None,
+):
+    """
+    Record what the system was asked and what it answered.
+
+    Raises on failure. An unaudited clinical recommendation is not an acceptable
+    outcome — the caller turns this into a 503 rather than returning advice that
+    leaves no trace. The answer hash lets a stored answer be shown to have not
+    been altered after the fact.
+    """
+    answer_hash = hashlib.sha256(answer.encode("utf-8")).hexdigest() if answer else None
+    citation_json = json.dumps(
+        [
+            {
+                "document_name": c.document_name,
+                "page_number": c.page_number,
+                "relevance_score": c.relevance_score,
+            }
+            for c in (citations or [])
+        ]
+    )
+
+    with db_cursor() as (cur, _):
+        cur.execute(
+            """
+            INSERT INTO bnp_audit_log
+              (session_id, user_id, username, query, query_type, confidence,
+               rejected, answer_text, answer_hash, dose_text, citations,
+               safety_alerts, confidence_label, rejection_reason,
+               client_ip, user_agent, model, drug_db_version, engine_version)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                session_id, user_id, username, query, query_type.value, confidence,
+                rejected, answer or None, answer_hash, dose, citation_json,
+                json.dumps(safety_alerts or []), confidence_label, rejection_reason,
+                client_ip, user_agent, RESPONSE_MODEL, DRUG_DB_VERSION, ENGINE_VERSION,
+            ),
+        )

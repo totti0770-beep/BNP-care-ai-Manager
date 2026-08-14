@@ -1,74 +1,52 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '@/contexts/AuditLogContext';
-import { useAuth } from '@/contexts/AuthContext';
 import {
   ClipboardList,
   Download,
-  Trash2,
+  RefreshCw,
   Search,
-  Calendar,
-  User,
-  FileText,
-  AlertCircle,
+  ShieldAlert,
   CheckCircle,
   XCircle,
-  LogIn,
-  LogOut,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
+/**
+ * Server-backed audit log. There is no "clear" action: the record of what
+ * clinical guidance was given is not the client's to erase.
+ */
 const AuditLogPage: React.FC = () => {
   const { t } = useTranslation();
-  const { logs, exportLogs, clearLogs } = useAuditLog();
-  const { hasPermission } = useAuth();
+  const { logs, isLoading, refresh, exportLogs } = useAuditLog();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterAction, setFilterAction] = useState<string>('all');
-
-  const canManageLogs = hasPermission('settings.manage');
-
-  const getActionIcon = (action: string) => {
-    switch (action) {
-      case 'query': return <Search className="w-4 h-4" />;
-      case 'response': return <FileText className="w-4 h-4" />;
-      case 'document_verified': return <CheckCircle className="w-4 h-4 text-green-400" />;
-      case 'document_rejected': return <XCircle className="w-4 h-4 text-red-400" />;
-      case 'permission_changed': return <AlertCircle className="w-4 h-4 text-yellow-400" />;
-      case 'login': return <LogIn className="w-4 h-4 text-blue-400" />;
-      case 'logout': return <LogOut className="w-4 h-4 text-gray-400" />;
-      default: return <FileText className="w-4 h-4" />;
-    }
-  };
-
-  const getActionColor = (action: string) => {
-    switch (action) {
-      case 'query': return 'text-blue-400';
-      case 'response': return 'text-purple-400';
-      case 'document_verified': return 'text-green-400';
-      case 'document_rejected': return 'text-red-400';
-      case 'permission_changed': return 'text-yellow-400';
-      case 'login': return 'text-blue-400';
-      case 'logout': return 'text-gray-400';
-      default: return 'text-gray-400';
-    }
-  };
+  const [filter, setFilter] = useState<'all' | 'rejected' | 'alerts'>('all');
 
   const filteredLogs = logs.filter((log) => {
-    const matchesSearch =
-      log.sessionId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.userId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      JSON.stringify(log.details).toLowerCase().includes(searchQuery.toLowerCase());
+    const haystack = [
+      log.sessionId,
+      log.username,
+      log.query,
+      log.answer ?? '',
+      log.queryType ?? '',
+    ]
+      .join(' ')
+      .toLowerCase();
 
-    const matchesFilter = filterAction === 'all' || log.action === filterAction;
+    const matchesSearch = haystack.includes(searchQuery.toLowerCase());
+    const matchesFilter =
+      filter === 'all' ||
+      (filter === 'rejected' && log.rejected) ||
+      (filter === 'alerts' && log.safetyAlerts.length > 0);
 
     return matchesSearch && matchesFilter;
   });
 
   const handleExport = () => {
-    const data = exportLogs();
-    const blob = new Blob([data], { type: 'application/json' });
+    const blob = new Blob([exportLogs()], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -78,16 +56,9 @@ const AuditLogPage: React.FC = () => {
     toast.success(t('logsExported'));
   };
 
-  const handleClear = () => {
-    if (confirm(t('confirmClearLogs'))) {
-      clearLogs();
-      toast.success(t('logsCleared'));
-    }
-  };
-
   return (
     <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
             <ClipboardList className="w-8 h-8 text-purple-400" />
@@ -97,6 +68,14 @@ const AuditLogPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <Button
+            onClick={() => void refresh()}
+            variant="outline"
+            className="border-purple-500/30 text-white hover:bg-purple-600/20"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            {t('refresh')}
+          </Button>
+          <Button
             onClick={handleExport}
             variant="outline"
             className="border-purple-500/30 text-white hover:bg-purple-600/20"
@@ -104,126 +83,116 @@ const AuditLogPage: React.FC = () => {
             <Download className="w-4 h-4 mr-2" />
             {t('export')}
           </Button>
-          {canManageLogs && (
-            <Button
-              onClick={handleClear}
-              variant="outline"
-              className="border-red-500/30 text-red-400 hover:bg-red-500/20"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              {t('clear')}
-            </Button>
-          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20">
-          <p className="text-gray-400 text-sm">{t('totalLogs')}</p>
-          <p className="text-2xl font-bold text-white">{logs.length}</p>
-        </div>
-        <div className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20">
-          <p className="text-gray-400 text-sm">{t('queries')}</p>
-          <p className="text-2xl font-bold text-blue-400">
-            {logs.filter(l => l.action === 'query').length}
-          </p>
-        </div>
-        <div className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20">
-          <p className="text-gray-400 text-sm">{t('responses')}</p>
-          <p className="text-2xl font-bold text-purple-400">
-            {logs.filter(l => l.action === 'response').length}
-          </p>
-        </div>
-        <div className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20">
-          <p className="text-gray-400 text-sm">{t('documentsVerified')}</p>
-          <p className="text-2xl font-bold text-green-400">
-            {logs.filter(l => l.action === 'document_verified').length}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('searchLogs')}
-            className="pl-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
+            placeholder={t('search')}
+            className="pl-9 bg-[#12122a] border-purple-500/20 text-white"
           />
         </div>
-        <select
-          value={filterAction}
-          onChange={(e) => setFilterAction(e.target.value)}
-          className="bg-[#1a1a2e] border border-purple-500/30 text-white rounded-lg px-4 py-2"
-        >
-          <option value="all">{t('allActions')}</option>
-          <option value="query">{t('queries')}</option>
-          <option value="response">{t('responses')}</option>
-          <option value="document_verified">{t('documentsVerified')}</option>
-          <option value="document_rejected">{t('documentsRejected')}</option>
-          <option value="login">{t('logins')}</option>
-          <option value="logout">{t('logouts')}</option>
-        </select>
+        {(['all', 'rejected', 'alerts'] as const).map((key) => (
+          <Button
+            key={key}
+            variant={filter === key ? 'default' : 'outline'}
+            onClick={() => setFilter(key)}
+            className={
+              filter === key
+                ? 'bg-purple-600 hover:bg-purple-700'
+                : 'border-purple-500/30 text-white hover:bg-purple-600/20'
+            }
+          >
+            {t(`auditFilter_${key}`)}
+          </Button>
+        ))}
       </div>
 
-      <div className="space-y-2 overflow-y-auto flex-1">
-        {filteredLogs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <ClipboardList className="w-16 h-16 text-gray-600 mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">{t('noLogs')}</h3>
-            <p className="text-gray-400">{t('noLogsDescription')}</p>
-          </div>
-        ) : (
-          filteredLogs.map((log) => (
+      {isLoading ? (
+        <p className="text-gray-400">{t('loading')}</p>
+      ) : filteredLogs.length === 0 ? (
+        <p className="text-gray-400">{t('auditLogEmpty')}</p>
+      ) : (
+        <div className="space-y-3">
+          {filteredLogs.map((log) => (
             <div
               key={log.id}
-              className="p-4 rounded-xl bg-[#1a1a2e] border border-purple-500/20 hover:border-purple-500/40 transition-colors"
+              className="rounded-xl bg-[#12122a] border border-purple-500/20 p-4"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg bg-[#0f0f1a] ${getActionColor(log.action)}`}>
-                    {getActionIcon(log.action)}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-medium capitalize ${getActionColor(log.action)}`}>
-                        {log.action}
-                      </span>
-                      <span className="text-gray-500">•</span>
-                      <span className="text-gray-400 text-sm">{log.sessionId}</span>
-                    </div>
-                    {log.details.query && (
-                      <p className="text-white text-sm mt-1">{log.details.query}</p>
-                    )}
-                    {log.details.response && (
-                      <p className="text-gray-400 text-sm mt-1 line-clamp-2">{log.details.response}</p>
-                    )}
-                    {log.details.rejectionReason && (
-                      <p className="text-red-400 text-sm mt-1">{log.details.rejectionReason}</p>
-                    )}
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <User className="w-3 h-3" />
-                        {log.userId}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(log.timestamp).toLocaleString()}
-                      </span>
-                      {log.details.confidenceLevel && (
-                        <span className="text-purple-400">
-                          {t('confidence')}: {(log.details.confidenceLevel * 100).toFixed(1)}%
-                        </span>
-                      )}
-                    </div>
-                  </div>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 text-sm">
+                  {log.rejected ? (
+                    <XCircle className="w-4 h-4 text-red-400" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                  )}
+                  <span className="text-white font-medium">{log.username}</span>
+                  <span className="text-gray-500">·</span>
+                  <span className="text-gray-400 font-mono text-xs">
+                    {log.sessionId}
+                  </span>
                 </div>
+                <span className="text-gray-500 text-xs">
+                  {log.timestamp.toLocaleString()}
+                </span>
               </div>
+
+              <p className="text-gray-200 text-sm mt-3">{log.query}</p>
+
+              {log.answer && (
+                <p className="text-gray-400 text-sm mt-2 whitespace-pre-line line-clamp-4">
+                  {log.answer}
+                </p>
+              )}
+
+              {log.dose && (
+                <p className="text-cyan-300 text-xs mt-2 font-mono">{log.dose}</p>
+              )}
+
+              {log.safetyAlerts.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {log.safetyAlerts.map((alert, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <ShieldAlert className="w-3.5 h-3.5 text-orange-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-orange-200 text-xs">{alert}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {log.citations.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {log.citations.map((c, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 text-xs text-gray-400 bg-purple-600/10 border border-purple-500/20 rounded px-2 py-0.5"
+                    >
+                      <FileText className="w-3 h-3" />
+                      {c.document_name} · p.{c.page_number}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500 font-mono">
+                {log.confidenceLabel && <span>confidence: {log.confidenceLabel}</span>}
+                {log.model && <span>model: {log.model}</span>}
+                {log.drugDbVersion && <span>drug-db: {log.drugDbVersion}</span>}
+                {log.answerHash && <span>sha256: {log.answerHash.slice(0, 16)}…</span>}
+                {log.clientIp && <span>ip: {log.clientIp}</span>}
+              </div>
+
+              {log.rejectionReason && (
+                <p className="text-red-300 text-xs mt-2">{log.rejectionReason}</p>
+              )}
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

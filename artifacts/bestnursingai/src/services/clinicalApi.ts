@@ -157,3 +157,47 @@ export async function deleteDocument(documentId: string): Promise<boolean> {
     return false;
   }
 }
+
+// ── Audit log ─────────────────────────────────────────────────────────────────
+
+export interface EngineAuditEntry {
+  id: number;
+  session_id: string;
+  user_id: number | null;
+  username: string | null;
+  query: string;
+  query_type: string | null;
+  confidence: number;
+  confidence_label: string | null;
+  rejected: boolean;
+  rejection_reason: string | null;
+  answer_text: string | null;
+  answer_hash: string | null;
+  dose_text: string | null;
+  citations: Array<{
+    document_name: string;
+    page_number: number;
+    relevance_score: number;
+  }> | null;
+  safety_alerts: string[] | null;
+  client_ip: string | null;
+  model: string | null;
+  drug_db_version: string | null;
+  timestamp: string;
+}
+
+/**
+ * Admin-only. Returns [] when unavailable or when the caller is not an admin —
+ * the server, not the client, decides who may read this.
+ */
+export async function listAuditLog(
+  limit = 200
+): Promise<EngineAuditEntry[]> {
+  try {
+    const res = await authFetch(`/auth/audit-log?limit=${limit}`);
+    if (!res || !res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
