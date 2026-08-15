@@ -23,6 +23,7 @@ import {
   Shield,
   ClipboardList,
   Brain,
+  Pill,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -55,6 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
 
   const advancedMenuItems = [
     { id: 'official-sources', label: t('officialSources'), icon: Shield },
+    { id: 'formulary', label: t('formulary'), icon: Pill },
     { id: 'audit-log', label: t('auditLog'), icon: ClipboardList },
     { id: 'rag-settings', label: t('closedLoopRAG'), icon: Brain },
   ];

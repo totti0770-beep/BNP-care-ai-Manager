@@ -62,7 +62,7 @@ def close_pool() -> None:
 # The revision this build expects. Pinned deliberately rather than read from
 # the migration directory: an older image must refuse to start against a
 # database that a newer one has already migrated.
-ALEMBIC_HEAD = "0002_audit_integrity"
+ALEMBIC_HEAD = "0003_drug_formulary"
 
 
 def _alembic_config():

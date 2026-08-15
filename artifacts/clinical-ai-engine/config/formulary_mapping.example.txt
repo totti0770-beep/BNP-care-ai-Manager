@@ -1,0 +1,61 @@
+# Column mapping for a formulary import.
+#
+# Each line is `canonical_field: Your Column Header`. Copy this file, change the
+# right-hand side to match the headers in your hospital's export, and upload it
+# alongside the data file. Any column not named here is reported as unmapped
+# rather than guessed at — a column silently read as the wrong field is how a
+# daily maximum ends up in a single-dose ceiling.
+#
+# A file that already uses the canonical names on the left needs no mapping at
+# all.
+
+# ── Required ──────────────────────────────────────────────────────────────────
+# A row missing any of these is rejected. source_name and source_ref are
+# required because a dose figure with no citable origin is exactly what this
+# import exists to keep out.
+generic_name: Generic Name
+unit: Unit
+source_name: Reference
+source_ref: Page / Section
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+name_ar: Arabic Name
+# Separate multiple values with | or ;
+aliases: Trade Names
+
+# ── Dosing ────────────────────────────────────────────────────────────────────
+# Every figure below must be expressed in the declared `unit`. A drug dosed in
+# international units (heparin, insulin) sets unit: unit, leaves all of these
+# blank, and puts its regimen in reference_regimen.
+dose_per_kg: Dose per kg
+adult_flat_min: Adult Dose Min
+adult_flat_max: Adult Dose Max
+adult_max_dose: Max Single Dose
+adult_max_daily: Max Daily Dose
+adult_max_daily_elderly: Max Daily Dose (Elderly)
+pediatric_min_per_kg: Pediatric Dose Min per kg
+pediatric_max_per_kg: Pediatric Dose Max per kg
+pediatric_max_daily_per_kg: Pediatric Max Daily per kg
+pediatric_max_doses_per_day: Pediatric Max Doses per Day
+
+# ── Overdose thresholds ───────────────────────────────────────────────────────
+# These two are not interchangeable. `absolute` is a total; `per_kg` is scaled
+# by patient weight. A per-kg value placed in the absolute field read a normal
+# 70 mg enoxaparin dose as a 35x overdose requiring protamine, so the import
+# rejects an absolute threshold that falls below the daily maximum.
+overdose_threshold_absolute: Overdose Threshold (total)
+overdose_threshold_per_kg: Overdose Threshold per kg
+
+# ── Administration and safety ─────────────────────────────────────────────────
+frequency: Frequency
+route: Route
+antidote: Antidote
+reference_regimen: Regimen
+contraindications: Contraindications
+interactions: Interactions
+warnings: Nursing Warnings
+high_risk: High Alert
+auto_calculate: Auto Calculate
+
+# ── Provenance ────────────────────────────────────────────────────────────────
+source_edition: Edition

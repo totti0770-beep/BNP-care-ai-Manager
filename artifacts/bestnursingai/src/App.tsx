@@ -15,6 +15,7 @@ import CitationsPage from '@/components/CitationsPage';
 import SettingsPage from '@/components/SettingsPage';
 import OfficialSourcesPage from '@/components/OfficialSourcesPage';
 import AuditLogPage from '@/components/AuditLogPage';
+import FormularyPage from '@/components/FormularyPage';
 import RAGSettingsPage from '@/components/RAGSettingsPage';
 import SecureUploadPage from '@/components/SecureUploadPage';
 import '@/i18n';
@@ -56,6 +57,8 @@ function AppContent() {
         return <OfficialSourcesPage />;
       case 'audit-log':
         return <AuditLogPage />;
+      case 'formulary':
+        return <FormularyPage />;
       case 'rag-settings':
         return <RAGSettingsPage />;
       default:

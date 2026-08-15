@@ -48,6 +48,13 @@ export interface EngineDocument {
   uploaded_by: string;
 }
 
+export interface FormularyCounts {
+  total: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+}
+
 export interface EngineHealth {
   status: string;
   service: string;
@@ -55,6 +62,9 @@ export interface EngineHealth {
   indexed_chunks: number;
   openai_enabled: boolean;
   database: boolean;
+  drug_db_version?: string;
+  drug_db_review_status?: string;
+  formulary?: FormularyCounts;
 }
 
 // ── Transport ─────────────────────────────────────────────────────────────────
@@ -222,4 +232,151 @@ export async function verifyAuditChain(): Promise<AuditChainStatus | null> {
   } catch {
     return null;
   }
+}
+
+// ── Formulary ─────────────────────────────────────────────────────────────────
+
+export type ReviewStatus = "pending" | "approved" | "rejected";
+
+export interface FormularyDrug {
+  drug_id: string;
+  generic_name: string;
+  name_ar: string | null;
+  unit: string;
+  auto_calculate: boolean;
+  dose_per_kg: string | number | null;
+  adult_flat_min: string | number | null;
+  adult_flat_max: string | number | null;
+  adult_max_dose: string | number | null;
+  adult_max_daily: string | number | null;
+  pediatric_min_per_kg: string | number | null;
+  pediatric_max_per_kg: string | number | null;
+  overdose_threshold_absolute: string | number | null;
+  overdose_threshold_per_kg: string | number | null;
+  frequency: string | null;
+  route: string | null;
+  antidote: string | null;
+  reference_regimen: string | null;
+  high_risk: boolean;
+  source_name: string;
+  source_edition: string | null;
+  source_ref: string | null;
+  imported_from_file: string | null;
+  imported_at: string | null;
+  imported_by: string | null;
+  review_status: ReviewStatus;
+  reviewed_by: string | null;
+  reviewer_license: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  version: number;
+}
+
+export interface FormularyListing {
+  summary: FormularyCounts;
+  drugs: FormularyDrug[];
+}
+
+export interface ImportRowOutcome {
+  row: number;
+  drug: string;
+  action: "inserted" | "updated" | "unchanged" | "rejected";
+  reason: string | null;
+  changed_fields: string[];
+}
+
+export interface ImportReport {
+  file_name: string;
+  sha256: string;
+  dry_run: boolean;
+  already_imported: boolean;
+  unknown_columns: string[];
+  missing_columns: string[];
+  summary: {
+    total: number;
+    inserted: number;
+    updated: number;
+    unchanged: number;
+    rejected: number;
+  };
+  rows: ImportRowOutcome[];
+}
+
+/** Admin-only. Returns null when unavailable or the caller is not an admin. */
+export async function listFormulary(
+  status?: ReviewStatus
+): Promise<FormularyListing | null> {
+  try {
+    const query = status ? `?status=${status}` : "";
+    const res = await authFetch(`/formulary${query}`);
+    if (!res || !res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Upload a formulary file. `dryRun` defaults to true: the operator reads the
+ * rejection report before anything is written.
+ *
+ * Returns the report, or a string describing why the file could not be read at
+ * all. Never throws — a failed import must not look like a successful one.
+ */
+export async function importFormulary(
+  file: File,
+  options: { mapping?: File; dryRun?: boolean } = {}
+): Promise<ImportReport | { error: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  if (options.mapping) form.append("mapping", options.mapping);
+  form.append("dry_run", String(options.dryRun ?? true));
+
+  try {
+    const res = await authFetch("/formulary/import", {
+      method: "POST",
+      body: form,
+    });
+    if (!res) return { error: "The engine is unreachable." };
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      return { error: body?.detail ?? `Import failed (${res.status}).` };
+    }
+    return body as ImportReport;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Import failed." };
+  }
+}
+
+export interface ReviewDecision {
+  decision: ReviewStatus;
+  reviewed_by: string;
+  reviewer_license: string;
+  note?: string;
+  source_name?: string;
+  source_edition?: string;
+  source_ref?: string;
+}
+
+/** Record a pharmacist's decision on one drug. Returns null on failure. */
+export async function reviewFormularyDrug(
+  drugId: string,
+  decision: ReviewDecision
+): Promise<{ drug: string; review_status: ReviewStatus; summary: FormularyCounts } | null> {
+  try {
+    const res = await authFetch(`/formulary/${drugId}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(decision),
+    });
+    if (!res || !res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** The URL of the sign-off packet. A plain link so the browser downloads it. */
+export function reviewPacketUrl(status: ReviewStatus | "all" = "pending"): string {
+  return `${BASE}/formulary/review-packet.xlsx?status=${status}`;
 }

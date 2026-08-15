@@ -19,6 +19,7 @@ import main  # noqa: E402
 from models.schemas import QueryType  # noqa: E402
 from routers import query as query_router  # noqa: E402
 from routers.auth import get_current_user  # noqa: E402
+from tests.formulary_fixture import build_formulary  # noqa: E402
 
 
 CHUNK = {
@@ -95,13 +96,18 @@ def engine(monkeypatch):
         chunks=None,
         retriever_raises=None,
         audit_fails=False,
+        formulary=None,
         answer="Paracetamol 500-1000 mg every 6 hours, maximum 4 g per day.",  # noqa: E501
         query_type=QueryType.DRUG,
     ):
         retriever = StubRetriever(chunks=chunks, raises=retriever_raises)
         audit = AuditRecorder(fail=audit_fails)
+        # The drug data lives in a table now. Pass formulary=... to test what
+        # the pipeline does for a drug that is pending review or absent.
+        drugs = build_formulary() if formulary is None else formulary
 
         monkeypatch.setattr(query_router, "get_retriever", lambda: retriever)
+        monkeypatch.setattr(query_router, "get_formulary", lambda: drugs)
         monkeypatch.setattr(query_router, "_log_query", audit)
         monkeypatch.setattr(query_router, "classify_query", lambda q: query_type)
         # generate_response returns the raw BNP-sectioned string, which

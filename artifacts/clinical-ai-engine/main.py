@@ -25,8 +25,8 @@ from contextlib import asynccontextmanager
 from models.database import init_db
 from middleware.logging import RequestLoggingMiddleware, configure_logging
 from middleware.rate_limit import RateLimitMiddleware
-from routers import auth, documents, query
-from services.drug_calculator import DRUG_DB_VERSION, DRUG_DB_REVIEW_STATUS
+from routers import auth, documents, formulary as formulary_router, query
+from services.formulary import get_formulary
 
 # JSON in production so logs are shippable and queryable; human-readable
 # locally. Set LOG_FORMAT=json or LOG_FORMAT=text to override.
@@ -55,7 +55,17 @@ async def lifespan(app: FastAPI):
             "Clinical queries will be refused with 503 until this is fixed."
         )
 
-    logger.info(f"   Drug safety database {DRUG_DB_VERSION} — {DRUG_DB_REVIEW_STATUS}")
+    # The formulary is data now, not code, so it is loaded here and republished
+    # on every import. Without it no medication question can be answered.
+    formulary = get_formulary()
+    formulary.reload()
+    if formulary.is_available:
+        logger.info(f"   Formulary {formulary.version()} — {formulary.review_summary()}")
+    else:
+        logger.error(
+            f"❌ Formulary unavailable ({formulary.degraded_reason}). "
+            "Clinical queries will be refused with 503 until this is fixed."
+        )
 
     yield
     logger.info("🛑 BNP Clinical AI Engine shutting down…")
@@ -103,6 +113,9 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(auth.router,      prefix="/auth",      tags=["Authentication"])
 app.include_router(documents.router, prefix="/documents", tags=["Documents"])
 app.include_router(query.router,     prefix="/query",     tags=["Clinical Query"])
+app.include_router(
+    formulary_router.router, prefix="/formulary", tags=["Formulary"]
+)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
@@ -115,6 +128,7 @@ def health():
     """
     from services.embeddings import get_retriever
     r = get_retriever()
+    _formulary = get_formulary()
 
     database = bool(os.environ.get("DATABASE_URL", ""))
     problems = []
@@ -124,6 +138,10 @@ def health():
         problems.append(r.degraded_reason or "retrieval backend unavailable")
     if r.chunk_count == 0:
         problems.append("no documents indexed")
+    if not _formulary.is_available:
+        problems.append(
+            _formulary.degraded_reason or "medication formulary unavailable"
+        )
 
     body = {
         "status": "ok" if not problems else "degraded",
@@ -132,8 +150,9 @@ def health():
         "indexed_chunks": r.chunk_count,
         "openai_enabled": bool(os.environ.get("OPENAI_API_KEY", "")),
         "database": database,
-        "drug_db_version": DRUG_DB_VERSION,
-        "drug_db_review_status": DRUG_DB_REVIEW_STATUS,
+        "drug_db_version": _formulary.version(),
+        "drug_db_review_status": _formulary.review_summary(),
+        "formulary": _formulary.counts(),
     }
     if problems:
         body["problems"] = problems

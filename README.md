@@ -7,11 +7,11 @@ model and refuse to answer.
 
 > ## ⚠️ Not for clinical use
 >
-> This system is **not cleared for use in patient care.** The medication safety database
-> (`services/drug_calculator.py`) contains 17 hand-written entries — roughly 1–2% of a
-> hospital formulary — and **has not been reviewed or signed off by a licensed pharmacist.**
-> Its review status is reported by `/health` as `UNVERIFIED — pending pharmacist review`
-> and shown in the UI.
+> This system is **not cleared for use in patient care.** The formulary ships seeded with
+> 17 entries — roughly 1–2% of a hospital formulary — and **not one of them has been
+> reviewed or signed off by a licensed pharmacist.** Until a drug is approved, the system
+> shows no dose for it at all. `/health` reports the tally, and the review screen shows
+> which drugs are waiting.
 >
 > Before any pilot with real patients, see [Before a pilot](#before-a-pilot).
 
@@ -49,7 +49,7 @@ service account.
 
 | Path | What it is |
 |---|---|
-| `artifacts/clinical-ai-engine` | Python FastAPI RAG engine and safety layer |
+| `artifacts/clinical-ai-engine` | Python FastAPI RAG engine, formulary, and safety layer |
 | `artifacts/api-server` | Express OIDC auth + `/bnp-api` gateway |
 | `artifacts/bestnursingai` | React + Vite web app |
 | `artifacts/nursing-mobile` | Expo React Native app (Arabic RTL) |
@@ -118,6 +118,23 @@ alembic revision -m "what changed"              # then write the SQL by hand
 alembic upgrade head
 ```
 
+### Loading the formulary
+
+Medication data is imported, not coded. Export your formulary as CSV or Excel, copy
+`artifacts/clinical-ai-engine/config/formulary_mapping.example.txt` and point its
+right-hand side at your column headers, then use the Formulary screen (admin only) or:
+
+```bash
+curl -F file=@formulary.xlsx -F mapping=@mapping.txt -F dry_run=true \
+     --cookie "$SESSION" http://localhost:8080/bnp-api/formulary/import
+```
+
+Dry run is the default and reports what would change, including every rejected row and
+why. Rows are refused rather than repaired: a missing source, an undeclared unit, or a
+per-kg value in an absolute threshold field stops that row and nothing else.
+
+Imported drugs arrive `pending` and quote no dose until a pharmacist approves them.
+
 The engine applies migrations itself on startup (`AUTO_MIGRATE=1`, the default) for
 single-instance and Replit deployments. Docker sets `AUTO_MIGRATE=0` and runs a dedicated
 `engine-migrate` job first, so the engine refuses to start against an unmigrated database
@@ -152,22 +169,32 @@ These are deliberate and should survive refactoring:
    the answer before generation; the model cannot talk its way past it.
 5. **Roles never come from the client.** They are derived server-side from `ADMIN_EMAILS`,
    never from request bodies or OIDC claims.
-6. **Units are explicit.** Every `DRUG_DB` entry declares `mg` or `unit`; drugs dosed in
-   international units set `auto_calculate: False` and no number is computed for them.
+6. **Units are explicit.** Every formulary row declares `mg` or `unit`; a drug dosed in
+   international units sets `auto_calculate = false` and no number is computed for it.
+   The import refuses a unit-dosed row that carries milligram figures.
 7. **Age gates the pediatric range.** Weight alone never selects it — an adult and a child can
    weigh the same.
+8. **A dose is only quoted for an approved drug.** Medication data lives in
+   `bnp_drug_formulary`, one row per drug, each carrying its source and its pharmacist
+   sign-off. A drug that is present but unreviewed produces no number — and changing any
+   clinical value by import returns it to pending, so a revised dose never inherits an old
+   approval.
 
 ## Before a pilot
 
 Engineering work is not the remaining blocker. These are:
 
-- [ ] **Pharmacist sign-off** on every `DRUG_DB` entry, with a cited formulary source and a
-      review date, plus a documented change-control process. Bump `DRUG_DB_VERSION` on any change.
+- [ ] **Pharmacist sign-off** on every formulary row, through the review screen or the
+      exported packet (`GET /bnp-api/formulary/review-packet.xlsx`, one line per clinical
+      value). Each decision records the reviewer's name and licence number on the audit
+      chain. Nothing else is needed to make it stick: approval is per drug, and the version
+      recorded on every audit row moves on its own.
 - [ ] **Rotate the JWT secret.** A signing key was committed to this repository's history
       (`.replit`, commit `f899a8a`) and must be treated as compromised. Rotating the value is
       not enough on its own if the history remains published.
-- [ ] **Expand formulary coverage**, or make the 17-drug boundary explicit in nurse training.
-      Out-of-formulary drugs are reported as not covered, but they are still not checked.
+- [ ] **Import the hospital formulary** (`POST /bnp-api/formulary/import`) so coverage is
+      the real one rather than the seeded 17. Out-of-formulary drugs are reported as not
+      covered, but they are still not checked.
 - [ ] **Compliance package**: CBAHI/PDPL mapping, an intended-use statement, a clinical
       validation protocol, data retention and residency, and incident response.
 - [ ] **Clinical validation** against a held-out question set, reviewed by clinicians.

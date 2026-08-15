@@ -26,3 +26,6 @@ langchain-text-splitters>=1.1.1
 openai>=2.30.0
 pypdf>=6.9.2
 tiktoken>=0.12.0
+
+# Formulary import and the pharmacist review packet
+openpyxl>=3.1.5
