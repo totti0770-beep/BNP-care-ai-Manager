@@ -135,6 +135,17 @@ per-kg value in an absolute threshold field stops that row and nothing else.
 
 Imported drugs arrive `pending` and quote no dose until a pharmacist approves them.
 
+A ready-made import extracted from the hospital's own documents ships at
+`artifacts/clinical-ai-engine/data/formulary/jsh_formulary_import.csv` — 143 drugs from
+the Adult Parenteral Dilution Manual and the Adult IV Drip Chart, each row citing its
+source page, regenerable with `tools/extract_formulary_pdfs.py`. Extraction is
+mechanical: these are administration references, so every extracted row sets
+`auto_calculate = no` and no dose is ever computed from them; nurses get the dilution,
+rate, stability and monitoring text verbatim. Names that collide with existing formulary
+entries are skipped and listed in the accompanying manifest rather than overwritten.
+The Do Not Crush List is a scanned document with no extractable text and needs OCR
+before it can join either the formulary or the retrieval corpus.
+
 The engine applies migrations itself on startup (`AUTO_MIGRATE=1`, the default) for
 single-instance and Replit deployments. Docker sets `AUTO_MIGRATE=0` and runs a dedicated
 `engine-migrate` job first, so the engine refuses to start against an unmigrated database
