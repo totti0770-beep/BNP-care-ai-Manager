@@ -49,10 +49,19 @@ from pathlib import Path
 # The engine root, so `models.database` resolves when run as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-try:
-    import pymupdf
-except ImportError:  # pragma: no cover
-    sys.exit("pymupdf is required: pip install pymupdf")
+
+def _pymupdf():
+    """
+    Imported lazily, not at module load. pymupdf is extraction-time only —
+    deliberately absent from requirements.txt and CI — so importing this
+    module (e.g. to reuse the pure name-matching helpers below) must not
+    require it; only actually parsing a PDF does.
+    """
+    try:
+        import pymupdf
+    except ImportError as exc:  # pragma: no cover
+        raise SystemExit("pymupdf is required: pip install pymupdf") from exc
+    return pymupdf
 
 
 # The formulary's canonical headers — no mapping file needed at import time.
@@ -122,7 +131,7 @@ def _starts_new_monograph(col0: str) -> bool:
 
 
 def parse_manual(path: Path, source_name: str, edition: str):
-    doc = pymupdf.open(path)
+    doc = _pymupdf().open(path)
     rows, dropped = [], []
     current = None  # (page, cells) — a drug row accumulating continuations
 
@@ -259,7 +268,7 @@ DRIP_DOSE_RE = re.compile(
 
 
 def parse_drip_chart(path: Path, source_name: str, edition: str):
-    doc = pymupdf.open(path)
+    doc = _pymupdf().open(path)
     by_drug = {}
     for index in range(len(doc)):
         text = doc[index].get_text()
