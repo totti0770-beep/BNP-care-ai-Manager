@@ -23,6 +23,11 @@ Ground rules, in order of importance:
     fields with blanks (this manual has none), which silently discards data a
     pharmacist could have reviewed. Which source wins for those drugs is a
     pharmacist's call, made in the review screen, not here.
+  * **A near-miss spelling is not a new drug.** A name one short edit away
+    from an existing one (e.g. the manual's "digoxine" vs. the formulary's
+    "digoxin") is excluded from the CSV and reported in the manifest as a
+    `possible_duplicate`, unresolved — never silently imported as a second
+    row for the same drug under a different name.
 
 Usage:
     pip install pymupdf   # extraction-time only; not a runtime dependency
@@ -333,6 +338,58 @@ def existing_formulary_names() -> set:
         return set()
 
 
+def _normalize(name: str) -> str:
+    """Alnum-lowercase collapse, so punctuation/spacing differences don't matter."""
+    return re.sub(r"[^a-z0-9]", "", (name or "").lower())
+
+
+def _levenshtein(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        curr = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            curr[j] = min(
+                prev[j] + 1,
+                curr[j - 1] + 1,
+                prev[j - 1] + (ca != cb),
+            )
+        prev = curr
+    return prev[-1]
+
+
+def find_near_duplicate(name: str, candidates) -> tuple:
+    """
+    A name that is one short edit away from an existing one — the
+    digoxin/digoxine shape — without being an exact match (exact matches are
+    handled separately, before this is ever called). Deliberately
+    conservative: only names of at least 5 characters are compared, and only
+    a distance of 1 is flagged, so unrelated short names never collide by
+    chance. Returns (existing_name, similarity) or None; never picks a
+    winner among several candidates — that judgement is a pharmacist's, not
+    this script's, so ties keep the closest edit distance only.
+    """
+    norm = _normalize(name)
+    if len(norm) < 5:
+        return None
+    best = None
+    for candidate in candidates:
+        cand_norm = _normalize(candidate)
+        if len(cand_norm) < 5 or cand_norm == norm:
+            continue
+        distance = _levenshtein(norm, cand_norm)
+        if distance <= 1:
+            similarity = 1 - distance / max(len(norm), len(cand_norm))
+            if best is None or distance < best[2]:
+                best = (candidate, round(similarity, 3), distance)
+    return (best[0], best[1]) if best else None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dilution_manual", type=Path)
@@ -357,7 +414,7 @@ def main() -> int:
     )
 
     existing = existing_formulary_names()
-    merged, skipped_dupe, skipped_existing = [], [], []
+    merged, skipped_dupe, skipped_existing, possible_duplicates = [], [], [], []
     seen = set()
     for row in manual_rows + drip_rows:
         name = row["generic_name"]
@@ -366,6 +423,13 @@ def main() -> int:
             continue
         if name in seen:
             skipped_dupe.append(name)
+            continue
+        near = find_near_duplicate(name, existing | seen)
+        if near:
+            existing_name, similarity = near
+            possible_duplicates.append(
+                {"new_name": name, "existing_name": existing_name, "similarity": similarity}
+            )
             continue
         seen.add(name)
         merged.append(row)
@@ -386,6 +450,9 @@ def main() -> int:
         "rows_dropped_unparseable": dropped,
         "skipped_existing_formulary_entries": sorted(set(skipped_existing)),
         "skipped_duplicate_names": sorted(set(skipped_dupe)),
+        "possible_duplicates": sorted(
+            possible_duplicates, key=lambda d: d["new_name"]
+        ),
     }
     manifest_path = args.out.with_suffix(".manifest.json")
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
@@ -393,6 +460,11 @@ def main() -> int:
     print(f"wrote {len(merged)} rows to {args.out}")
     print(f"  dropped (unparseable): {len(dropped)}")
     print(f"  skipped (already in formulary): {sorted(set(skipped_existing))}")
+    if possible_duplicates:
+        print(
+            "  possible duplicates (excluded, needs a pharmacist's call): "
+            + ", ".join(f"{d['new_name']!r}~{d['existing_name']!r}" for d in possible_duplicates)
+        )
     print(f"  manifest: {manifest_path}")
     return 0
 
