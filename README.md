@@ -11,11 +11,11 @@ model and refuse to answer.
 > validation, no compliance package, and no rotation of a signing key that is in this
 > repository's published history.
 >
-> The formulary itself is loaded and signed off: 638 drugs, of which 622 carry a
+> The formulary itself is loaded and signed off: 638 drugs, of which 637 carry a
 > pharmacist's recorded approval against the hospital's P&T-approved 2026 formulary and
-> IV sterile preparations manual, each row citing its source page. The remaining 16 are
-> `pending` and the system shows no dose for them at all. `/health` reports the tally and
-> the review screen shows which are waiting.
+> IV sterile preparations manual or its Adult Parenteral Dilution Manual, each row citing
+> its source page. One is still `pending` and the system shows no dose for it at all.
+> `/health` reports the tally and the review screen shows which are waiting.
 >
 > **No approved row carries a computed dose.** The source documents state dosing as prose,
 > and no number is parsed out of prose into a calculation field, so a nurse gets the
@@ -238,20 +238,20 @@ These are deliberate and should survive refactoring:
 
 Engineering work is not the remaining blocker. These are:
 
-- [x] **Pharmacist sign-off.** 622 of 638 drugs are approved against the hospital's
+- [x] **Pharmacist sign-off.** 637 of 638 drugs are approved against the hospital's
       P&T-approved 2026 formulary and IV preparations manual, recorded on the audit chain
       with the reviewer's name and licence number. The evidence trail is
       `data/formulary/pharmacist_review_log.csv` plus the source workbooks beside it.
-- [ ] **The remaining 16 drugs**, which the 2026 formulary does not carry — `vecuronium`,
-      `pancuronium`, `capreomycin`, `kanamycin`, `ranitidine`, `iron dextran`,
-      `bretylium tosylate` and others. Most have an approved alternative in the same
-      class; ranitidine was withdrawn globally in 2020. They quote no dose. Either the
-      pharmacy supplies a source or they should be retired. Four now carry a high-risk
-      flag they were missing (`vecuronium`, `pancuronium`, `amobarbital`, `botulinum
-      toxin`), so the warning fires whatever is decided about approval.
-- [ ] **`capreomycin` needs its page read visually.** The manual's text layer on p.11
-      splits figures across a column boundary (`370m g/ml`, `SWFI310m g/ml`). Broken words
-      elsewhere were rejoined; broken *numbers* are not something this pipeline guesses at.
+- [ ] **`capreomycin` — the one drug still pending.** Its p.11 dilution table has figures
+      split across a column boundary in the source text layer (`370m g/ml`,
+      `SWFI310m g/ml`). Broken words elsewhere were rejoined because a split word has one
+      reading; a split *number* does not, and guessing one on a dilution table is not
+      something this pipeline does. It needs the page read visually.
+- [ ] **Reconcile the two hospital documents.** 15 drugs are approved from the Adult
+      Parenteral Dilution Manual that the P&T-approved 2026 formulary does not carry —
+      `vecuronium`, `pancuronium`, `kanamycin`, `ranitidine`, `iron dextran`,
+      `bretylium tosylate` and others. That the two documents differ in scope is worth
+      the committee's attention in its own right.
 - [ ] **`amphotericin b lipid complex`** is held pending deliberately: conventional,
       lipid-complex and liposomal amphotericin B are three products with different doses
       and are not interchangeable. The formulary carries two of the three.
