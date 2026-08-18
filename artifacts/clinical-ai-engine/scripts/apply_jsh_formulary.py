@@ -252,7 +252,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--token", required=True, help="an admin engine token")
-    parser.add_argument("--csv", type=Path, required=True)
+    parser.add_argument(
+        "--csv", type=Path, required=True, action="append",
+        help="repeatable — the converted formulary, plus any correction files",
+    )
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--review-log", type=Path)
     parser.add_argument(
@@ -278,7 +281,9 @@ def main() -> int:
         )
 
         print("2. importing the converted formulary")
-        import_csv(args.base_url, args.token, args.csv, args.dry_run)
+        for path in args.csv:
+            print(f"  {path.name}")
+            import_csv(args.base_url, args.token, path, args.dry_run)
 
         if args.review_log:
             print("3. applying pharmacist decisions")

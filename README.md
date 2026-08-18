@@ -157,6 +157,7 @@ The hospital's own formulary ships loaded, under
 | `jsh_workbooks_import.csv` | 620 drugs converted from those two workbooks, one row per drug, each citing its source page. Regenerate with `tools/convert_jsh_workbooks.py`. |
 | `pharmacist_review_log.csv` | One row per approval: drug, decision, reviewer, licence number, date. |
 | `retirement_log.csv` | One row per withdrawal, each naming the entry that supersedes it and why. |
+| `corrections_import.csv` | Pharmacist-directed corrections to a source document's own text. Each keeps the original wording as an alias, so the document stays findable by exactly what it says. |
 | `jsh_formulary_import.csv` | The earlier PDF table-scraping, superseded. 41 of its rows were duplicates under a misspelt or shorter name and are retired; what remains live is the handful of drugs the 2026 workbooks do not carry, plus the two antivenoms. |
 
 Reproduce the whole state on any migrated deployment in one command — it retires,
@@ -167,6 +168,7 @@ with an actor attached:
 python scripts/apply_jsh_formulary.py \
     --base-url http://localhost:8080/bnp-api --token "$ENGINE_ADMIN_TOKEN" \
     --csv data/formulary/jsh_workbooks_import.csv \
+    --csv data/formulary/corrections_import.csv \
     --manifest data/formulary/jsh_workbooks_import.manifest.json \
     --retirement-log data/formulary/retirement_log.csv \
     --review-log data/formulary/pharmacist_review_log.csv
