@@ -262,8 +262,12 @@ Engineering work is not the remaining blocker. These are:
       drugs whose thresholds came from the unsourced seed: those figures were cleared, not
       approved. Restoring it means a pharmacist supplying cited numeric limits.
 - [ ] **Rotate the JWT secret.** A signing key was committed to this repository's history
-      (`.replit`, commit `f899a8a`) and must be treated as compromised. Rotating the value is
-      not enough on its own if the history remains published.
+      (`.replit`, commit `f899a8a`) and must be treated as compromised — anyone holding it
+      can mint an admin token. Procedure, measured blast radius and the history question:
+      [`docs/security/jwt-rotation.md`](docs/security/jwt-rotation.md). It is smaller than
+      it sounds: nurse sessions are Postgres-backed cookies, not JWTs, so nobody is logged
+      out — but it still has to be done, and someone with Replit access has to confirm
+      whether the original deployment is still serving with the committed value.
 - [x] **Import the hospital formulary.** Coverage is the real one: 638 drugs, not the
       seeded 17. Out-of-formulary drugs are reported as not covered rather than silently
       returning an empty contraindication list.
