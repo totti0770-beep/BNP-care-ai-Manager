@@ -105,8 +105,36 @@ def live_drug_ids(base_url, token) -> dict:
 
 # ── Step 1: retire superseded rows ────────────────────────────────────────────
 
-def retire_superseded(base_url, token, manifest, ids, dry_run) -> int:
-    supersedes = manifest.get("supersedes") or []
+def read_retirement_log(path: Path) -> list:
+    """
+    Retirements a pharmacist decided on, in the same shape the manifest uses.
+
+    Separate from the manifest's `supersedes` because the two are found
+    differently: the manifest's are mechanical (a name the converter can see is
+    a misspelling of one it is importing), while these come from a human
+    reading the queue and recognising that "epinephrine" and "adrenaline
+    (epinephrine)" are one drug. Both end at the same endpoint.
+    """
+    rows = list(csv.DictReader(path.open(encoding="utf-8")))
+    missing = {"drug", "reason", "retired_by"} - set(rows[0] if rows else {})
+    if missing:
+        raise ApiError(
+            f"retirement log is missing {sorted(missing)}. A drug leaving a "
+            "clinical formulary needs a recorded reason and a named actor."
+        )
+    return [
+        {
+            "retire": (r["drug"] or "").strip().lower(),
+            "superseded_by": (r.get("superseded_by") or "").strip(),
+            "reason": r["reason"].strip(),
+            "retired_by": r["retired_by"].strip(),
+        }
+        for r in rows
+    ]
+
+
+def retire_superseded(base_url, token, manifest, ids, dry_run, extra=()) -> int:
+    supersedes = (manifest.get("supersedes") or []) + list(extra)
     if not supersedes:
         print("  nothing to retire")
         return 0
@@ -123,12 +151,13 @@ def retire_superseded(base_url, token, manifest, ids, dry_run) -> int:
             done += 1
             continue
         request(base_url, token, "POST", f"/formulary/{drug_id}/retire", body={
-            "reason": (
+            "reason": item.get("reason") or (
                 "Superseded by the JSH 2026 structured formulary export, which "
                 "spells this drug correctly. This row came from an automated "
                 "table extraction of the source PDF and its name is wrong."
             ),
-            "retired_by": manifest.get("retired_by", "formulary import"),
+            "retired_by": item.get("retired_by")
+            or manifest.get("retired_by", "formulary import"),
             "superseded_by": replacement,
         })
         print(f"  retired {name!r} -> {replacement!r}")
@@ -227,6 +256,10 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--review-log", type=Path)
     parser.add_argument(
+        "--retirement-log", type=Path,
+        help="drugs a pharmacist decided to withdraw, with a reason each",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="report every step without changing anything",
     )
@@ -237,7 +270,12 @@ def main() -> int:
     try:
         print("1. retiring superseded rows")
         ids = live_drug_ids(args.base_url, args.token)
-        retire_superseded(args.base_url, args.token, manifest, ids, args.dry_run)
+        extra = (
+            read_retirement_log(args.retirement_log) if args.retirement_log else []
+        )
+        retire_superseded(
+            args.base_url, args.token, manifest, ids, args.dry_run, extra
+        )
 
         print("2. importing the converted formulary")
         import_csv(args.base_url, args.token, args.csv, args.dry_run)

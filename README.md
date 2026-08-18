@@ -11,9 +11,9 @@ model and refuse to answer.
 > validation, no compliance package, and no rotation of a signing key that is in this
 > repository's published history.
 >
-> The formulary itself is loaded and signed off: 680 drugs, of which 620 carry a
+> The formulary itself is loaded and signed off: 639 drugs, of which 622 carry a
 > pharmacist's recorded approval against the hospital's P&T-approved 2026 formulary and
-> IV sterile preparations manual, each row citing its source page. The remaining 60 are
+> IV sterile preparations manual, each row citing its source page. The remaining 17 are
 > `pending` and the system shows no dose for them at all. `/health` reports the tally and
 > the review screen shows which are waiting.
 >
@@ -156,7 +156,8 @@ The hospital's own formulary ships loaded, under
 | `source/*.xlsx` | The pharmacy's field-labelled exports of the JSH Drug Formulary 2026 (521 drugs) and the IV Sterile Preparations Manual (206 preparations), both P&T-approved. Committed with their SHA-256 in the manifest, because a decision log citing a document nobody can open is not an evidence trail. |
 | `jsh_workbooks_import.csv` | 620 drugs converted from those two workbooks, one row per drug, each citing its source page. Regenerate with `tools/convert_jsh_workbooks.py`. |
 | `pharmacist_review_log.csv` | One row per approval: drug, decision, reviewer, licence number, date. |
-| `jsh_formulary_import.csv` | The earlier PDF table-scraping, superseded. Kept for the 58 drugs the workbooks do not cover; those rows remain `pending`. |
+| `retirement_log.csv` | One row per withdrawal, each naming the entry that supersedes it and why. |
+| `jsh_formulary_import.csv` | The earlier PDF table-scraping, superseded. 41 of its rows were duplicates under a misspelt or shorter name and are retired; what remains live is the handful of drugs the 2026 workbooks do not carry, plus the two antivenoms. |
 
 Reproduce the whole state on any migrated deployment in one command — it retires,
 imports and approves through the real endpoints, so every change lands on the audit chain
@@ -167,6 +168,7 @@ python scripts/apply_jsh_formulary.py \
     --base-url http://localhost:8080/bnp-api --token "$ENGINE_ADMIN_TOKEN" \
     --csv data/formulary/jsh_workbooks_import.csv \
     --manifest data/formulary/jsh_workbooks_import.manifest.json \
+    --retirement-log data/formulary/retirement_log.csv \
     --review-log data/formulary/pharmacist_review_log.csv
 ```
 
@@ -234,13 +236,18 @@ These are deliberate and should survive refactoring:
 
 Engineering work is not the remaining blocker. These are:
 
-- [x] **Pharmacist sign-off.** 620 of 680 drugs are approved against the hospital's
+- [x] **Pharmacist sign-off.** 622 of 639 drugs are approved against the hospital's
       P&T-approved 2026 formulary and IV preparations manual, recorded on the audit chain
       with the reviewer's name and licence number. The evidence trail is
       `data/formulary/pharmacist_review_log.csv` plus the source workbooks beside it.
-- [ ] **The remaining 60 drugs**, which the two workbooks do not cover — mostly rows from
-      the superseded PDF extraction, some with garbled names (`acetamionphen`). They quote
-      no dose. Either the pharmacy supplies a source for them or they should be retired.
+- [ ] **The remaining 17 drugs**, which the 2026 formulary does not carry — `vecuronium`,
+      `pancuronium`, `capreomycin`, `kanamycin`, `ranitidine`, `iron dextran`, `bretylium`
+      and others. Most have an approved alternative in the same class; ranitidine was
+      withdrawn globally in 2020. They quote no dose. Either the pharmacy supplies a
+      source or they should be retired.
+- [ ] **`amphotericin b lipid complex`** is held pending deliberately: conventional,
+      lipid-complex and liposomal amphotericin B are three products with different doses
+      and are not interchangeable. The formulary carries two of the three.
 - [ ] **Resolve the 57 prefix families and 2 near-miss spellings** listed in
       `jsh_workbooks_import.manifest.json`, so the same molecule is not reviewed twice
       under two names and a nurse searching the short name reaches the fuller record.
@@ -250,7 +257,7 @@ Engineering work is not the remaining blocker. These are:
 - [ ] **Rotate the JWT secret.** A signing key was committed to this repository's history
       (`.replit`, commit `f899a8a`) and must be treated as compromised. Rotating the value is
       not enough on its own if the history remains published.
-- [x] **Import the hospital formulary.** Coverage is the real one: 680 drugs, not the
+- [x] **Import the hospital formulary.** Coverage is the real one: 639 drugs, not the
       seeded 17. Out-of-formulary drugs are reported as not covered rather than silently
       returning an empty contraindication list.
 - [ ] **Compliance package**: CBAHI/PDPL mapping, an intended-use statement, a clinical
