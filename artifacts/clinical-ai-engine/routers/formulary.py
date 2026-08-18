@@ -257,6 +257,88 @@ def review_drug(
     }
 
 
+# ── Retirement ────────────────────────────────────────────────────────────────
+
+class RetirementDecision(BaseModel):
+    reason: str = Field(min_length=4, max_length=2000)
+    retired_by: str = Field(min_length=2, max_length=200)
+    superseded_by: Optional[str] = Field(default=None, max_length=200)
+
+
+RETIRE_SQL = """
+    UPDATE bnp_drug_formulary SET
+        retired_at = NOW(),
+        review_note = %(note)s,
+        updated_at = NOW()
+    WHERE drug_id = %(drug_id)s AND retired_at IS NULL
+    RETURNING generic_name, version
+"""
+
+
+@router.post("/{drug_id}/retire")
+def retire_drug(
+    drug_id: str,
+    body: RetirementDecision,
+    request: Request,
+    admin: dict = Depends(require_admin),
+):
+    """
+    Withdraw a drug from the live formulary without destroying it.
+
+    Needed when an entry is superseded rather than corrected — a row imported
+    under a misspelt name ("acetylcystine") cannot be updated in place by a
+    later file that spells it properly, so the wrong one has to go or the same
+    drug sits in the formulary twice.
+
+    Retirement, not deletion, for the same reason document deletion became
+    retirement: a past recommendation cited this row, and evidence that
+    disappears is not evidence. The row stops being served — `coverage_status`
+    treats it as not in the formulary, so no dose is ever quoted from it — but
+    it remains readable for audit.
+
+    A reason is required. An entry vanishing from a clinical formulary with no
+    recorded justification is precisely the kind of unattributable change the
+    audit chain exists to make impossible.
+    """
+    note = f"Retired: {body.reason}"
+    if body.superseded_by:
+        note += f" (superseded by {body.superseded_by})"
+
+    with db_cursor() as (cur, _):
+        try:
+            cur.execute(RETIRE_SQL, {"drug_id": drug_id, "note": note})
+        except Exception as e:  # invalid UUID
+            raise HTTPException(status_code=400, detail=str(e))
+        row = cur.fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code=404, detail="No such live drug in the formulary."
+        )
+
+    record_formulary_event(
+        user_id=int(admin["sub"]),
+        username=admin.get("username") or str(admin["sub"]),
+        action="formulary.retire",
+        detail=(
+            f"drug={row['generic_name']} version={row['version']} "
+            f"retired_by={body.retired_by} reason={body.reason} "
+            f"superseded_by={body.superseded_by or ''}"
+        ),
+        drug_id=drug_id,
+        rejected=False,
+        client_ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+
+    get_formulary().reload()
+    return {
+        "drug": row["generic_name"],
+        "retired": True,
+        "summary": get_formulary().counts(),
+    }
+
+
 # ── Review packet ─────────────────────────────────────────────────────────────
 
 PACKET_FIELDS = [

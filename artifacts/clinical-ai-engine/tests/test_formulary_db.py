@@ -59,9 +59,12 @@ def db():
         cur.execute(
             "DELETE FROM bnp_drug_formulary WHERE source_name NOT LIKE 'seed%%'"
         )
+        # retired_at too: retirement is a soft delete, so without this a test
+        # that retires a drug leaves it retired for every test after it.
         cur.execute(
             "UPDATE bnp_drug_formulary SET review_status='pending', "
-            "reviewed_by=NULL, reviewer_license=NULL, reviewed_at=NULL"
+            "reviewed_by=NULL, reviewer_license=NULL, reviewed_at=NULL, "
+            "retired_at=NULL"
         )
     return db_cursor
 
@@ -412,3 +415,107 @@ def test_tampering_with_a_recorded_approval_is_detected(db):
 
     result = verify_audit_chain(limit=100, _admin={"role": "admin"})
     assert result["valid"] is False
+
+
+# ── Retirement ────────────────────────────────────────────────────────────────
+
+def retire(drug_id, **kw):
+    from unittest.mock import Mock
+
+    from routers.formulary import RetirementDecision, retire_drug
+
+    body = RetirementDecision(**{
+        "reason": "superseded by a corrected spelling",
+        "retired_by": "Dr Pharmacist",
+        **kw,
+    })
+    request = Mock()
+    request.client.host = "127.0.0.1"
+    request.headers = {"user-agent": "pytest"}
+    return retire_drug(
+        drug_id, body, request, admin={"sub": "1", "username": "pharmacy", "role": "admin"}
+    )
+
+
+def drug_id_of(db, name):
+    with db() as (cur, _):
+        cur.execute(
+            "SELECT drug_id FROM bnp_drug_formulary WHERE generic_name = %s", (name,)
+        )
+        return cur.fetchone()["drug_id"]
+
+
+def test_a_retired_drug_leaves_the_formulary(db, formulary):
+    """
+    A misspelt row cannot be corrected in place by a later file, so it has to
+    be withdrawn or the same drug appears twice.
+    """
+    from models.formulary import CoverageStatus
+
+    assert formulary.coverage_status("morphine") is CoverageStatus.PENDING_REVIEW
+    retire(drug_id_of(db, "morphine"))
+
+    formulary.reload()
+    assert formulary.coverage_status("morphine") is CoverageStatus.NOT_IN_FORMULARY
+    assert formulary.get("morphine") is None
+
+
+def test_a_retired_drug_is_preserved_not_deleted(db):
+    """Retirement, not deletion — a past citation must still resolve."""
+    retire(drug_id_of(db, "morphine"), superseded_by="morphine sulfate")
+
+    with db() as (cur, _):
+        cur.execute(
+            "SELECT retired_at, review_note FROM bnp_drug_formulary "
+            "WHERE generic_name = 'morphine'"
+        )
+        row = cur.fetchone()
+
+    assert row is not None, "the row was destroyed rather than retired"
+    assert row["retired_at"] is not None
+    assert "morphine sulfate" in row["review_note"]
+
+
+def test_retirement_lands_on_the_audit_chain(db):
+    from routers.auth import verify_audit_chain
+
+    retire(drug_id_of(db, "morphine"), reason="replaced by the 2026 formulary")
+
+    with db() as (cur, _):
+        # The action is stored in `query`; `answer_text` carries the detail.
+        cur.execute(
+            "SELECT query, answer_text FROM bnp_audit_log "
+            "WHERE query = 'formulary.retire'"
+        )
+        entry = cur.fetchone()
+
+    assert entry is not None, "a drug left the formulary with no audit record"
+    assert "replaced by the 2026 formulary" in entry["answer_text"]
+    assert "Dr Pharmacist" in entry["answer_text"]
+    assert verify_audit_chain(limit=100, _admin={"role": "admin"})["valid"] is True
+
+
+def test_retiring_an_already_retired_drug_is_refused(db):
+    from fastapi import HTTPException
+
+    drug_id = drug_id_of(db, "morphine")
+    retire(drug_id)
+
+    with pytest.raises(HTTPException) as excinfo:
+        retire(drug_id)
+    assert excinfo.value.status_code == 404
+
+
+def test_a_retired_drug_quotes_no_dose(db, formulary):
+    """The point of retiring: the row stops being able to answer."""
+    from models.formulary import CoverageStatus
+    from services.drug_calculator import calculate_dose
+
+    retire(drug_id_of(db, "morphine"))
+    formulary.reload()
+
+    assert formulary.get("morphine") is None
+    assert formulary.coverage_status("morphine") is CoverageStatus.NOT_IN_FORMULARY
+    # With no entry there is nothing to calculate from — not a zero, not a
+    # guess, no result at all.
+    assert calculate_dose(None, "morphine dose for a 70 kg patient", 70) is None
