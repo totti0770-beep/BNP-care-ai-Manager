@@ -7,11 +7,22 @@ model and refuse to answer.
 
 > ## ⚠️ Not for clinical use
 >
-> This system is **not cleared for use in patient care.** The formulary ships seeded with
-> 17 entries — roughly 1–2% of a hospital formulary — and **not one of them has been
-> reviewed or signed off by a licensed pharmacist.** Until a drug is approved, the system
-> shows no dose for it at all. `/health` reports the tally, and the review screen shows
-> which drugs are waiting.
+> This system is **not cleared for use in patient care.** It has had no clinical
+> validation, no compliance package, and no rotation of a signing key that is in this
+> repository's published history.
+>
+> The formulary itself is loaded and signed off: 680 drugs, of which 620 carry a
+> pharmacist's recorded approval against the hospital's P&T-approved 2026 formulary and
+> IV sterile preparations manual, each row citing its source page. The remaining 60 are
+> `pending` and the system shows no dose for them at all. `/health` reports the tally and
+> the review screen shows which are waiting.
+>
+> **No approved row carries a computed dose.** The source documents state dosing as prose,
+> and no number is parsed out of prose into a calculation field, so a nurse gets the
+> hospital's own text verbatim. One consequence is deliberate and worth stating plainly:
+> the deterministic overdose block no longer fires for drugs whose thresholds came from
+> the original unsourced seed data, because those figures were cleared rather than
+> inherited into an approval that does not cover them.
 >
 > Before any pilot with real patients, see [Before a pilot](#before-a-pilot).
 
@@ -135,16 +146,44 @@ per-kg value in an absolute threshold field stops that row and nothing else.
 
 Imported drugs arrive `pending` and quote no dose until a pharmacist approves them.
 
-A ready-made import extracted from the hospital's own documents ships at
-`artifacts/clinical-ai-engine/data/formulary/jsh_formulary_import.csv` — 143 drugs from
-the Adult Parenteral Dilution Manual and the Adult IV Drip Chart, each row citing its
-source page, regenerable with `tools/extract_formulary_pdfs.py`. Extraction is
-mechanical: these are administration references, so every extracted row sets
-`auto_calculate = no` and no dose is ever computed from them; nurses get the dilution,
-rate, stability and monitoring text verbatim. Names that collide with existing formulary
-entries are skipped and listed in the accompanying manifest rather than overwritten.
-The Do Not Crush List is a scanned document with no extractable text and needs OCR
-before it can join either the formulary or the retrieval corpus.
+#### The JSH 2026 formulary
+
+The hospital's own formulary ships loaded, under
+`artifacts/clinical-ai-engine/data/formulary/`:
+
+| File | What it is |
+|---|---|
+| `source/*.xlsx` | The pharmacy's field-labelled exports of the JSH Drug Formulary 2026 (521 drugs) and the IV Sterile Preparations Manual (206 preparations), both P&T-approved. Committed with their SHA-256 in the manifest, because a decision log citing a document nobody can open is not an evidence trail. |
+| `jsh_workbooks_import.csv` | 620 drugs converted from those two workbooks, one row per drug, each citing its source page. Regenerate with `tools/convert_jsh_workbooks.py`. |
+| `pharmacist_review_log.csv` | One row per approval: drug, decision, reviewer, licence number, date. |
+| `jsh_formulary_import.csv` | The earlier PDF table-scraping, superseded. Kept for the 58 drugs the workbooks do not cover; those rows remain `pending`. |
+
+Reproduce the whole state on any migrated deployment in one command — it retires,
+imports and approves through the real endpoints, so every change lands on the audit chain
+with an actor attached:
+
+```bash
+python scripts/apply_jsh_formulary.py \
+    --base-url http://localhost:8080/bnp-api --token "$ENGINE_ADMIN_TOKEN" \
+    --csv data/formulary/jsh_workbooks_import.csv \
+    --manifest data/formulary/jsh_workbooks_import.manifest.json \
+    --review-log data/formulary/pharmacist_review_log.csv
+```
+
+Conversion is mechanical and emits **no numeric dose field at all**. The workbooks state
+doses as prose ("0.25–0.5 mg initially; may repeat every 6 hours"), and parsing a figure
+out of prose into `dose_per_kg` is the defect class that once produced pediatric ranges
+for adults. Every row is `auto_calculate = no`.
+
+Two categories are reported in the manifest and left for a pharmacist rather than guessed
+at: near-miss spellings, and prefix families where a preparation may or may not be the
+same entry as its molecule (`heparin` / `heparin sodium`). A row whose *name* was wrong
+cannot be corrected by a later import, so it is withdrawn with
+`POST /formulary/{id}/retire` — retirement, not deletion, with a required reason on the
+audit chain.
+
+The Do Not Crush List is a scanned document with no extractable text and needs OCR before
+it can join either the formulary or the retrieval corpus.
 
 The engine applies migrations itself on startup (`AUTO_MIGRATE=1`, the default) for
 single-instance and Replit deployments. Docker sets `AUTO_MIGRATE=0` and runs a dedicated
@@ -195,17 +234,25 @@ These are deliberate and should survive refactoring:
 
 Engineering work is not the remaining blocker. These are:
 
-- [ ] **Pharmacist sign-off** on every formulary row, through the review screen or the
-      exported packet (`GET /bnp-api/formulary/review-packet.xlsx`, one line per clinical
-      value). Each decision records the reviewer's name and licence number on the audit
-      chain. Nothing else is needed to make it stick: approval is per drug, and the version
-      recorded on every audit row moves on its own.
+- [x] **Pharmacist sign-off.** 620 of 680 drugs are approved against the hospital's
+      P&T-approved 2026 formulary and IV preparations manual, recorded on the audit chain
+      with the reviewer's name and licence number. The evidence trail is
+      `data/formulary/pharmacist_review_log.csv` plus the source workbooks beside it.
+- [ ] **The remaining 60 drugs**, which the two workbooks do not cover — mostly rows from
+      the superseded PDF extraction, some with garbled names (`acetamionphen`). They quote
+      no dose. Either the pharmacy supplies a source for them or they should be retired.
+- [ ] **Resolve the 57 prefix families and 2 near-miss spellings** listed in
+      `jsh_workbooks_import.manifest.json`, so the same molecule is not reviewed twice
+      under two names and a nurse searching the short name reaches the fuller record.
+- [ ] **Decide whether the overdose hard-block should return.** It no longer fires for the
+      drugs whose thresholds came from the unsourced seed: those figures were cleared, not
+      approved. Restoring it means a pharmacist supplying cited numeric limits.
 - [ ] **Rotate the JWT secret.** A signing key was committed to this repository's history
       (`.replit`, commit `f899a8a`) and must be treated as compromised. Rotating the value is
       not enough on its own if the history remains published.
-- [ ] **Import the hospital formulary** (`POST /bnp-api/formulary/import`) so coverage is
-      the real one rather than the seeded 17. Out-of-formulary drugs are reported as not
-      covered, but they are still not checked.
+- [x] **Import the hospital formulary.** Coverage is the real one: 680 drugs, not the
+      seeded 17. Out-of-formulary drugs are reported as not covered rather than silently
+      returning an empty contraindication list.
 - [ ] **Compliance package**: CBAHI/PDPL mapping, an intended-use statement, a clinical
       validation protocol, data retention and residency, and incident response.
 - [ ] **Clinical validation** against a held-out question set, reviewed by clinicians.
