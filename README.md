@@ -11,9 +11,9 @@ model and refuse to answer.
 > validation, no compliance package, and no rotation of a signing key that is in this
 > repository's published history.
 >
-> The formulary itself is loaded and signed off: 639 drugs, of which 622 carry a
+> The formulary itself is loaded and signed off: 638 drugs, of which 622 carry a
 > pharmacist's recorded approval against the hospital's P&T-approved 2026 formulary and
-> IV sterile preparations manual, each row citing its source page. The remaining 17 are
+> IV sterile preparations manual, each row citing its source page. The remaining 16 are
 > `pending` and the system shows no dose for them at all. `/health` reports the tally and
 > the review screen shows which are waiting.
 >
@@ -238,15 +238,20 @@ These are deliberate and should survive refactoring:
 
 Engineering work is not the remaining blocker. These are:
 
-- [x] **Pharmacist sign-off.** 622 of 639 drugs are approved against the hospital's
+- [x] **Pharmacist sign-off.** 622 of 638 drugs are approved against the hospital's
       P&T-approved 2026 formulary and IV preparations manual, recorded on the audit chain
       with the reviewer's name and licence number. The evidence trail is
       `data/formulary/pharmacist_review_log.csv` plus the source workbooks beside it.
-- [ ] **The remaining 17 drugs**, which the 2026 formulary does not carry — `vecuronium`,
-      `pancuronium`, `capreomycin`, `kanamycin`, `ranitidine`, `iron dextran`, `bretylium`
-      and others. Most have an approved alternative in the same class; ranitidine was
-      withdrawn globally in 2020. They quote no dose. Either the pharmacy supplies a
-      source or they should be retired.
+- [ ] **The remaining 16 drugs**, which the 2026 formulary does not carry — `vecuronium`,
+      `pancuronium`, `capreomycin`, `kanamycin`, `ranitidine`, `iron dextran`,
+      `bretylium tosylate` and others. Most have an approved alternative in the same
+      class; ranitidine was withdrawn globally in 2020. They quote no dose. Either the
+      pharmacy supplies a source or they should be retired. Four now carry a high-risk
+      flag they were missing (`vecuronium`, `pancuronium`, `amobarbital`, `botulinum
+      toxin`), so the warning fires whatever is decided about approval.
+- [ ] **`capreomycin` needs its page read visually.** The manual's text layer on p.11
+      splits figures across a column boundary (`370m g/ml`, `SWFI310m g/ml`). Broken words
+      elsewhere were rejoined; broken *numbers* are not something this pipeline guesses at.
 - [ ] **`amphotericin b lipid complex`** is held pending deliberately: conventional,
       lipid-complex and liposomal amphotericin B are three products with different doses
       and are not interchangeable. The formulary carries two of the three.
@@ -259,7 +264,7 @@ Engineering work is not the remaining blocker. These are:
 - [ ] **Rotate the JWT secret.** A signing key was committed to this repository's history
       (`.replit`, commit `f899a8a`) and must be treated as compromised. Rotating the value is
       not enough on its own if the history remains published.
-- [x] **Import the hospital formulary.** Coverage is the real one: 639 drugs, not the
+- [x] **Import the hospital formulary.** Coverage is the real one: 638 drugs, not the
       seeded 17. Out-of-formulary drugs are reported as not covered rather than silently
       returning an empty contraindication list.
 - [ ] **Compliance package**: CBAHI/PDPL mapping, an intended-use statement, a clinical
