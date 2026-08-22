@@ -6,8 +6,11 @@ import {
   ExchangeMobileAuthorizationCodeResponse,
   LogoutMobileSessionResponse,
 } from "@workspace/api-zod";
+import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { grantRolesFor, toAuthUser } from "../lib/authUser";
+import { verifyPassword } from "../lib/password";
+import { loginRateLimit, resetLoginAttempts } from "../lib/loginRateLimit";
 import {
   clearSession,
   getOidcConfig,
@@ -197,6 +200,80 @@ router.get("/logout", async (req: Request, res: Response) => {
   });
 
   res.redirect(endSessionUrl.href);
+});
+
+// ── Credentials login ────────────────────────────────────────────────────────
+// OIDC is the path when REPL_ID is configured. Off Replit there is no issuer to
+// redirect to, so without this nobody can reach a protected screen at all. It
+// deliberately reuses the same session machinery as the OIDC callback —
+// grantRolesFor, createSession, toAuthUser, setSessionCookie — so there is one
+// notion of "signed in", not two.
+
+/** Whether a hosted OIDC issuer is actually configured. */
+export function oidcConfigured(): boolean {
+  return Boolean(process.env["REPL_ID"]);
+}
+
+router.get("/auth/methods", (_req: Request, res: Response) => {
+  // Lets the web app render the right sign-in affordance instead of guessing.
+  res.json({ oidc: oidcConfigured(), password: true });
+});
+
+router.post("/auth/login", loginRateLimit, async (req: Request, res: Response) => {
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required." });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email));
+
+    // One message and one code for "no such account" and "wrong password":
+    // distinguishing them tells an attacker which emails are registered.
+    // verifyPassword returns false for a null hash, so an OIDC-only account
+    // cannot be signed into with a password.
+    const ok = await verifyPassword(password, user?.passwordHash ?? null);
+    if (!user || !ok) {
+      res.status(401).json({ error: "Invalid email or password." });
+      return;
+    }
+
+    // Roles are re-derived from ADMIN_EMAILS on every sign-in rather than read
+    // from the row, so revoking an admin is a config change and takes effect
+    // at the next login instead of needing a database edit.
+    const roles = grantRolesFor(user.email);
+    if (JSON.stringify(roles) !== JSON.stringify(user.roles)) {
+      await db.update(usersTable).set({ roles }).where(eq(usersTable.id, user.id));
+    }
+
+    const sid = await createSession({
+      user: toAuthUser({ ...user, roles }),
+    } as SessionData);
+
+    resetLoginAttempts(req);
+    setSessionCookie(res, sid);
+    // Same envelope as GET /auth/user — `{ user }`, not a bare AuthUser — so the
+    // client has one shape to handle however the session was established.
+    res.json(
+      GetCurrentAuthUserResponse.parse({ user: toAuthUser({ ...user, roles }) }),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Credentials login failed");
+    res.status(500).json({ error: "Login failed." });
+  }
+});
+
+router.post("/auth/logout", async (req: Request, res: Response) => {
+  // Separate from GET /logout, which additionally redirects through the OIDC
+  // end-session endpoint and therefore needs REPL_ID.
+  await clearSession(res, getSessionId(req));
+  res.status(204).end();
 });
 
 router.post(

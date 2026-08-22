@@ -14,6 +14,14 @@ import { authMiddleware } from "./middlewares/authMiddleware";
 
 const app: Express = express();
 
+// Railway, Replit and Docker all put exactly one reverse proxy in front of this
+// process. Without this, req.ip is the proxy's address for every request, which
+// would make the login rate limiter share a single bucket across all clients —
+// locking out everyone once any one caller misbehaves. One hop, not `true`:
+// trusting the whole chain would let a client spoof X-Forwarded-For and get a
+// fresh budget per request.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,

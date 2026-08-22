@@ -14,6 +14,10 @@ const resources = {
       enterEmail: 'Enter your email',
       enterPassword: 'Enter your password',
       signIn: 'Sign In',
+      signingIn: 'Signing in…',
+      loginSubtitle: 'Sign in to access the nursing AI assistant',
+      notForClinicalUse:
+        'Not cleared for clinical use. Verify every recommendation against the hospital formulary and the prescriber.',
       welcomeBack: 'Welcome Back',
       newChat: 'New Chat',
       home: 'Home',
@@ -307,6 +311,10 @@ const resources = {
       enterEmail: 'أدخل بريدك الإلكتروني',
       enterPassword: 'أدخل كلمة المرور',
       signIn: 'دخول',
+      signingIn: 'جارٍ تسجيل الدخول…',
+      loginSubtitle: 'سجّل الدخول للوصول إلى مساعد التمريض الذكي',
+      notForClinicalUse:
+        'غير مُصرَّح للاستخدام السريري. تحقّق من كل توصية مقابل دستور أدوية المستشفى والطبيب المعالج.',
       welcomeBack: 'مرحباً بعودتك',
       newChat: 'محادثة جديدة',
       home: 'الرئيسية',

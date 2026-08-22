@@ -26,6 +26,11 @@ export const usersTable = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  // Set only for accounts that sign in with a password. OIDC accounts leave it
+  // null and can never be password-authenticated, because verifyPassword()
+  // treats a null hash as a failure rather than as "no password required".
+  // Format and hashing live in artifacts/api-server/src/lib/password.ts.
+  passwordHash: varchar("password_hash"),
   // Authorization roles. Never assigned from client input — see grantRolesFor()
   // in artifacts/api-server/src/routes/auth.ts.
   roles: text("roles")
