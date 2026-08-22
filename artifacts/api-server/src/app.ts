@@ -11,6 +11,7 @@ import router from "./routes";
 import gatewayRouter from "./routes/gateway";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { mountWebApp } from "./lib/webApp";
 
 const app: Express = express();
 
@@ -57,6 +58,12 @@ app.use("/api", router);
 app.use("/api", (_req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });
 });
+
+// The built web app, served from this process when the image contains one.
+// See mountWebApp for why, and why this must come after the /api 404 handler.
+if (mountWebApp(app, process.env["WEB_ROOT"] ?? "public")) {
+  logger.info("Serving the web app from this process");
+}
 
 // Errors must never reach Express's default HTML handler: clients parse JSON,
 // and the default handler leaks stack traces.
