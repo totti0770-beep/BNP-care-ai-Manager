@@ -160,6 +160,26 @@ def health():
     return body
 
 
+@app.get("/livez", tags=["System"])
+def livez():
+    """
+    Liveness, not readiness — deliberately separate from /health.
+
+    /health is a *readiness* gate: it reports 503 whenever the engine cannot
+    actually answer a clinical question (no database, no embeddings, an empty
+    index, no formulary), and that is what it must keep doing. But an
+    orchestrator that uses readiness to decide whether a container may run at
+    all will restart-loop a correctly-behaving engine that is simply waiting on
+    a corpus or an API key — and a restarting engine cannot even serve /health
+    to tell an operator why.
+
+    So: this says the process is up and serving. It never says the engine is
+    fit to answer anything. Point a platform healthcheck here and read /health
+    to find out whether the engine is actually usable.
+    """
+    return {"status": "alive", "service": "BNP Clinical AI Engine"}
+
+
 @app.get("/metrics", tags=["System"], response_class=PlainTextResponse)
 def prometheus_metrics():
     """
@@ -185,6 +205,7 @@ def root():
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/health",
+        "liveness": "/livez",
         "endpoints": {
             "auth": ["/auth/register", "/auth/login", "/auth/me"],
             "documents": ["/documents/upload", "/documents/"],
