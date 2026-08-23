@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import {
+  fetchAllAuditLog,
   listAuditLog,
   verifyAuditChain,
   type AuditChainStatus,
@@ -51,10 +52,29 @@ interface AuditLogContextType {
   /** Whether the trail verifies as unaltered. null while unknown. */
   chainStatus: AuditChainStatus | null;
   refresh: () => Promise<void>;
-  exportLogs: () => string;
+  /**
+   * True when the screen is showing a window rather than the whole trail, so
+   * the UI can say so. An auditor filtering for a refusal that fell outside
+   * the window must not read an empty result as "there were none".
+   */
+  truncated: boolean;
+  /** How many rows the screen holds at most. */
+  windowSize: number;
+  /**
+   * The complete trail as JSON, fetched page by page — not the window. Returns
+   * null if it could not be assembled, so the caller reports a failure instead
+   * of writing a short file that looks whole.
+   */
+  exportLogs: () => Promise<string | null>;
 }
 
 const AuditLogContext = createContext<AuditLogContextType | undefined>(undefined);
+
+/**
+ * How many of the most recent rows the screen holds. Rendering a hospital's
+ * whole audit trail is neither useful nor fast; the export covers the rest.
+ */
+const WINDOW = 200;
 
 function toEntry(row: EngineAuditEntry): AuditLogEntry {
   return {
@@ -85,11 +105,18 @@ export const AuditLogProvider: React.FC<{ children: React.ReactNode }> = ({
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [chainStatus, setChainStatus] = useState<AuditChainStatus | null>(null);
+  const [truncated, setTruncated] = useState(false);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
-    const [rows, chain] = await Promise.all([listAuditLog(), verifyAuditChain()]);
+    const [rows, chain] = await Promise.all([
+      listAuditLog(WINDOW),
+      verifyAuditChain(),
+    ]);
     setLogs(rows.map(toEntry));
+    // A full page means there is at least one more row the screen is not
+    // showing. Anything shorter is the whole trail.
+    setTruncated(rows.length === WINDOW);
     setChainStatus(chain);
     setIsLoading(false);
   }, []);
@@ -98,12 +125,26 @@ export const AuditLogProvider: React.FC<{ children: React.ReactNode }> = ({
     void refresh();
   }, [refresh]);
 
-  // Export reflects exactly what the server holds. There is no client-side
-  // delete: the audit log is not the client's to erase.
-  const exportLogs = useCallback(() => JSON.stringify(logs, null, 2), [logs]);
+  // Exports the whole trail, not the window on screen. There is no
+  // client-side delete either: the audit log is not the client's to erase.
+  const exportLogs = useCallback(async () => {
+    const { rows, complete } = await fetchAllAuditLog();
+    if (!complete) return null;
+    return JSON.stringify(rows.map(toEntry), null, 2);
+  }, []);
 
   return (
-    <AuditLogContext.Provider value={{ logs, isLoading, chainStatus, refresh, exportLogs }}>
+    <AuditLogContext.Provider
+      value={{
+        logs,
+        isLoading,
+        chainStatus,
+        refresh,
+        exportLogs,
+        truncated,
+        windowSize: WINDOW,
+      }}
+    >
       {children}
     </AuditLogContext.Provider>
   );

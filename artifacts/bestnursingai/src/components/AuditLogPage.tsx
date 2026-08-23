@@ -22,7 +22,8 @@ import { toast } from 'sonner';
  */
 const AuditLogPage: React.FC = () => {
   const { t } = useTranslation();
-  const { logs, isLoading, chainStatus, refresh, exportLogs } = useAuditLog();
+  const { logs, isLoading, chainStatus, refresh, exportLogs, truncated, windowSize } =
+    useAuditLog();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'rejected' | 'alerts'>('all');
 
@@ -46,8 +47,22 @@ const AuditLogPage: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const handleExport = () => {
-    const blob = new Blob([exportLogs()], { type: 'application/json' });
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    // The export walks every page, so it is not instant on a busy trail — and
+    // it must not fall back to the window on screen, which would produce a
+    // short file indistinguishable from a complete one.
+    const json = await exportLogs();
+    setIsExporting(false);
+
+    if (json === null) {
+      toast.error(t('auditExportFailed'));
+      return;
+    }
+
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -77,7 +92,8 @@ const AuditLogPage: React.FC = () => {
             {t('refresh')}
           </Button>
           <Button
-            onClick={handleExport}
+            onClick={() => void handleExport()}
+            disabled={isExporting}
             variant="outline"
             className="border-purple-500/30 text-white hover:bg-purple-600/20"
           >
@@ -152,6 +168,14 @@ const AuditLogPage: React.FC = () => {
           </Button>
         ))}
       </div>
+
+      {/* An auditor searching for one refusal must know whether they searched
+          the trail or only the newest slice of it. */}
+      {truncated && !isLoading && (
+        <p className="text-amber-300/80 text-xs mb-3" role="note">
+          {t('auditWindowed', { count: windowSize })}
+        </p>
+      )}
 
       {isLoading ? (
         <p className="text-gray-400">{t('loading')}</p>

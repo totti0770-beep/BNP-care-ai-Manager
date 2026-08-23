@@ -196,20 +196,51 @@ export interface EngineAuditEntry {
   timestamp: string;
 }
 
+/** The endpoint's hard per-request ceiling. Asking for more is a 422. */
+export const AUDIT_PAGE_MAX = 500;
+
 /**
+ * One page of the audit log, newest first.
+ *
  * Admin-only. Returns [] when unavailable or when the caller is not an admin —
  * the server, not the client, decides who may read this.
  */
 export async function listAuditLog(
-  limit = 200
+  limit = 200,
+  offset = 0
 ): Promise<EngineAuditEntry[]> {
   try {
-    const res = await authFetch(`/auth/audit-log?limit=${limit}`);
+    const res = await authFetch(
+      `/auth/audit-log?limit=${limit}&offset=${offset}`
+    );
     if (!res || !res.ok) return [];
     return res.json();
   } catch {
     return [];
   }
+}
+
+/**
+ * Every audit row, by walking the pages.
+ *
+ * The screen shows a recent window because rendering the whole trail is not
+ * useful, but an export that quietly stopped at that window would be a
+ * compliance artefact missing the rows an auditor came for. `cap` is a
+ * runaway guard, and the caller is told when it was hit rather than being
+ * handed a short file that looks complete.
+ */
+export async function fetchAllAuditLog(
+  cap = 20_000
+): Promise<{ rows: EngineAuditEntry[]; complete: boolean }> {
+  const rows: EngineAuditEntry[] = [];
+
+  while (rows.length < cap) {
+    const page = await listAuditLog(AUDIT_PAGE_MAX, rows.length);
+    rows.push(...page);
+    if (page.length < AUDIT_PAGE_MAX) return { rows, complete: true };
+  }
+
+  return { rows, complete: false };
 }
 
 export interface AuditChainStatus {
