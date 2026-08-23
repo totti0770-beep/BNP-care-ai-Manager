@@ -6,11 +6,11 @@ import {
   Shield,
   Plus,
   Trash2,
-  Check,
-  X,
   Key,
   Building2,
   Search,
+  AlertTriangle,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,7 +63,7 @@ const OfficialSourcesPage: React.FC = () => {
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500">
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-4 h-4 me-2" />
                 {t('addSource')}
               </Button>
             </DialogTrigger>
@@ -103,29 +103,35 @@ const OfficialSourcesPage: React.FC = () => {
       </div>
 
       <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('searchSources')}
-          className="pl-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
+          className="ps-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      {/* This list is configuration for a control that is not implemented: no
+          signature is validated against these entries, so the "verified
+          documents" tile could only ever read zero. Stated plainly rather than
+          rendered as a governance dashboard. */}
+      <div className="flex items-start gap-3 p-4 mb-6 rounded-xl bg-amber-600/10 border border-amber-500/30">
+        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        <div className="text-sm">
+          <p className="text-amber-200 font-medium">{t('provenanceNotEnforced')}</p>
+          <p className="text-amber-200/80 mt-1">{t('whitelistConfigOnly')}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20">
           <p className="text-gray-400 text-sm">{t('totalSources')}</p>
           <p className="text-2xl font-bold text-white">{officialSources.length}</p>
         </div>
         <div className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20">
-          <p className="text-gray-400 text-sm">{t('activeSources')}</p>
-          <p className="text-2xl font-bold text-green-400">
-            {officialSources.filter(s => s.isActive).length}
-          </p>
-        </div>
-        <div className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20">
-          <p className="text-gray-400 text-sm">{t('verifiedDocuments')}</p>
-          <p className="text-2xl font-bold text-purple-400">{verifiedDocuments.filter(d => d.status === 'verified').length}</p>
+          <p className="text-gray-400 text-sm">{t('documentsRecorded')}</p>
+          <p className="text-2xl font-bold text-purple-400">{verifiedDocuments.length}</p>
         </div>
       </div>
 
@@ -161,10 +167,6 @@ const OfficialSourcesPage: React.FC = () => {
             <div className="flex items-center gap-2">
               {canManageSources && (
                 <>
-                  <Switch
-                    checked={source.isActive}
-                    className="data-[state=checked]:bg-purple-600"
-                  />
                   <button
                     onClick={() => removeOfficialSource(source.id)}
                     className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
@@ -180,7 +182,7 @@ const OfficialSourcesPage: React.FC = () => {
 
       {verifiedDocuments.length > 0 && (
         <div className="mt-8">
-          <h3 className="text-lg font-semibold text-white mb-4">{t('verificationLog')}</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">{t('uploadRecord')}</h3>
           <div className="space-y-2">
             {verifiedDocuments.slice(0, 5).map((doc) => (
               <div
@@ -188,16 +190,10 @@ const OfficialSourcesPage: React.FC = () => {
                 className="flex items-center justify-between p-3 rounded-lg bg-[#0f0f1a] border border-purple-500/20"
               >
                 <div className="flex items-center gap-3">
-                  {doc.status === 'verified' ? (
-                    <Check className="w-5 h-5 text-green-400" />
-                  ) : (
-                    <X className="w-5 h-5 text-red-400" />
-                  )}
+                  <FileText className="w-5 h-5 text-gray-400" />
                   <span className="text-white text-sm">{doc.name}</span>
                 </div>
-                <span className={`text-xs ${doc.status === 'verified' ? 'text-green-400' : 'text-red-400'}`}>
-                  {doc.status === 'verified' ? t('verified') : t('rejected')}
-                </span>
+                <span className="text-xs text-amber-400">{t('unverified')}</span>
               </div>
             ))}
           </div>

@@ -14,11 +14,14 @@ export interface VerifiedDocument {
   id: string;
   name: string;
   size: string;
-  sourceId: string;
+  // null until a real signature check attributes the document to a source.
+  sourceId: string | null;
   checksum: string;
   signature: string;
   verifiedAt: Date;
-  status: 'verified' | 'rejected';
+  // 'verified' is currently unreachable: it requires signature validation
+  // against a real key, which is not implemented.
+  status: 'verified' | 'rejected' | 'unverified';
   rejectionReason?: string;
   fileUrl?: string;
   fileObject?: File;
@@ -32,17 +35,16 @@ interface DocumentVerificationContextType {
   verifyDocument: (file: File, signature?: string) => Promise<VerifiedDocument | null>;
   removeDocument: (id: string) => void;
   calculateChecksum: (file: File) => Promise<string>;
-  isSourceWhitelisted: (sourceId: string) => boolean;
   downloadDocument: (doc: VerifiedDocument) => void;
 }
 
 const DocumentVerificationContext = createContext<DocumentVerificationContextType | undefined>(undefined);
 
-const DEMO_SOURCES: OfficialSource[] = [
-  { id: '1', name: 'Saudi Ministry of Health', publicKey: 'MOH-RSA-2048-PUBLIC-KEY', isActive: true },
-  { id: '2', name: 'American Nurses Association', publicKey: 'ANA-Ed25519-PUBLIC-KEY', isActive: true },
-  { id: '3', name: 'WHO Guidelines', publicKey: 'WHO-RSA-2048-PUBLIC-KEY', isActive: true },
-];
+// Seeded empty. This previously shipped three organisations carrying literal
+// placeholder strings ('MOH-RSA-2048-PUBLIC-KEY') in the publicKey field, which
+// rendered as verified trust anchors for the Saudi MOH, WHO and ANA. No key was
+// ever parsed and no signature was ever checked against them.
+const DEMO_SOURCES: OfficialSource[] = [];
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -67,40 +69,34 @@ export const DocumentVerificationProvider: React.FC<{ children: React.ReactNode 
     });
   }, []);
 
-  const isSourceWhitelisted = useCallback((sourceId: string): boolean => {
-    return officialSources.some(s => s.id === sourceId && s.isActive);
-  }, [officialSources]);
-
   const verifyDocument = useCallback(async (file: File, signature: string = ''): Promise<VerifiedDocument | null> => {
+    // This records a local checksum for display. It is NOT a provenance check:
+    // the checksum is not compared against any expected value and the signature
+    // is not validated against any key, so no document can be reported as
+    // "verified" here. Attribution to an official source requires real
+    // signature verification, which is not implemented — until it is, uploads
+    // are recorded as unverified and the UI says so.
     const checksum = await calculateChecksum(file);
-    const sourceId = '1';
-    const isWhitelisted = isSourceWhitelisted(sourceId);
     const fileUrl = URL.createObjectURL(file);
 
-    const verifiedDoc: VerifiedDocument = {
+    const recordedDoc: VerifiedDocument = {
       id: Date.now().toString(),
       name: file.name,
       size: formatFileSize(file.size),
-      sourceId,
+      sourceId: null,
       checksum,
       signature,
       verifiedAt: new Date(),
-      status: isWhitelisted ? 'verified' : 'rejected',
-      rejectionReason: !isWhitelisted ? 'Source not in whitelist' : undefined,
+      status: 'unverified',
       fileUrl,
       fileObject: file,
     };
 
-    setVerifiedDocuments(prev => [...prev, verifiedDoc]);
+    setVerifiedDocuments(prev => [...prev, recordedDoc]);
+    toast.success(t('documentRecordedUnverified'));
 
-    if (verifiedDoc.status === 'verified') {
-      toast.success(t('documentVerified'));
-    } else {
-      toast.error(`${t('documentRejected')}: ${verifiedDoc.rejectionReason}`);
-    }
-
-    return verifiedDoc.status === 'verified' ? verifiedDoc : null;
-  }, [calculateChecksum, isSourceWhitelisted, t]);
+    return recordedDoc;
+  }, [calculateChecksum, t]);
 
   const removeDocument = useCallback((id: string) => {
     setVerifiedDocuments(prev => {
@@ -112,7 +108,7 @@ export const DocumentVerificationProvider: React.FC<{ children: React.ReactNode 
 
   const downloadDocument = useCallback((doc: VerifiedDocument) => {
     if (!doc.fileUrl) {
-      toast.error('File not available for download');
+      toast.error(t('fileNotAvailable'));
       return;
     }
     const a = document.createElement('a');
@@ -121,8 +117,8 @@ export const DocumentVerificationProvider: React.FC<{ children: React.ReactNode 
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    toast.success(`Downloading: ${doc.name}`);
-  }, []);
+    toast.success(t('downloadingFile', { name: doc.name }));
+  }, [t]);
 
   const addOfficialSource = useCallback((source: Omit<OfficialSource, 'id'>) => {
     setOfficialSources(prev => [...prev, { ...source, id: Date.now().toString() }]);
@@ -144,7 +140,6 @@ export const DocumentVerificationProvider: React.FC<{ children: React.ReactNode 
         verifyDocument,
         removeDocument,
         calculateChecksum,
-        isSourceWhitelisted,
         downloadDocument,
       }}
     >

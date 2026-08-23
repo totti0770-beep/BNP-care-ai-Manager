@@ -4,7 +4,6 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { DocumentVerificationProvider } from '@/contexts/DocumentVerificationContext';
 import { AuditLogProvider } from '@/contexts/AuditLogContext';
-import { ClosedLoopRAGProvider } from '@/contexts/ClosedLoopRAGContext';
 import { BackendProvider } from '@/contexts/BackendContext';
 import { Toaster } from '@/components/ui/sonner';
 import LoginScreen from '@/components/LoginScreen';
@@ -16,6 +15,7 @@ import CitationsPage from '@/components/CitationsPage';
 import SettingsPage from '@/components/SettingsPage';
 import OfficialSourcesPage from '@/components/OfficialSourcesPage';
 import AuditLogPage from '@/components/AuditLogPage';
+import FormularyPage from '@/components/FormularyPage';
 import RAGSettingsPage from '@/components/RAGSettingsPage';
 import SecureUploadPage from '@/components/SecureUploadPage';
 import '@/i18n';
@@ -24,7 +24,13 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Open on a desktop, closed on a phone. The sidebar is 320px wide, so
+  // starting it open on a 375px screen left about 55px for the content.
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () =>
+      typeof window === 'undefined' ||
+      window.matchMedia('(min-width: 768px)').matches,
+  );
 
   if (isLoading) {
     return (
@@ -57,6 +63,8 @@ function AppContent() {
         return <OfficialSourcesPage />;
       case 'audit-log':
         return <AuditLogPage />;
+      case 'formulary':
+        return <FormularyPage />;
       case 'rag-settings':
         return <RAGSettingsPage />;
       default:
@@ -72,7 +80,13 @@ function AppContent() {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
-      <main className={`flex-1 transition-all duration-300 overflow-auto ${sidebarOpen ? 'ml-80' : 'ml-0'}`}>
+      {/* Below md the sidebar overlays the content instead of pushing it —
+          there is no room to push into. */}
+      <main
+        className={`flex-1 transition-all duration-300 overflow-auto ${
+          sidebarOpen ? 'ms-0 md:ms-80' : 'ms-0'
+        }`}
+      >
         {renderContent()}
       </main>
     </div>
@@ -86,7 +100,6 @@ function App() {
     <LanguageProvider>
       <AuditLogProvider>
         <DocumentVerificationProvider>
-          <ClosedLoopRAGProvider>
             <BackendProvider>
               <AppContent />
               <Toaster
@@ -100,7 +113,6 @@ function App() {
                 }}
               />
             </BackendProvider>
-          </ClosedLoopRAGProvider>
         </DocumentVerificationProvider>
       </AuditLogProvider>
     </LanguageProvider>

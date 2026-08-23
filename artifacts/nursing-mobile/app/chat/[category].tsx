@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useTranslation } from "react-i18next";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
 import {
@@ -21,20 +22,20 @@ import { queryEngine } from "@/services/clinicalApi";
 
 const CATEGORY_CONFIG: Record<
   Category,
-  { title: string; accentColor: string; iconName: keyof typeof Ionicons.glyphMap }
+  { titleKey: string; accentColor: string; iconName: keyof typeof Ionicons.glyphMap }
 > = {
   pharmacy: {
-    title: "المستحضرات الصيدلانية",
+    titleKey: "catPharmacy",
     accentColor: "#4CC9F0",
     iconName: "medical",
   },
   policies: {
-    title: "سياسات التمريض",
+    titleKey: "catPolicies",
     accentColor: "#8B5CF6",
     iconName: "document-text",
   },
   quality: {
-    title: "الجودة والسباحي",
+    titleKey: "catQuality",
     accentColor: "#7C3AED",
     iconName: "shield-checkmark",
   },
@@ -50,6 +51,7 @@ function extractWeight(text: string): number | undefined {
 }
 
 export default function ChatScreen() {
+  const { t } = useTranslation();
   const { category } = useLocalSearchParams<{ category: string }>();
   const cat = (category as Category) ?? "pharmacy";
   const config = CATEGORY_CONFIG[cat] ?? CATEGORY_CONFIG.pharmacy;
@@ -88,14 +90,14 @@ export default function ChatScreen() {
           aiMsg = {
             id: generateId(),
             role: "assistant",
-            content: "تعذّر الاتصال بالمحرك السريري. يرجى المحاولة مرة أخرى.",
+            content: t("engineUnreachable"),
             timestamp: new Date().toISOString(),
           };
         } else if (result.rejected) {
           aiMsg = {
             id: generateId(),
             role: "assistant",
-            content: result.rejection_reason ?? "تم رفض الاستعلام من طبقة السلامة.",
+            content: result.rejection_reason ?? t("queryRejected"),
             timestamp: new Date().toISOString(),
             rejected: true,
             safetyAlert: true,
@@ -138,7 +140,7 @@ export default function ChatScreen() {
         const errMsg: Message = {
           id: generateId(),
           role: "assistant",
-          content: "حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.",
+          content: t("chatError"),
           timestamp: new Date().toISOString(),
         };
         addMessage(cat, errMsg);
@@ -192,7 +194,7 @@ export default function ChatScreen() {
           <View style={[styles.iconBadge, { backgroundColor: config.accentColor + "22" }]}>
             <Ionicons name={config.iconName} size={16} color={config.accentColor} />
           </View>
-          <Text style={styles.headerTitle}>{config.title}</Text>
+          <Text style={styles.headerTitle}>{t(config.titleKey)}</Text>
         </View>
         <Pressable style={styles.headerButton} onPress={() => router.back()}>
           <Ionicons name="chevron-forward" size={22} color="#94A3B8" />
@@ -213,12 +215,12 @@ export default function ChatScreen() {
                 color={config.accentColor}
               />
             </View>
-            <Text style={styles.emptyTitle}>كيف يمكنني مساعدتك؟</Text>
+            <Text style={styles.emptyTitle}>{t("chatEmptyTitle")}</Text>
             <Text style={styles.emptySubtitle}>
-              اطرح سؤالاً في {config.title} وسأجيبك استناداً إلى الوثائق المعتمدة
+              {t("chatEmptyBody", { category: t(config.titleKey) })}
             </Text>
             <View style={styles.suggestionsContainer}>
-              {getSuggestions(cat).map((s) => (
+              {getSuggestionKeys(cat).map((s) => (
                 <Pressable
                   key={s}
                   style={[styles.suggestionChip, { borderColor: config.accentColor + "55" }]}
@@ -247,7 +249,7 @@ export default function ChatScreen() {
               isSending ? (
                 <View style={styles.typingIndicator}>
                   <ActivityIndicator size="small" color={config.accentColor} />
-                  <Text style={styles.typingText}>يعالج...</Text>
+                  <Text style={styles.typingText}>{t("processing")}</Text>
                 </View>
               ) : null
             }
@@ -264,19 +266,16 @@ export default function ChatScreen() {
   );
 }
 
-function getSuggestions(category: Category): string[] {
-  const suggestions: Record<Category, string[]> = {
-    pharmacy: ["ما جرعة الأموكسيسيلين للبالغين؟", "ما تداخلات الوارفارين الدوائية؟"],
-    policies: [
-      "كيف أطبق بروتوكول نظافة اليدين؟",
-      "ما مقياس تقييم خطر السقوط؟",
-    ],
-    quality: [
-      "ما هي أهداف سلامة المرضى IPSG؟",
-      "كيف نطبق قائمة تحقق السلامة الجراحية؟",
-    ],
-  };
-  return suggestions[category] ?? [];
+// Suggestions are sent verbatim as the query, so they are localised: an English
+// user's prompt should reach the engine in English.
+const SUGGESTION_KEYS: Record<Category, string[]> = {
+  pharmacy: ["sugPharmacy1", "sugPharmacy2"],
+  policies: ["sugPolicies1", "sugPolicies2"],
+  quality: ["sugQuality1", "sugQuality2"],
+};
+
+function getSuggestionKeys(category: Category): string[] {
+  return SUGGESTION_KEYS[category] ?? [];
 }
 
 const styles = StyleSheet.create({

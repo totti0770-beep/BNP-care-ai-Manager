@@ -29,11 +29,16 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setCurrentLanguage(lang);
     i18n.changeLanguage(lang);
     localStorage.setItem('i18nextLng', lang);
-    document.dir = lang === 'ar' ? 'rtl' : 'ltr';
   };
 
+  // `dir` drives every logical Tailwind utility in the app (ms-*, border-e,
+  // start-*), and `lang` is what tells a screen reader to read Arabic with an
+  // Arabic voice rather than spelling it out in English. Both are set here, in
+  // one place, so they can never disagree with the selected language.
   useEffect(() => {
-    document.dir = currentLanguage === 'ar' ? 'rtl' : 'ltr';
+    const rtl = currentLanguage === 'ar';
+    document.documentElement.dir = rtl ? 'rtl' : 'ltr';
+    document.documentElement.lang = currentLanguage;
   }, [currentLanguage]);
 
   return (

@@ -44,16 +44,16 @@ const DocumentsPage: React.FC = () => {
     e.target.value = '';
 
     if (file.type !== 'application/pdf') {
-      toast.error('الملفات المدعومة: PDF فقط');
+      toast.error(t('pdfOnly'));
       return;
     }
 
     setIsUploading(true);
     const result = await uploadToEngine(file);
     if (result) {
-      toast.success(`تم فهرسة ${result.chunks} مقطعاً في قاعدة البيانات`);
+      toast.success(t('indexedSegmentsToast', { count: result.chunks }));
     } else {
-      toast.error('فشل رفع الملف — تأكد من تشغيل المحرك');
+      toast.error(t('uploadFailedEngine'));
     }
     setIsUploading(false);
   };
@@ -62,7 +62,7 @@ const DocumentsPage: React.FC = () => {
     setIsRefreshing(true);
     await refreshDocuments();
     setIsRefreshing(false);
-    toast.success('تم تحديث القائمة');
+    toast.success(t('listRefreshed'));
   };
 
   const handleDeleteConfirm = async () => {
@@ -70,9 +70,9 @@ const DocumentsPage: React.FC = () => {
     setIsDeleting(true);
     const ok = await removeFromEngine(confirmDeleteId);
     if (ok) {
-      toast.success('تم حذف المستند من قاعدة البيانات');
+      toast.success(t('documentDeleted'));
     } else {
-      toast.error('فشل الحذف — تحقق من الصلاحيات');
+      toast.error(t('deleteFailedPermissions'));
     }
     setConfirmDeleteId(null);
     setIsDeleting(false);
@@ -103,9 +103,9 @@ const DocumentsPage: React.FC = () => {
                 <AlertTriangle className="w-6 h-6 text-red-400" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-lg mb-1">تأكيد الحذف</h3>
+                <h3 className="text-white font-bold text-lg mb-1">{t('confirmDeleteTitle')}</h3>
                 <p className="text-gray-400 text-sm">
-                  سيتم حذف المستند وجميع مقاطعه ({confirmDoc.chunk_count} مقطع) من قاعدة البيانات نهائياً.
+                  {t('confirmDeleteBody', { count: confirmDoc.chunk_count })}
                 </p>
                 <p className="text-red-400 text-sm font-medium mt-2 break-all">
                   "{confirmDoc.filename}"
@@ -119,8 +119,8 @@ const DocumentsPage: React.FC = () => {
                 className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
                 disabled={isDeleting}
               >
-                <X className="w-4 h-4 mr-2" />
-                إلغاء
+                <X className="w-4 h-4 me-2" />
+                {t('cancel')}
               </Button>
               <Button
                 onClick={handleDeleteConfirm}
@@ -131,8 +131,8 @@ const DocumentsPage: React.FC = () => {
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    حذف نهائي
+                    <Trash2 className="w-4 h-4 me-2" />
+                    {t('deletePermanently')}
                   </>
                 )}
               </Button>
@@ -147,12 +147,12 @@ const DocumentsPage: React.FC = () => {
           <h2 className="text-2xl font-bold text-white">{t('documents')}</h2>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-gray-400 text-sm">
-              {engineDocuments.length} مستند
+              {t('documentCountLabel', { count: engineDocuments.length })}
             </p>
             {isEngineAvailable && (
               <span className="flex items-center gap-1.5 text-xs text-purple-400">
                 <Database className="w-3 h-3" />
-                {indexedChunks.toLocaleString()} مقطع مفهرس
+                {t('indexedChunksLabel', { count: indexedChunks })}
               </span>
             )}
           </div>
@@ -183,7 +183,7 @@ const DocumentsPage: React.FC = () => {
             {isUploading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                جارٍ الرفع...
+                {t('uploading')}
               </>
             ) : (
               <>
@@ -200,7 +200,7 @@ const DocumentsPage: React.FC = () => {
         <div className="mb-6 p-4 rounded-xl bg-yellow-600/10 border border-yellow-500/30 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
           <p className="text-yellow-400 text-sm">
-            المحرك غير متصل — لا يمكن عرض المستندات أو رفعها حالياً
+            {t('engineOfflineDocuments')}
           </p>
         </div>
       )}
@@ -208,12 +208,12 @@ const DocumentsPage: React.FC = () => {
       {/* Search */}
       {engineDocuments.length > 0 && (
         <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('search')}
-            className="pl-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
+            className="ps-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
           />
         </div>
       )}
@@ -226,15 +226,15 @@ const DocumentsPage: React.FC = () => {
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">{t('noDocuments')}</h3>
           <p className="text-gray-400 mb-6">
-            {searchQuery ? 'لا توجد نتائج لهذا البحث' : 'ارفع وثيقة PDF للبدء'}
+            {searchQuery ? t('noSearchResults') : t('uploadToStart')}
           </p>
           {canUpload && isEngineAvailable && !searchQuery && (
             <Button
               onClick={() => fileInputRef.current?.click()}
               className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500"
             >
-              <Upload className="w-4 h-4 mr-2" />
-              رفع أول وثيقة
+              <Upload className="w-4 h-4 me-2" />
+              {t('uploadFirstDocument')}
             </Button>
           )}
         </div>
@@ -256,14 +256,14 @@ const DocumentsPage: React.FC = () => {
                 <div className="flex items-center gap-3 mt-1 flex-wrap">
                   <span className="text-xs flex items-center gap-1 text-purple-400">
                     <Zap className="w-3 h-3" />
-                    {doc.chunk_count} مقطع
+                    {doc.chunk_count} {t('segments')}
                   </span>
                   <span className="text-gray-600 text-xs">·</span>
                   <span className="text-gray-400 text-xs">{formatDate(doc.upload_date)}</span>
                   <span className="text-gray-600 text-xs">·</span>
                   <span className="text-xs text-green-400 flex items-center gap-1">
                     <Database className="w-3 h-3" />
-                    مفهرس في قاعدة البيانات
+                    {t('indexedInDatabase')}
                   </span>
                 </div>
               </div>
@@ -273,7 +273,7 @@ const DocumentsPage: React.FC = () => {
                 <button
                   onClick={() => setConfirmDeleteId(doc.id)}
                   className="p-2 hover:bg-red-500/20 rounded-lg transition-colors group flex-shrink-0"
-                  title="حذف المستند"
+                  title={t('deleteDocument')}
                 >
                   <Trash2 className="w-5 h-5 text-gray-500 group-hover:text-red-400 transition-colors" />
                 </button>

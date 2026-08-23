@@ -9,7 +9,7 @@ const HomePage: React.FC = () => {
     { icon: Lock, label: t('hipaaAware'), color: 'from-amber-500 to-orange-600' },
     { icon: BookOpen, label: t('evidenceBased'), color: 'from-emerald-500 to-teal-600' },
     { icon: Zap, label: t('realTime'), color: 'from-yellow-500 to-amber-600' },
-    { icon: Brain, label: t('selfLearning'), color: 'from-pink-500 to-rose-600' },
+    { icon: Brain, label: t('citedSources'), color: 'from-pink-500 to-rose-600' },
   ];
 
   return (

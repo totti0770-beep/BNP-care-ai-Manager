@@ -4,7 +4,10 @@ modules = ["nodejs-24", "javascript", "python-3.11", "postgresql-16"]
 id = "artifacts/api-server"
 
 [[artifacts]]
-id = "artifacts/mockup-sandbox"
+id = "artifacts/bestnursingai"
+
+[[artifacts]]
+id = "artifacts/clinical-ai-engine"
 
 [deployment]
 router = "application"
@@ -31,8 +34,10 @@ name = "artifacts/clinical-ai-engine: Clinical AI Engine"
 author = "agent"
 
 [[workflows.workflow.tasks]]
+# Bound to loopback: the engine is reached through the API server's /bnp-api
+# gateway, never directly from a browser.
 task = "shell.exec"
-args = "cd artifacts/clinical-ai-engine && uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level info"
+args = "cd artifacts/clinical-ai-engine && uvicorn main:app --host 127.0.0.1 --port 8000 --reload --log-level info"
 waitForPort = 8000
 
 [workflows.workflow.metadata]
@@ -52,8 +57,10 @@ packages = ["cargo", "freetype", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec"
 
 [userenv]
 
+# Secrets are NOT stored here — this file is tracked in git. Set JWT_SECRET,
+# ENGINE_JWT_SECRET, DATABASE_URL, OPENAI_API_KEY and ADMIN_EMAILS in Replit
+# Secrets (or a local .env). See .env.example.
 [userenv.shared]
-JWT_SECRET = "a7e539d7cfaa76152e8d5d72e9abb1a6e8d064c232ce40a142e5cd1a197388d1"
 
 [[ports]]
 localPort = 8000

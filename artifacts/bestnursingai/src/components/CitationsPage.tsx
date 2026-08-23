@@ -1,117 +1,151 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Quote, Search, Copy, ExternalLink } from 'lucide-react';
+import { FileText, Search, Quote, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
+import { useBackend } from '@/contexts/BackendContext';
+import { listAuditLog } from '@/services/clinicalApi';
 
-interface Citation {
-  id: string;
-  title: string;
-  authors: string;
-  journal: string;
-  year: string;
-  doi: string;
+/**
+ * The clinical sources this system answers from.
+ *
+ * This page previously listed three fabricated journal articles with invented
+ * DOIs, and its copy button handed the nurse a reference that does not exist.
+ * It now shows the documents actually indexed in the engine, and how often each
+ * has been cited in real answers — derived from the audit log rather than
+ * authored here.
+ */
+interface SourceRow {
+  filename: string;
+  chunkCount: number;
+  uploadDate: string;
+  citationCount: number;
+  pagesCited: number[];
 }
 
 const CitationsPage: React.FC = () => {
   const { t } = useTranslation();
+  const { engineDocuments, isEngineAvailable } = useBackend();
   const [searchQuery, setSearchQuery] = useState('');
-  const [citations] = useState<Citation[]>([
-    {
-      id: '1',
-      title: 'Evidence-Based Nursing Practice: A Comprehensive Review',
-      authors: 'Smith, J., Johnson, M., Williams, K.',
-      journal: 'Journal of Nursing Research',
-      year: '2024',
-      doi: '10.1234/jnr.2024.001',
-    },
-    {
-      id: '2',
-      title: 'Clinical Decision Making in Critical Care Nursing',
-      authors: 'Brown, A., Davis, L.',
-      journal: 'Critical Care Nursing Quarterly',
-      year: '2023',
-      doi: '10.5678/ccnq.2023.045',
-    },
-    {
-      id: '3',
-      title: 'Patient Safety Protocols: Implementation and Outcomes',
-      authors: 'Wilson, R., Martinez, C.',
-      journal: 'Nursing Administration',
-      year: '2024',
-      doi: '10.9012/na.2024.078',
-    },
-  ]);
+  const [citationCounts, setCitationCounts] = useState<
+    Record<string, { count: number; pages: Set<number> }>
+  >({});
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredCitations = citations.filter(citation =>
-    citation.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    citation.authors.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    let cancelled = false;
+
+    // Citation usage is only visible to admins, since it reads the audit log.
+    // A non-admin simply sees the source list without counts.
+    listAuditLog().then((rows) => {
+      if (cancelled) return;
+      const counts: Record<string, { count: number; pages: Set<number> }> = {};
+      for (const row of rows) {
+        for (const citation of row.citations ?? []) {
+          const entry = counts[citation.document_name] ?? {
+            count: 0,
+            pages: new Set<number>(),
+          };
+          entry.count += 1;
+          entry.pages.add(citation.page_number);
+          counts[citation.document_name] = entry;
+        }
+      }
+      setCitationCounts(counts);
+      setIsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const sources: SourceRow[] = useMemo(
+    () =>
+      engineDocuments.map((doc) => {
+        const usage = citationCounts[doc.filename];
+        return {
+          filename: doc.filename,
+          chunkCount: doc.chunk_count,
+          uploadDate: doc.upload_date,
+          citationCount: usage?.count ?? 0,
+          pagesCited: usage ? [...usage.pages].sort((a, b) => a - b) : [],
+        };
+      }),
+    [engineDocuments, citationCounts],
   );
 
-  const copyCitation = (citation: Citation) => {
-    const text = `${citation.title}. ${citation.authors}. ${citation.journal}. ${citation.year}. DOI: ${citation.doi}`;
-    navigator.clipboard.writeText(text);
-    toast.success('Citation copied to clipboard');
-  };
+  const filtered = sources.filter((source) =>
+    source.filename.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   return (
     <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-white">{t('citations')}</h2>
-          <p className="text-gray-400">{t('citationCount', { count: citations.length })}</p>
-        </div>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-white">{t('citations')}</h2>
+        <p className="text-gray-400 mt-1">{t('citationsDescription')}</p>
       </div>
 
+      {!isEngineAvailable && (
+        <div className="flex items-start gap-3 p-4 mb-6 rounded-xl bg-amber-600/10 border border-amber-500/30">
+          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-amber-200 text-sm">{t('engineUnavailableTitle')}</p>
+        </div>
+      )}
+
       <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('search')}
-          className="pl-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
+          className="ps-10 bg-[#12122a] border-purple-500/20 text-white"
         />
       </div>
 
-      <div className="grid gap-4">
-        {filteredCitations.map((citation) => (
-          <div
-            key={citation.id}
-            className="p-5 rounded-xl bg-[#1a1a2e] border border-purple-500/20 hover:border-purple-500/40 transition-colors"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center flex-shrink-0">
-                <Quote className="w-5 h-5 text-white" />
+      {isLoading ? (
+        <p className="text-gray-400">{t('loading')}</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-gray-400">{t('noDocuments')}</p>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((source) => (
+            <div
+              key={source.filename}
+              className="rounded-xl bg-[#12122a] border border-purple-500/20 p-4"
+            >
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex items-start gap-3">
+                  <FileText className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-white font-medium">{source.filename}</p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      {source.chunkCount} {t('indexedSegments')} ·{' '}
+                      {new Date(source.uploadDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+
+                {source.citationCount > 0 && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-purple-600/15 border border-purple-500/30">
+                    <Quote className="w-3 h-3 text-purple-300" />
+                    <span className="text-purple-200 text-xs font-medium">
+                      {t('citedNTimes', { count: source.citationCount })}
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="flex-1">
-                <h4 className="text-white font-semibold mb-1">{citation.title}</h4>
-                <p className="text-gray-400 text-sm mb-2">{citation.authors}</p>
-                <p className="text-gray-500 text-sm">
-                  {citation.journal} • {citation.year} • DOI: {citation.doi}
+
+              {source.pagesCited.length > 0 && (
+                <p className="text-gray-500 text-xs mt-3 font-mono">
+                  {t('pagesCited')}:{' '}
+                  {source.pagesCited.slice(0, 20).join(', ')}
+                  {source.pagesCited.length > 20 ? ' …' : ''}
                 </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => copyCitation(citation)}
-                  className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors"
-                  title="Copy citation"
-                >
-                  <Copy className="w-5 h-5 text-gray-400" />
-                </button>
-                <a
-                  href={`https://doi.org/${citation.doi}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors"
-                  title="View source"
-                >
-                  <ExternalLink className="w-5 h-5 text-gray-400" />
-                </a>
-              </div>
+              )}
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

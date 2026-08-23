@@ -11,8 +11,11 @@ export interface HealthStatus {
 
 export interface AuthUser {
   id: string;
+  /** Display name derived from the OIDC profile, falling back to email then id. */
   name: string;
-  profileImage?: string;
+  email?: string;
+  profileImageUrl?: string;
+  /** Authorization roles. Every user has at least "user". */
   roles: string[];
 }
 

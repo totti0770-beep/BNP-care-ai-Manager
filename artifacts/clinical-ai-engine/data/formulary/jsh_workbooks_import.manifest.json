@@ -1,0 +1,484 @@
+{
+  "sources": {
+    "JSH_Drug_Formulary_2026_structured.xlsx": {
+      "sha256": "73297c989b202b24b3ff358230a6442bac0991f00bbb866b976eb8b8c9ed0641",
+      "rows_read": 521
+    },
+    "IV_Sterile_Preparations_Manual_2026_structured.xlsx": {
+      "sha256": "72797ebe68644d81a886b89f60b86c6c10bfd5b81b4639094bd306efc4f61bc0",
+      "rows_read": 206
+    }
+  },
+  "rows_written": 620,
+  "high_risk_exact_match": [
+    "amiodarone",
+    "digoxin",
+    "enoxaparin",
+    "gentamicin",
+    "heparin",
+    "morphine",
+    "vancomycin",
+    "warfarin"
+  ],
+  "high_risk_inferred_from_prefix": [
+    "digoxin immune fab",
+    "heparin sodium",
+    "insulin regular",
+    "insulin – intermediate-acting (isophane/nph human)",
+    "insulin – long-acting analogues (glargine, detemir, degludec)",
+    "insulin – premixed (biphasic) preparations",
+    "insulin – rapid-acting (aspart, lispro, glulisine)",
+    "insulin – short-acting (neutral/regular human)",
+    "morphine sulfate",
+    "vancomycin eye solution",
+    "vancomycin intravitreal injection"
+  ],
+  "curated_fields_carried_forward": {
+    "name_ar": [
+      "amiodarone",
+      "amoxicillin",
+      "ceftriaxone",
+      "digoxin",
+      "enoxaparin",
+      "furosemide",
+      "gentamicin",
+      "heparin",
+      "ibuprofen",
+      "metformin",
+      "metoprolol",
+      "morphine",
+      "omeprazole",
+      "vancomycin",
+      "warfarin"
+    ],
+    "aliases": [
+      "amiodarone",
+      "amoxicillin",
+      "ceftriaxone",
+      "digoxin",
+      "enoxaparin",
+      "furosemide",
+      "gentamicin",
+      "heparin",
+      "ibuprofen",
+      "metformin",
+      "metoprolol",
+      "morphine",
+      "omeprazole",
+      "vancomycin",
+      "warfarin"
+    ],
+    "antidote": [
+      "amiodarone",
+      "amoxicillin",
+      "amoxicillin/clavulanic acid",
+      "ceftriaxone",
+      "digoxin",
+      "digoxin immune fab",
+      "enoxaparin",
+      "furosemide",
+      "gentamicin",
+      "heparin",
+      "heparin sodium",
+      "ibuprofen",
+      "insulin regular",
+      "insulin – intermediate-acting (isophane/nph human)",
+      "insulin – long-acting analogues (glargine, detemir, degludec)",
+      "insulin – premixed (biphasic) preparations",
+      "insulin – rapid-acting (aspart, lispro, glulisine)",
+      "insulin – short-acting (neutral/regular human)",
+      "metformin",
+      "metoprolol",
+      "morphine",
+      "morphine sulfate",
+      "omeprazole",
+      "omeprazole (omecure)",
+      "paracetamol (acetaminophen)",
+      "vancomycin",
+      "vancomycin eye solution",
+      "vancomycin intravitreal injection",
+      "warfarin"
+    ]
+  },
+  "merged_across_both_workbooks": [
+    "acetylcysteine",
+    "adenosine",
+    "adrenaline (epinephrine)",
+    "alteplase",
+    "amikacin",
+    "aminophylline",
+    "amiodarone",
+    "ampicillin",
+    "anidulafungin",
+    "atenolol",
+    "azithromycin",
+    "aztreonam",
+    "calcium chloride",
+    "calcium gluconate",
+    "caspofungin",
+    "cefepime",
+    "cefotaxime",
+    "ceftazidime",
+    "ceftriaxone",
+    "cefuroxime",
+    "ciprofloxacin",
+    "cisatracurium",
+    "clarithromycin",
+    "clindamycin",
+    "cloxacillin",
+    "desmopressin",
+    "dexmedetomidine",
+    "diazepam",
+    "digoxin",
+    "diltiazem",
+    "dobutamine",
+    "dopamine",
+    "enoxaparin",
+    "ertapenem",
+    "erythromycin",
+    "etomidate",
+    "famotidine",
+    "fentanyl",
+    "ferric carboxymaltose",
+    "fluconazole",
+    "flumazenil",
+    "furosemide",
+    "ganciclovir",
+    "gentamicin",
+    "glucagon",
+    "granisetron",
+    "ibuprofen",
+    "infliximab",
+    "iron sucrose",
+    "ketamine",
+    "labetalol",
+    "levetiracetam",
+    "levofloxacin",
+    "linezolid",
+    "lorazepam",
+    "mannitol",
+    "meropenem",
+    "metoclopramide",
+    "metoprolol",
+    "metronidazole",
+    "midazolam",
+    "milrinone",
+    "naloxone",
+    "neostigmine",
+    "noradrenaline (norepinephrine)",
+    "octreotide",
+    "ondansetron",
+    "papaverine",
+    "phentolamine",
+    "phenylephrine",
+    "phenytoin",
+    "potassium chloride",
+    "potassium phosphate",
+    "procainamide",
+    "propofol",
+    "propranolol",
+    "reteplase",
+    "rituximab",
+    "rocuronium",
+    "sodium nitroprusside",
+    "streptomycin",
+    "suxamethonium (succinylcholine)",
+    "thiamine (vitamin b1)",
+    "tigecycline",
+    "tramadol",
+    "tranexamic acid",
+    "vancomycin",
+    "vedolizumab",
+    "verapamil",
+    "voriconazole",
+    "zoledronate (zoledronic acid)"
+  ],
+  "merged_within_one_sheet": [
+    "azathioprine",
+    "baclofen",
+    "calcitriol (1,25-dihydroxycholecalciferol)",
+    "cinacalcet",
+    "dantrolene",
+    "docusate sodium",
+    "fusidic acid",
+    "ibuprofen",
+    "mercaptopurine (6-mp)",
+    "midazolam",
+    "naproxen",
+    "octreotide",
+    "rifaximin",
+    "sevelamer",
+    "sildenafil",
+    "tamsulosin"
+  ],
+  "possible_duplicates": [
+    {
+      "name": "imipenem/cilstatin",
+      "similar_to": "imipenem + cilastatin",
+      "similarity": 0.944
+    },
+    {
+      "name": "indomethacin",
+      "similar_to": "indometacin",
+      "similarity": 0.917
+    }
+  ],
+  "prefix_families_for_review": [
+    {
+      "name": "mesna (uromitexa)",
+      "extends": "mesna"
+    },
+    {
+      "name": "digoxin immune fab",
+      "extends": "digoxin"
+    },
+    {
+      "name": "quinine dihydrochloride",
+      "extends": "quinine"
+    },
+    {
+      "name": "heparin sodium",
+      "extends": "heparin"
+    },
+    {
+      "name": "morphine sulfate",
+      "extends": "morphine"
+    },
+    {
+      "name": "atropine sulphate 43",
+      "extends": "atropine"
+    },
+    {
+      "name": "acyclovir (aciclovir)",
+      "extends": "acyclovir"
+    },
+    {
+      "name": "lidocaine (lignocaine)",
+      "extends": "lidocaine"
+    },
+    {
+      "name": "lidocaine 2.5% + prilocaine 2.5% cream",
+      "extends": "lidocaine"
+    },
+    {
+      "name": "omeprazole (omecure)",
+      "extends": "omeprazole"
+    },
+    {
+      "name": "diclofenac sodium",
+      "extends": "diclofenac"
+    },
+    {
+      "name": "dantrolene (dantrium, revonto)",
+      "extends": "dantrolene"
+    },
+    {
+      "name": "ampicillin/salbactam",
+      "extends": "ampicillin"
+    },
+    {
+      "name": "cefuroxime eye solution",
+      "extends": "cefuroxime"
+    },
+    {
+      "name": "vancomycin eye solution",
+      "extends": "vancomycin"
+    },
+    {
+      "name": "vancomycin intravitreal injection",
+      "extends": "vancomycin"
+    },
+    {
+      "name": "miconazole cream (miconaz)",
+      "extends": "miconazole"
+    },
+    {
+      "name": "rifampicin (rifampin)",
+      "extends": "rifampicin"
+    },
+    {
+      "name": "atracurium besilate",
+      "extends": "atracurium"
+    },
+    {
+      "name": "pyridoxine (vitamin b6)",
+      "extends": "pyridoxine"
+    },
+    {
+      "name": "thiopental sodium",
+      "extends": "thiopental"
+    },
+    {
+      "name": "haloperidol lactate",
+      "extends": "haloperidol"
+    },
+    {
+      "name": "amoxicillin/clavulanic acid",
+      "extends": "amoxicillin"
+    },
+    {
+      "name": "ceftazidime/avibactam",
+      "extends": "ceftazidime"
+    },
+    {
+      "name": "ceftazidime eye solution",
+      "extends": "ceftazidime"
+    },
+    {
+      "name": "ceftazidime intravitreal injection",
+      "extends": "ceftazidime"
+    },
+    {
+      "name": "clindamycin 1% topical solution (derma-t)",
+      "extends": "clindamycin"
+    },
+    {
+      "name": "terbinafine 1% cream (lamifen)",
+      "extends": "terbinafine"
+    },
+    {
+      "name": "trastuzumab emtansine",
+      "extends": "trastuzumab"
+    },
+    {
+      "name": "neostigmine (nmb reversal)",
+      "extends": "neostigmine"
+    },
+    {
+      "name": "pentamidine isetionate",
+      "extends": "pentamidine"
+    },
+    {
+      "name": "vasopressin (argipressin)",
+      "extends": "vasopressin"
+    },
+    {
+      "name": "hydralazine hcl",
+      "extends": "hydralazine"
+    },
+    {
+      "name": "moxifloxacin hydrochloride",
+      "extends": "moxifloxacin"
+    },
+    {
+      "name": "moxifloxacin 0.5% eye drops",
+      "extends": "moxifloxacin"
+    },
+    {
+      "name": "tetracycline hcl",
+      "extends": "tetracycline"
+    },
+    {
+      "name": "fusidic acid 2% cream (fusibact)",
+      "extends": "fusidic acid"
+    },
+    {
+      "name": "ketoconazole 2% shampoo (drof shampoo)",
+      "extends": "ketoconazole"
+    },
+    {
+      "name": "alfacalcidol (1-alpha-hydroxycholecalciferol)",
+      "extends": "alfacalcidol"
+    },
+    {
+      "name": "multivitamin (cernevit®)",
+      "extends": "multivitamin"
+    },
+    {
+      "name": "ciprofloxacin ophthalmic solution",
+      "extends": "ciprofloxacin"
+    },
+    {
+      "name": "dexamethasone (systemic)",
+      "extends": "dexamethasone"
+    },
+    {
+      "name": "levothyroxine (thyroxine, t4)",
+      "extends": "levothyroxine"
+    },
+    {
+      "name": "acetylcysteine eye solution",
+      "extends": "acetylcysteine"
+    },
+    {
+      "name": "amphotericin b eye solution",
+      "extends": "amphotericin b"
+    },
+    {
+      "name": "amphotericin b liposomal (ambisome®)",
+      "extends": "amphotericin b"
+    },
+    {
+      "name": "amphotericin b liposomal eye solution",
+      "extends": "amphotericin b"
+    },
+    {
+      "name": "amphotericin b lipid complex (abelcet®)",
+      "extends": "amphotericin b"
+    },
+    {
+      "name": "amphotericin b (as liposomal) — ambisome®",
+      "extends": "amphotericin b"
+    },
+    {
+      "name": "amphotericin b desoxycholate (conventional)",
+      "extends": "amphotericin b"
+    },
+    {
+      "name": "hydrocortisone (systemic)",
+      "extends": "hydrocortisone"
+    },
+    {
+      "name": "hydrocortisone 1% cream (cortiderm)",
+      "extends": "hydrocortisone"
+    },
+    {
+      "name": "diphenhydramine hcl",
+      "extends": "diphenhydramine"
+    },
+    {
+      "name": "methylprednisolone sodium succinate",
+      "extends": "methylprednisolone"
+    },
+    {
+      "name": "sodium bicarbonate 8.4%",
+      "extends": "sodium bicarbonate"
+    },
+    {
+      "name": "colistimethate sodium (colistin)",
+      "extends": "colistimethate sodium"
+    },
+    {
+      "name": "aluminium hydroxide + magnesium hydroxide + dimethicone",
+      "extends": "aluminium hydroxide + magnesium hydroxide"
+    }
+  ],
+  "supersedes": [
+    {
+      "retire": "acetylcystine",
+      "superseded_by": "acetylcysteine",
+      "similarity": 0.929
+    },
+    {
+      "retire": "ciprofloxacine",
+      "superseded_by": "ciprofloxacin",
+      "similarity": 0.929
+    },
+    {
+      "retire": "hyoscine butylbromide",
+      "superseded_by": "hyoscine – n butylbromide",
+      "similarity": 0.952
+    },
+    {
+      "retire": "methylprednisoln e sodium succinate",
+      "superseded_by": "methylprednisolone sodium succinate",
+      "similarity": 0.97
+    },
+    {
+      "retire": "retaplase",
+      "superseded_by": "reteplase",
+      "similarity": 0.889
+    }
+  ],
+  "note": "auto_calculate is 'no' on every row and no numeric dose field is emitted: these workbooks state doses as prose, and parsing a number out of prose is not something this converter will do. possible_duplicates and prefix_families_for_review are reported unresolved — which spellings and which preparations are one entry is a pharmacist's decision, not this script's."
+}

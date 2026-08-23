@@ -66,9 +66,9 @@ const SecureUploadPage: React.FC = () => {
     if (isEngineAvailable) {
       const result = await uploadToEngine(pendingFile);
       if (result) {
-        toast.success(`Indexed ${result.chunks} chunks into Clinical AI Engine`);
+        toast.success(t('indexedSegmentsToast', { count: result.chunks }));
       } else {
-        toast.error('Engine upload failed — document saved locally only');
+        toast.error(t('uploadFailedEngine'));
       }
     }
 
@@ -94,22 +94,45 @@ const SecureUploadPage: React.FC = () => {
         <p className="text-gray-400 mt-1">{t('secureUploadDescription')}</p>
       </div>
 
-      {/* Steps */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      {/* What upload actually does.
+          This previously showed four steps — digital signature, checksum,
+          whitelist check, and an "OfficialOnly Tag" — with green ticks, as
+          though a provenance pipeline ran. Only the checksum and the indexing
+          are real: there is no signature validation and no whitelist check
+          anywhere in the codebase. Steps that do not execute are marked as not
+          enforced rather than dropped, so the gap stays visible. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
-          { icon: Fingerprint, label: t('digitalSignature'), sub: 'اختياري' },
-          { icon: Lock, label: t('checksum'), sub: 'SHA-256' },
-          { icon: Key, label: t('whitelistCheck'), sub: t('officialSources') },
-          { icon: CheckCircle, label: t('indexing'), sub: 'OfficialOnly Tag', iconClass: 'text-green-400' },
+          { icon: Lock, label: t('checksum'), sub: 'SHA-256', enforced: true },
+          { icon: CheckCircle, label: t('indexing'), sub: t('indexingSub'), enforced: true },
+          { icon: Fingerprint, label: t('digitalSignature'), sub: t('notEnforced'), enforced: false },
+          { icon: Key, label: t('whitelistCheck'), sub: t('notEnforced'), enforced: false },
         ].map((step) => {
           const Icon = step.icon;
           return (
-            <div key={step.label} className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20 text-center">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-purple-600/20 flex items-center justify-center">
-                <Icon className={`w-6 h-6 ${step.iconClass || 'text-purple-400'}`} />
+            <div
+              key={step.label}
+              className={`rounded-xl p-4 border text-center ${
+                step.enforced
+                  ? 'bg-[#1a1a2e] border-purple-500/20'
+                  : 'bg-[#12121c] border-gray-600/30 opacity-70'
+              }`}
+            >
+              <div
+                className={`w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center ${
+                  step.enforced ? 'bg-purple-600/20' : 'bg-gray-600/20'
+                }`}
+              >
+                <Icon
+                  className={`w-6 h-6 ${step.enforced ? 'text-purple-400' : 'text-gray-500'}`}
+                />
               </div>
-              <p className="text-white font-medium text-sm">{step.label}</p>
-              <p className="text-gray-500 text-xs mt-1">{step.sub}</p>
+              <p className={`font-medium text-sm ${step.enforced ? 'text-white' : 'text-gray-400'}`}>
+                {step.label}
+              </p>
+              <p className={`text-xs mt-1 ${step.enforced ? 'text-gray-500' : 'text-amber-400/80'}`}>
+                {step.sub}
+              </p>
             </div>
           );
         })}
@@ -137,7 +160,7 @@ const SecureUploadPage: React.FC = () => {
           <div>
             <Label className="text-gray-300 mb-1 block text-sm">
               {t('digitalSignature')}
-              <span className="text-gray-500 text-xs ml-2">(اختياري)</span>
+              <span className="text-gray-500 text-xs ms-2">({t('optional')})</span>
             </Label>
             <Input
               value={signature}
@@ -154,7 +177,7 @@ const SecureUploadPage: React.FC = () => {
               variant="outline"
               className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
             >
-              إلغاء
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleUpload}
@@ -164,12 +187,12 @@ const SecureUploadPage: React.FC = () => {
               {isVerifying ? (
                 <span className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  جارٍ الرفع...
+                  {t('uploading')}
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
                   <Upload className="w-4 h-4" />
-                  رفع الملف
+                  {t('upload')}
                 </span>
               )}
             </Button>
@@ -219,8 +242,8 @@ const SecureUploadPage: React.FC = () => {
       {engineDocuments.length > 0 && (
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-white mb-3">
-            الوثائق المفهرسة في قاعدة البيانات
-            <span className="text-sm text-gray-400 font-normal ml-2">({engineDocuments.length})</span>
+            {t('indexedDocumentsInDb')}
+            <span className="text-sm text-gray-400 font-normal ms-2">({engineDocuments.length})</span>
           </h3>
           <div className="space-y-2">
             {engineDocuments.map((doc) => (
@@ -232,19 +255,19 @@ const SecureUploadPage: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium truncate">{doc.filename}</p>
                   <p className="text-gray-400 text-xs">
-                    {doc.chunk_count} مقطع ·{' '}
-                    {new Date(doc.upload_date).toLocaleDateString('ar-SA')} ·{' '}
-                    <span className="text-green-400">✓ مفهرس ودائم</span>
+                    {doc.chunk_count} {t('segments')} ·{' '}
+                    {new Date(doc.upload_date).toLocaleDateString()} ·{' '}
+                    <span className="text-green-400">{t('indexedPermanent')}</span>
                   </p>
                 </div>
                 <button
                   onClick={async () => {
                     const ok = await removeFromEngine(doc.id);
-                    if (ok) toast.success('تم حذف المستند من قاعدة البيانات');
-                    else toast.error('فشل الحذف');
+                    if (ok) toast.success(t('documentDeleted'));
+                    else toast.error(t('documentDeleteFailed'));
                   }}
                   className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors text-gray-500 hover:text-red-400"
-                  title="حذف"
+                  title={t('delete')}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -254,19 +277,15 @@ const SecureUploadPage: React.FC = () => {
         </div>
       )}
 
-      {/* Whitelisted sources */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4">{t('whitelistedSources')}</h3>
-        <div className="flex flex-wrap gap-2">
-          {officialSources.filter(s => s.isActive).map((source) => (
-            <span
-              key={source.id}
-              className="px-3 py-1.5 rounded-full bg-green-600/20 text-green-400 text-sm flex items-center gap-2"
-            >
-              <CheckCircle className="w-4 h-4" />
-              {source.name}
-            </span>
-          ))}
+      {/* The "whitelisted sources" chips were rendered as green ticks, which
+          read as verified trust anchors for MOH/WHO/ANA. Nothing validates a
+          signature against them, so they are stated as a pending configuration
+          rather than an enforced control. */}
+      <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-600/10 border border-amber-500/30">
+        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        <div className="text-sm">
+          <p className="text-amber-200 font-medium">{t('provenanceNotEnforced')}</p>
+          <p className="text-amber-200/80 mt-1">{t('provenanceNotEnforcedBody')}</p>
         </div>
       </div>
 

@@ -11,9 +11,7 @@ import {
   Users,
   ChevronRight,
   Check,
-  Edit2,
-  Trash2,
-  Plus,
+  ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,13 +26,6 @@ interface Permission {
   enabled: boolean;
 }
 
-interface UserAccount {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: 'active' | 'inactive';
-}
 
 const SettingsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -42,19 +33,24 @@ const SettingsPage: React.FC = () => {
   const { currentLanguage, changeLanguage } = useLanguage();
   const [activeSection, setActiveSection] = useState('profile');
 
-  const [permissions, setPermissions] = useState<Permission[]>([
-    { id: '1', name: 'chat.access', description: 'Access to chat feature', enabled: true },
-    { id: '2', name: 'documents.view', description: 'View documents', enabled: true },
-    { id: '3', name: 'documents.manage', description: 'Manage documents', enabled: false },
-    { id: '4', name: 'settings.view', description: 'View settings', enabled: true },
-    { id: '5', name: 'settings.manage', description: 'Manage settings', enabled: false },
-    { id: '6', name: 'users.manage', description: 'Manage users', enabled: false },
-  ]);
+  // Derived from the signed-in user, not editable here. These toggles used to be
+  // local state with a "Permission updated" toast attached — flipping one changed
+  // nothing, was lost on remount, and told the admin the opposite.
+  const ALL_PERMISSIONS: { name: string; description: string }[] = [
+    { name: 'chat.access', description: 'Access to chat feature' },
+    { name: 'documents.view', description: 'View documents' },
+    { name: 'documents.manage', description: 'Manage documents' },
+    { name: 'settings.view', description: 'View settings' },
+    { name: 'settings.manage', description: 'Manage settings' },
+    { name: 'users.manage', description: 'Manage users' },
+  ];
 
-  const [users] = useState<UserAccount[]>([
-    { id: '1', name: 'Admin User', email: 'admin@bestnursing.ai', role: 'Admin', status: 'active' },
-    { id: '2', name: 'Nurse User', email: 'user@bestnursing.ai', role: 'User', status: 'active' },
-  ]);
+  const permissions: Permission[] = ALL_PERMISSIONS.map((p, i) => ({
+    id: String(i + 1),
+    name: p.name,
+    description: p.description,
+    enabled: hasPermission(p.name),
+  }));
 
   const [notifications, setNotifications] = useState({
     email: true,
@@ -64,13 +60,6 @@ const SettingsPage: React.FC = () => {
   });
 
   const [theme, setTheme] = useState('dark');
-
-  const togglePermission = (id: string) => {
-    setPermissions(permissions.map(p =>
-      p.id === id ? { ...p, enabled: !p.enabled } : p
-    ));
-    toast.success('Permission updated');
-  };
 
   const toggleNotification = (key: keyof typeof notifications) => {
     setNotifications({ ...notifications, [key]: !notifications[key] });
@@ -170,11 +159,15 @@ const SettingsPage: React.FC = () => {
                     <p className="text-white font-medium">{permission.name}</p>
                     <p className="text-gray-400 text-sm">{permission.description}</p>
                   </div>
-                  <Switch
-                    checked={permission.enabled}
-                    onCheckedChange={() => togglePermission(permission.id)}
-                    className="data-[state=checked]:bg-purple-600"
-                  />
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      permission.enabled
+                        ? 'bg-green-600/20 text-green-400'
+                        : 'bg-gray-600/20 text-gray-400'
+                    }`}
+                  >
+                    {permission.enabled ? t('granted') : t('notGranted')}
+                  </span>
                 </div>
               ))}
             </div>
@@ -235,45 +228,47 @@ const SettingsPage: React.FC = () => {
         );
 
       case 'users':
+        // The platform has no user-management API: identities come from the
+        // OIDC provider and the admin role is granted by the operator via the
+        // ADMIN_EMAILS environment variable. This section previously showed a
+        // hardcoded two-person roster with non-functional Add/Edit/Delete
+        // buttons, which read as the real user list.
         return (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">{t('userManagement')}</h3>
-              <Button className="bg-purple-600 hover:bg-purple-500">
-                <Plus className="w-4 h-4 mr-2" />
-                {t('add')}
-              </Button>
+            <h3 className="text-lg font-semibold text-white">{t('userManagement')}</h3>
+
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-600/10 border border-amber-500/30">
+              <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="text-amber-200 font-medium">{t('userManagementExternal')}</p>
+                <p className="text-amber-200/80 mt-1">{t('userManagementExternalBody')}</p>
+              </div>
             </div>
-            <div className="space-y-2">
-              {users.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex items-center justify-between p-4 rounded-xl bg-[#0f0f1a] border border-purple-500/30"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-                      <User className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">{u.name}</p>
-                      <p className="text-gray-400 text-sm">{u.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      u.status === 'active' ? 'bg-green-600/20 text-green-400' : 'bg-gray-600/20 text-gray-400'
-                    }`}>
-                      {u.status}
-                    </span>
-                    <button className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors">
-                      <Edit2 className="w-4 h-4 text-gray-400" />
-                    </button>
-                    <button className="p-2 hover:bg-red-500/20 rounded-lg transition-colors">
-                      <Trash2 className="w-4 h-4 text-red-400" />
-                    </button>
-                  </div>
+
+            <div className="p-4 rounded-xl bg-[#0f0f1a] border border-purple-500/30">
+              <p className="text-gray-400 text-xs uppercase tracking-wide mb-3">
+                {t('signedInAs')}
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+                  <User className="w-5 h-5 text-white" />
                 </div>
-              ))}
+                <div className="flex-1">
+                  <p className="text-white font-medium">{user?.name ?? '—'}</p>
+                  {user?.email && (
+                    <p className="text-gray-400 text-sm">{user.email}</p>
+                  )}
+                </div>
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    user?.role === 'admin'
+                      ? 'bg-purple-600/20 text-purple-300'
+                      : 'bg-gray-600/20 text-gray-400'
+                  }`}
+                >
+                  {user?.role ?? 'user'}
+                </span>
+              </div>
             </div>
           </div>
         );
@@ -285,7 +280,7 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="flex-1 flex bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen">
-      <div className="w-64 border-r border-purple-500/20 bg-[#0f0f1a] p-4">
+      <div className="w-64 border-e border-purple-500/20 bg-[#0f0f1a] p-4">
         <h2 className="text-xl font-bold text-white mb-6">{t('settings')}</h2>
         <nav className="space-y-1">
           {sections.map((section) => {
@@ -301,7 +296,7 @@ const SettingsPage: React.FC = () => {
                 }`}
               >
                 <Icon className="w-5 h-5" />
-                <span className="flex-1 text-left">{section.label}</span>
+                <span className="flex-1 text-start">{section.label}</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             );

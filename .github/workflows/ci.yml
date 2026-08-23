@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typescript:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Unit tests
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Check the API contract matches the spec
+        # Regenerating must be a no-op. The AuthUser schema and the server
+        # drifted apart once already, which broke both the build and login.
+        run: |
+          pnpm --filter @workspace/api-spec run codegen
+          git diff --exit-code -- lib/api-zod lib/api-client-react
+
+  python:
+    name: Clinical engine
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: artifacts/clinical-ai-engine
+    services:
+      # So the migration tests actually run rather than skipping.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      JWT_SECRET: ci-only-not-a-real-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        # httpx backs fastapi's TestClient, which the query-pipeline
+        # integration tests use.
+        run: pip install -r requirements.txt pytest httpx
+
+      - name: Safety-layer tests
+        # These regression-lock defects that produced clinically unsafe dose
+        # output. Treat a failure as a patient-safety incident.
+        run: pytest -q
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A JWT signing key was committed to this repository once. This is the
+      # gate that would have caught it.
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

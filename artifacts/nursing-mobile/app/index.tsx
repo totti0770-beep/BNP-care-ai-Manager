@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import React from "react";
 import {
   Platform,
@@ -19,22 +20,22 @@ import { useColors } from "@/hooks/useColors";
 const CATEGORIES = [
   {
     id: "pharmacy" as const,
-    title: "المستحضرات الصيدلانية",
-    subtitle: "الجرعات والتفاعلات الدوائية",
+    titleKey: "catPharmacy",
+    subtitleKey: "catPharmacySub",
     accentColor: "#4CC9F0",
     iconName: "medical" as const,
   },
   {
     id: "policies" as const,
-    title: "سياسات التمريض",
-    subtitle: "البروتوكولات والإجراءات السريرية",
+    titleKey: "catPolicies",
+    subtitleKey: "catPoliciesSub",
     accentColor: "#8B5CF6",
     iconName: "document-text" as const,
   },
   {
     id: "quality" as const,
-    title: "الجودة والسباحي",
-    subtitle: "معايير JCIA وأهداف سلامة المرضى",
+    titleKey: "catQuality",
+    subtitleKey: "catQualitySub",
     accentColor: "#7C3AED",
     iconName: "shield-checkmark" as const,
   },
@@ -42,7 +43,8 @@ const CATEGORIES = [
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { documents, themeMode, setThemeMode } = useApp();
+  const { t, i18n } = useTranslation();
+  const { themeMode, setThemeMode } = useApp();
   const colors = useColors();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -55,7 +57,7 @@ export default function HomeScreen() {
   };
 
   const themeIcon = themeMode === "light" ? "sunny" : themeMode === "dark" ? "moon" : "phone-portrait-outline";
-  const themeLabel = themeMode === "light" ? "نهاري" : themeMode === "dark" ? "ليلي" : "تلقائي";
+  const themeLabel = themeMode === "light" ? t("themeLight") : themeMode === "dark" ? t("themeDark") : t("themeAuto");
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -78,9 +80,22 @@ export default function HomeScreen() {
           <View style={[styles.logoRow, { backgroundColor: colors.primary + "22" }]}>
             <Ionicons name="hardware-chip" size={20} color={colors.primary} />
           </View>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>مساعد التمريض الذكي</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>نظام الاستفسار الطبي</Text>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>{t("homeTitle")}</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>{t("homeTagline")}</Text>
         </View>
+
+        {/* Language toggle. RTL only takes effect after a reload, so the label
+            shows the language being switched TO rather than pretending the
+            layout has already flipped. */}
+        <Pressable
+          style={[styles.iconButton, { backgroundColor: colors.card }]}
+          onPress={() => void i18n.changeLanguage(i18n.language === "ar" ? "en" : "ar")}
+          testID="language-button"
+        >
+          <Text style={[styles.langButtonText, { color: colors.primary }]}>
+            {i18n.language === "ar" ? "EN" : "ع"}
+          </Text>
+        </Pressable>
 
         {/* Theme toggle */}
         <Pressable
@@ -116,28 +131,27 @@ export default function HomeScreen() {
               <Ionicons name="medical" size={24} color="#F97316" />
             </View>
             <View>
-              <Text style={[styles.drugAssistantTitle, { color: isDark ? "#F8FAFC" : "#1E1B4B" }]}>حاسبة الجرعات</Text>
+              <Text style={[styles.drugAssistantTitle, { color: isDark ? "#F8FAFC" : "#1E1B4B" }]}>{t("doseCalculator")}</Text>
               <Text style={styles.drugAssistantSub}>Drug Dose Calculator</Text>
             </View>
           </View>
           <View style={styles.drugAssistantRight}>
-            <Text style={styles.drugAssistantBadge}>جديد</Text>
+            <Text style={styles.drugAssistantBadge}>{t("badgeNew")}</Text>
             <Ionicons name="chevron-back" size={18} color="#F97316" />
           </View>
         </Pressable>
 
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>اختر التصنيف</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("chooseCategory")}</Text>
         <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
-          اختر الفئة للحصول على إجابات مستندة إلى مصادر معتمدة
+          {t("homeSubtitle")}
         </Text>
 
         {CATEGORIES.map((cat) => (
           <CategoryCard
             key={cat.id}
             category={cat.id}
-            title={cat.title}
-            subtitle={cat.subtitle}
-            docCount={documents[cat.id]?.length ?? 0}
+            title={t(cat.titleKey)}
+            subtitle={t(cat.subtitleKey)}
             accentColor={cat.accentColor}
             iconName={cat.iconName}
             onPress={() =>
@@ -153,7 +167,7 @@ export default function HomeScreen() {
         <View style={[styles.infoCard, { backgroundColor: isDark ? "#0D0820" : "#F5F3FF", borderColor: "#8B5CF630" }]}>
           <Ionicons name="information-circle-outline" size={18} color="#8B5CF6" />
           <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-            الإجابات مستندة إلى الوثائق المرفوعة. تواصل مع الطاقم الطبي للقرارات الحرجة.
+            {t("homeDisclaimer")}
           </Text>
         </View>
       </ScrollView>
@@ -202,6 +216,10 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     textAlign: "center",
     marginTop: 2,
+  },
+  langButtonText: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
   },
   themeBadgeRow: {
     alignItems: "center",

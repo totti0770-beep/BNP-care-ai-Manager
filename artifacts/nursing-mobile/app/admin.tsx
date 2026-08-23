@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as LocalAuthentication from "expo-local-authentication";
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,34 +17,31 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Category, Document, useApp } from "@/contexts/AppContext";
+import { Category, useApp } from "@/contexts/AppContext";
+import { listEngineDocuments, type EngineDocument } from "@/services/clinicalApi";
 
 const CATEGORY_CONFIG: Record<
   Category,
-  { title: string; accentColor: string; iconName: keyof typeof Ionicons.glyphMap }
+  { titleKey: string; accentColor: string; iconName: keyof typeof Ionicons.glyphMap }
 > = {
   pharmacy: {
-    title: "المستحضرات الصيدلانية",
+    titleKey: "catPharmacy",
     accentColor: "#4CC9F0",
     iconName: "medical",
   },
   policies: {
-    title: "سياسات التمريض",
+    titleKey: "catPolicies",
     accentColor: "#8B5CF6",
     iconName: "document-text",
   },
   quality: {
-    title: "الجودة والسباحي",
+    titleKey: "catQuality",
     accentColor: "#7C3AED",
     iconName: "shield-checkmark",
   },
 };
 
 const CATEGORIES: Category[] = ["pharmacy", "policies", "quality"];
-
-function generateId() {
-  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-}
 
 function formatDate(isoString: string) {
   try {
@@ -55,15 +53,14 @@ function formatDate(isoString: string) {
 
 export default function AdminScreen() {
   const insets = useSafeAreaInsets();
-  const { documents, addDocument, removeDocument, isAdminAuthenticated, setAdminAuth } = useApp();
+  const { t } = useTranslation();
+  const { isAdminAuthenticated, setAdminAuth } = useApp();
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [webPin, setWebPin] = useState("");
-  const [webPinVisible, setWebPinVisible] = useState(false);
-  const [addingFor, setAddingFor] = useState<Category | null>(null);
-  const [newDocName, setNewDocName] = useState("");
-  const [newDocPages, setNewDocPages] = useState("");
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [accessDenied, setAccessDenied] = useState<string | null>(null);
+  const [engineDocs, setEngineDocs] = useState<EngineDocument[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+  const [docsError, setDocsError] = useState<string | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -74,9 +71,15 @@ export default function AdminScreen() {
     }
   }, []);
 
+  // Biometric authentication is mandatory. There is deliberately no PIN or
+  // passcode fallback: a shared fallback secret would defeat the point of
+  // gating the clinical document surface at all.
   const authenticateAdmin = useCallback(async () => {
-    if (Platform.OS === "web") {
-      setWebPinVisible(true);
+    const isWeb = Platform.OS === ("web" as typeof Platform.OS);
+    if (isWeb) {
+      setAccessDenied(
+        t("adminWebBlocked"),
+      );
       return;
     }
 
@@ -85,110 +88,70 @@ export default function AdminScreen() {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
-      if (hasHardware && isEnrolled) {
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: "تحقق من هويتك للوصول إلى لوحة الإدارة",
-          fallbackLabel: "استخدم رمز المرور",
-          cancelLabel: "إلغاء",
-        });
+      if (!hasHardware || !isEnrolled) {
+        setAccessDenied(
+          t("adminNoBiometrics"),
+        );
+        return;
+      }
 
-        if (result.success) {
-          setAdminAuth(true);
-          if (Platform.OS !== "web") {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        } else {
-          router.back();
-        }
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: t("adminBiometricPrompt"),
+        disableDeviceFallback: true,
+        cancelLabel: t("cancel"),
+      });
+
+      if (result.success) {
+        setAdminAuth(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        setWebPinVisible(true);
+        router.back();
       }
     } catch {
-      setWebPinVisible(true);
+      setAccessDenied(t("adminAuthFailed"));
     } finally {
       setIsAuthenticating(false);
     }
-  }, [setAdminAuth]);
+  }, [setAdminAuth, t]);
 
-  const handleWebPin = useCallback(() => {
-    if (webPin === "1234") {
-      setAdminAuth(true);
-      setWebPinVisible(false);
-      setWebPin("");
-    } else {
-      Alert.alert("خطأ", "رمز المرور غير صحيح. استخدم: 1234");
-      setWebPin("");
-    }
-  }, [webPin, setAdminAuth]);
+  useEffect(() => {
+    if (!isAdminAuthenticated) return;
+    let cancelled = false;
 
-  const handleAddDocument = useCallback(() => {
-    if (!addingFor || !newDocName.trim()) return;
-    const doc: Document = {
-      id: generateId(),
-      name: newDocName.trim(),
-      category: addingFor,
-      uploadedAt: new Date().toISOString(),
-      pages: parseInt(newDocPages) || 1,
+    listEngineDocuments().then((docs) => {
+      if (cancelled) return;
+      setEngineDocs(docs);
+      setDocsError(
+        docs.length === 0 ? t("documentsLoadFailed") : null,
+      );
+      setIsLoadingDocs(false);
+    });
+
+    return () => {
+      cancelled = true;
     };
-    addDocument(doc);
-    setNewDocName("");
-    setNewDocPages("");
-    setShowAddForm(false);
-    setAddingFor(null);
-    if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-  }, [addingFor, newDocName, newDocPages, addDocument]);
-
-  const handleRemoveDocument = useCallback(
-    (category: Category, docId: string) => {
-      Alert.alert("حذف الوثيقة", "هل تريد حذف هذه الوثيقة؟", [
-        { text: "إلغاء", style: "cancel" },
-        {
-          text: "حذف",
-          style: "destructive",
-          onPress: () => removeDocument(category, docId),
-        },
-      ]);
-    },
-    [removeDocument]
-  );
+  }, [isAdminAuthenticated, t]);
 
   if (isAuthenticating) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color="#8B5CF6" />
-        <Text style={styles.authText}>جارٍ التحقق من الهوية...</Text>
+        <Text style={styles.authText}>{t("adminVerifying")}</Text>
       </View>
     );
   }
 
-  if (webPinVisible && !isAdminAuthenticated) {
+  if (accessDenied && !isAdminAuthenticated) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <View style={styles.pinCard}>
           <View style={styles.pinIconContainer}>
             <Ionicons name="lock-closed" size={32} color="#8B5CF6" />
           </View>
-          <Text style={styles.pinTitle}>لوحة الإدارة</Text>
-          <Text style={styles.pinSubtitle}>أدخل رمز المرور للمتابعة</Text>
-          <TextInput
-            style={styles.pinInput}
-            value={webPin}
-            onChangeText={setWebPin}
-            placeholder="رمز المرور"
-            placeholderTextColor="#475569"
-            secureTextEntry
-            keyboardType="number-pad"
-            maxLength={4}
-            textAlign="center"
-          />
-          <Text style={styles.pinHint}>تلميح: الرمز هو 1234</Text>
-          <Pressable style={styles.pinButton} onPress={handleWebPin}>
-            <Text style={styles.pinButtonText}>دخول</Text>
-          </Pressable>
+          <Text style={styles.pinTitle}>{t("accessDenied")}</Text>
+          <Text style={styles.pinSubtitle}>{accessDenied}</Text>
           <Pressable onPress={() => router.back()}>
-            <Text style={styles.cancelText}>إلغاء</Text>
+            <Text style={styles.cancelText}>{t("back")}</Text>
           </Pressable>
         </View>
       </View>
@@ -202,11 +165,11 @@ export default function AdminScreen() {
         <View style={styles.headerLeft}>
           <View style={styles.adminBadge}>
             <Ionicons name="shield-checkmark" size={14} color="#8B5CF6" />
-            <Text style={styles.adminBadgeText}>مدير</Text>
+            <Text style={styles.adminBadgeText}>{t("admin")}</Text>
           </View>
         </View>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>لوحة الإدارة</Text>
+          <Text style={styles.headerTitle}>{t("adminPanel")}</Text>
         </View>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="chevron-forward" size={22} color="#94A3B8" />
@@ -218,69 +181,52 @@ export default function AdminScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad + 20 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Info bar */}
+        {/* This screen is read-only. It previously let an admin type a document
+            name and a page count, stored it in AsyncStorage under an upload
+            button, and never called the engine — so an admin could believe they
+            had curated the corpus that dose answers come from while nothing had
+            changed. Uploading is done from the web app; here we show what is
+            genuinely indexed. */}
         <View style={styles.infoBar}>
-          <Ionicons name="cloud-upload-outline" size={16} color="#8B5CF6" />
+          <Ionicons name="library-outline" size={16} color="#8B5CF6" />
           <Text style={styles.infoBarText}>
-            إدارة الوثائق المرجعية لكل تصنيف طبي
+            {t("indexedDocumentsReadOnly")}
           </Text>
         </View>
 
-        {/* Category sections */}
-        {CATEGORIES.map((cat) => {
-          const conf = CATEGORY_CONFIG[cat];
-          const docs = documents[cat] ?? [];
-
-          return (
-            <View key={cat} style={styles.categorySection}>
-              <View style={styles.categoryHeader}>
-                <Pressable
-                  style={[styles.uploadButton, { backgroundColor: conf.accentColor + "22", borderColor: conf.accentColor + "44" }]}
-                  onPress={() => {
-                    setAddingFor(cat);
-                    setShowAddForm(true);
-                  }}
-                >
-                  <Ionicons name="add" size={16} color={conf.accentColor} />
-                  <Text style={[styles.uploadButtonText, { color: conf.accentColor }]}>
-                    رفع PDF
+        {isLoadingDocs ? (
+          <View style={styles.emptyDocs}>
+            <ActivityIndicator color="#8B5CF6" />
+          </View>
+        ) : engineDocs.length === 0 ? (
+          <View style={styles.emptyDocs}>
+            <Ionicons name="document-outline" size={24} color="#2D1B4E" />
+            <Text style={styles.emptyDocsText}>
+              {docsError ?? t("noIndexedDocuments")}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.categorySection}>
+            {engineDocs.map((doc) => (
+              <View key={doc.id} style={styles.docRow}>
+                <View style={styles.docInfo}>
+                  <Text style={styles.docName}>{doc.filename}</Text>
+                  <Text style={styles.docMeta}>
+                    {doc.chunk_count} {t("segments")} · {formatDate(doc.upload_date)}
                   </Text>
-                </Pressable>
-                <View style={styles.categoryTitle}>
-                  <Text style={styles.categoryTitleText}>{conf.title}</Text>
-                  <View style={[styles.catIconBadge, { backgroundColor: conf.accentColor + "22" }]}>
-                    <Ionicons name={conf.iconName} size={16} color={conf.accentColor} />
-                  </View>
                 </View>
+                <Ionicons name="document-text" size={20} color="#8B5CF6" />
               </View>
+            ))}
+          </View>
+        )}
 
-              {docs.length === 0 ? (
-                <View style={styles.emptyDocs}>
-                  <Ionicons name="document-outline" size={24} color="#2D1B4E" />
-                  <Text style={styles.emptyDocsText}>لا توجد وثائق مرفوعة</Text>
-                </View>
-              ) : (
-                docs.map((doc) => (
-                  <View key={doc.id} style={styles.docRow}>
-                    <Pressable
-                      style={styles.docRemoveBtn}
-                      onPress={() => handleRemoveDocument(cat, doc.id)}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                    </Pressable>
-                    <View style={styles.docInfo}>
-                      <Text style={styles.docName}>{doc.name}</Text>
-                      <Text style={styles.docMeta}>
-                        {doc.pages} صفحة · {formatDate(doc.uploadedAt)}
-                      </Text>
-                    </View>
-                    <Ionicons name="document-text" size={20} color={conf.accentColor} />
-                  </View>
-                ))
-              )}
-            </View>
-          );
-        })}
+        <View style={styles.infoBar}>
+          <Ionicons name="information-circle-outline" size={16} color="#64748B" />
+          <Text style={styles.infoBarText}>
+            {t("useWebToManage")}
+          </Text>
+        </View>
 
         {/* Logout */}
         <Pressable
@@ -291,66 +237,10 @@ export default function AdminScreen() {
           }}
         >
           <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-          <Text style={styles.logoutText}>تسجيل الخروج</Text>
+          <Text style={styles.logoutText}>{t("signOut")}</Text>
         </Pressable>
       </ScrollView>
 
-      {/* Add document modal */}
-      {showAddForm && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>
-              رفع وثيقة · {addingFor ? CATEGORY_CONFIG[addingFor].title : ""}
-            </Text>
-
-            <Text style={styles.modalLabel}>اسم الوثيقة</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={newDocName}
-              onChangeText={setNewDocName}
-              placeholder="مثال: دليل الأدوية السريرية 2024"
-              placeholderTextColor="#475569"
-              textAlign="right"
-            />
-
-            <Text style={styles.modalLabel}>عدد الصفحات</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={newDocPages}
-              onChangeText={setNewDocPages}
-              placeholder="مثال: 120"
-              placeholderTextColor="#475569"
-              keyboardType="number-pad"
-              textAlign="right"
-            />
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={styles.modalCancelBtn}
-                onPress={() => {
-                  setShowAddForm(false);
-                  setAddingFor(null);
-                  setNewDocName("");
-                  setNewDocPages("");
-                }}
-              >
-                <Text style={styles.modalCancelText}>إلغاء</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.modalConfirmBtn,
-                  { opacity: newDocName.trim() ? 1 : 0.5 },
-                ]}
-                onPress={handleAddDocument}
-                disabled={!newDocName.trim()}
-              >
-                <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text style={styles.modalConfirmText}>حفظ</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      )}
     </View>
   );
 }

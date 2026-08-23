@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -19,7 +20,7 @@ interface ChatInputProps {
 }
 
 // ── Voice support (Web Speech API — web platform only) ────────────────────────
-function useVoiceInput(onTranscript: (t: string) => void) {
+function useVoiceInput(onTranscript: (t: string) => void, lang: string) {
   const [isListening, setIsListening] = useState(false);
   const recRef = useRef<unknown>(null);
 
@@ -33,10 +34,15 @@ function useVoiceInput(onTranscript: (t: string) => void) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
     const rec = new SR();
-    rec.lang = "ar-SA";
+    rec.lang = lang;
     rec.interimResults = true;
     rec.continuous = false;
-    rec.onresult = (e: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => {
+    rec.onresult = (e: {
+      results: {
+        length: number;
+        [i: number]: { [j: number]: { transcript: string } };
+      };
+    }) => {
       const text = Array.from({ length: e.results.length }, (_, i) =>
         e.results[i][0].transcript
       ).join("");
@@ -47,7 +53,7 @@ function useVoiceInput(onTranscript: (t: string) => void) {
     recRef.current = rec;
     rec.start();
     setIsListening(true);
-  }, [isSupported, isListening, onTranscript]);
+  }, [isSupported, isListening, onTranscript, lang]);
 
   const stop = useCallback(() => {
     if (recRef.current) {
@@ -60,12 +66,16 @@ function useVoiceInput(onTranscript: (t: string) => void) {
 }
 
 export function ChatInput({ onSend, isSending, accentColor }: ChatInputProps) {
+  const { t, i18n } = useTranslation();
   const [text, setText] = useState("");
   const insets = useSafeAreaInsets();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const { isListening, isSupported: voiceSupported, start: startVoice, stop: stopVoice } =
-    useVoiceInput((transcript) => setText(transcript));
+    useVoiceInput(
+      (transcript) => setText(transcript),
+      i18n.language === "en" ? "en-US" : "ar-SA",
+    );
 
   // Pulsing animation when mic is active
   useEffect(() => {
@@ -115,7 +125,7 @@ export function ChatInput({ onSend, isSending, accentColor }: ChatInputProps) {
       {isListening && (
         <View style={styles.listeningBar}>
           <Animated.View style={[styles.micDot, { transform: [{ scale: pulseAnim }] }]} />
-          <Text style={styles.listeningText}>جارٍ الاستماع... تحدّث الآن</Text>
+          <Text style={styles.listeningText}>{t("listeningNow")}</Text>
           <Pressable onPress={stopVoice}>
             <Ionicons name="close-circle" size={18} color="#EF4444" />
           </Pressable>
@@ -145,17 +155,20 @@ export function ChatInput({ onSend, isSending, accentColor }: ChatInputProps) {
         )}
 
         <TextInput
-          style={[styles.input, isListening && styles.inputListening]}
+          style={[
+            styles.input,
+            { writingDirection: "rtl" as const },
+            isListening && styles.inputListening,
+          ]}
           value={text}
           onChangeText={setText}
-          placeholder={isListening ? "🎤 استمع..." : "اكتب سؤالك هنا..."}
+          placeholder={isListening ? t("listening") : t("askQuestion")}
           placeholderTextColor={isListening ? "#EF4444aa" : "#475569"}
           multiline
           maxLength={500}
           onSubmitEditing={handleSend}
           textAlign="right"
           textAlignVertical="center"
-          writingDirection="rtl"
           editable={!isSending}
           testID="chat-input"
         />

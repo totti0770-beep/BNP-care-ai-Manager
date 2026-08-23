@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -35,13 +36,15 @@ function confidenceColor(label?: string) {
   if (label === "Medium") return "#FBBF24";
   return "#F87171";
 }
-function confidenceAr(label?: string) {
-  if (label === "High") return "ثقة عالية";
-  if (label === "Medium") return "ثقة متوسطة";
-  return "ثقة منخفضة";
+function confidenceKey(label?: string) {
+  if (label === "High") return "confidenceHigh";
+  if (label === "Medium") return "confidenceMedium";
+  return "confidenceLow";
 }
 
 export default function DrugAssistantScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === "ar";
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -65,7 +68,7 @@ export default function DrugAssistantScreen() {
   async function handleCalculate() {
     if (!drugName.trim()) {
       shake();
-      setError("يرجى إدخال اسم الدواء");
+      setError(t("enterDrugName"));
       return;
     }
     setError(null);
@@ -80,12 +83,12 @@ export default function DrugAssistantScreen() {
         weight ? parseFloat(weight) : undefined
       );
       if (!res) {
-        setError("تعذّر الاتصال بالمحرك السريري. تحقق من الاتصال.");
+        setError(t("engineUnreachable"));
       } else {
         setResult(res);
       }
     } catch {
-      setError("حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.");
+      setError(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -113,7 +116,7 @@ export default function DrugAssistantScreen() {
           <View style={styles.headerIcon}>
             <Ionicons name="medical" size={18} color="#F97316" />
           </View>
-          <Text style={styles.headerTitle}>حاسبة الجرعات الدوائية</Text>
+          <Text style={styles.headerTitle}>{t("calculatorTitle")}</Text>
           <Text style={styles.headerSub}>Drug Dose Calculator</Text>
         </View>
         <View style={styles.backBtn} />
@@ -126,7 +129,7 @@ export default function DrugAssistantScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Quick drug selection */}
-        <Text style={styles.label}>اختر الدواء السريع</Text>
+        <Text style={styles.label}>{t("quickSelect")}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -145,10 +148,10 @@ export default function DrugAssistantScreen() {
                 onPress={() => selectDrug(d.name)}
               >
                 <Text style={[styles.chipAr, { color: selected ? d.color : "#94A3B8" }]}>
-                  {d.nameAr}
+                  {isArabic ? d.nameAr : d.name}
                 </Text>
                 <Text style={[styles.chipEn, { color: selected ? d.color + "CC" : "#64748B" }]}>
-                  {d.name}
+                  {isArabic ? d.name : d.nameAr}
                 </Text>
               </Pressable>
             );
@@ -157,12 +160,12 @@ export default function DrugAssistantScreen() {
 
         {/* Drug name input */}
         <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
-          <Text style={styles.label}>اسم الدواء *</Text>
+          <Text style={styles.label}>{t("drugName")} *</Text>
           <View style={[styles.inputWrap, error && !drugName && styles.inputError]}>
             <Ionicons name="medical-outline" size={18} color="#8B5CF6" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="مثال: Paracetamol"
+              placeholder={t("drugNamePlaceholder")}
               placeholderTextColor="#475569"
               value={drugName}
               onChangeText={(t) => { setDrugName(t); setError(null); }}
@@ -177,12 +180,12 @@ export default function DrugAssistantScreen() {
         </Animated.View>
 
         {/* Weight input */}
-        <Text style={styles.label}>وزن المريض (كيلوغرام) — اختياري</Text>
+        <Text style={styles.label}>{t("patientWeight")}</Text>
         <View style={styles.inputWrap}>
           <Ionicons name="body-outline" size={18} color="#4CC9F0" style={styles.inputIcon} />
           <TextInput
             style={styles.input}
-            placeholder="مثال: 70"
+            placeholder={t("weightPlaceholder")}
             placeholderTextColor="#475569"
             value={weight}
             onChangeText={setWeight}
@@ -214,7 +217,7 @@ export default function DrugAssistantScreen() {
           ) : (
             <>
               <Ionicons name="calculator-outline" size={20} color="#fff" />
-              <Text style={styles.calcBtnText}>احسب الجرعة</Text>
+              <Text style={styles.calcBtnText}>{t("calculate")}</Text>
             </>
           )}
         </Pressable>
@@ -223,7 +226,7 @@ export default function DrugAssistantScreen() {
         {loading && (
           <View style={styles.loadingCard}>
             <ActivityIndicator color="#8B5CF6" size="small" />
-            <Text style={styles.loadingText}>جارٍ الاستعلام من المحرك السريري…</Text>
+            <Text style={styles.loadingText}>{t("querying")}</Text>
           </View>
         )}
 
@@ -232,12 +235,12 @@ export default function DrugAssistantScreen() {
           <View style={styles.resultsSection}>
             {/* Header row */}
             <View style={styles.resultHeaderRow}>
-              <Text style={styles.resultHeaderText}>نتائج الحاسبة</Text>
+              <Text style={styles.resultHeaderText}>{t("results")}</Text>
               {result.confidenceLabel && (
                 <View style={[styles.confBadge, { borderColor: confidenceColor(result.confidenceLabel) + "55", backgroundColor: confidenceColor(result.confidenceLabel) + "15" }]}>
                   <Ionicons name="bar-chart-outline" size={10} color={confidenceColor(result.confidenceLabel)} />
                   <Text style={[styles.confText, { color: confidenceColor(result.confidenceLabel) }]}>
-                    {confidenceAr(result.confidenceLabel)}
+                    {t(confidenceKey(result.confidenceLabel))}
                   </Text>
                 </View>
               )}
@@ -248,9 +251,9 @@ export default function DrugAssistantScreen() {
               <View style={styles.blockedCard}>
                 <Ionicons name="close-circle" size={22} color="#F87171" />
                 <View style={styles.blockedTextCol}>
-                  <Text style={styles.blockedTitle}>❌ جرعة غير آمنة — تم الإيقاف</Text>
+                  <Text style={styles.blockedTitle}>{t("doseBlocked")}</Text>
                   <Text style={styles.blockedSub}>
-                    {result.rejectionReason ?? "الجرعة المحسوبة تتجاوز الحد الأقصى. تواصل مع الطبيب فوراً."}
+                    {result.rejectionReason ?? t("doseBlockedDefault")}
                   </Text>
                 </View>
               </View>
@@ -260,7 +263,7 @@ export default function DrugAssistantScreen() {
             {result.safetyAlert && !result.rejected && (
               <View style={styles.alertBanner}>
                 <Ionicons name="shield-half" size={16} color="#F97316" />
-                <Text style={styles.alertBannerText}>تنبيه سلامة نشط — راجع التنبيهات أدناه</Text>
+                <Text style={styles.alertBannerText}>{t("safetyAlertActive")}</Text>
               </View>
             )}
 
@@ -269,7 +272,7 @@ export default function DrugAssistantScreen() {
               <View style={styles.doseCard}>
                 <View style={styles.cardHeaderRow}>
                   <Ionicons name="medical" size={14} color="#4CC9F0" />
-                  <Text style={[styles.cardTitle, { color: "#4CC9F0" }]}>الجرعة المحسوبة</Text>
+                  <Text style={[styles.cardTitle, { color: "#4CC9F0" }]}>{t("calculatedDose")}</Text>
                 </View>
                 <Text style={styles.doseText}>{result.dose}</Text>
               </View>
@@ -280,7 +283,7 @@ export default function DrugAssistantScreen() {
               <View style={[styles.infoCard, { borderColor: "#2DD4BF33", backgroundColor: "#001A18" }]}>
                 <View style={styles.cardHeaderRow}>
                   <Ionicons name="pulse-outline" size={14} color="#2DD4BF" />
-                  <Text style={[styles.cardTitle, { color: "#2DD4BF" }]}>الدواعي السريرية</Text>
+                  <Text style={[styles.cardTitle, { color: "#2DD4BF" }]}>{t("indication")}</Text>
                 </View>
                 <Text style={styles.infoText}>{result.indication}</Text>
               </View>
@@ -291,7 +294,7 @@ export default function DrugAssistantScreen() {
               <View style={[styles.infoCard, { borderColor: "#8B5CF633", backgroundColor: "#0D0820" }]}>
                 <View style={styles.cardHeaderRow}>
                   <Ionicons name="chatbubble-ellipses-outline" size={14} color="#8B5CF6" />
-                  <Text style={[styles.cardTitle, { color: "#8B5CF6" }]}>الإجابة السريرية</Text>
+                  <Text style={[styles.cardTitle, { color: "#8B5CF6" }]}>{t("clinicalAnswer")}</Text>
                 </View>
                 <Text style={styles.infoText}>{result.answer}</Text>
               </View>
@@ -302,7 +305,7 @@ export default function DrugAssistantScreen() {
               <View style={[styles.infoCard, { borderColor: "#F9731633", backgroundColor: "#1A120A" }]}>
                 <View style={styles.cardHeaderRow}>
                   <Ionicons name="shield-half-outline" size={14} color="#F97316" />
-                  <Text style={[styles.cardTitle, { color: "#F97316" }]}>تنبيهات السلامة</Text>
+                  <Text style={[styles.cardTitle, { color: "#F97316" }]}>{t("safetyAlerts")}</Text>
                 </View>
                 {result.safetyAlerts.map((a, i) => (
                   <Text key={i} style={styles.alertItem}>{a}</Text>
@@ -315,7 +318,7 @@ export default function DrugAssistantScreen() {
               <View style={[styles.infoCard, { borderColor: "#FBBF2433", backgroundColor: "#1A1A00" }]}>
                 <View style={styles.cardHeaderRow}>
                   <Ionicons name="ban-outline" size={14} color="#FBBF24" />
-                  <Text style={[styles.cardTitle, { color: "#FBBF24" }]}>موانع الاستخدام</Text>
+                  <Text style={[styles.cardTitle, { color: "#FBBF24" }]}>{t("contraindications")}</Text>
                 </View>
                 {result.contraindications.map((c, i) => (
                   <Text key={i} style={styles.contraItem}>• {c}</Text>
@@ -328,7 +331,7 @@ export default function DrugAssistantScreen() {
               <View style={[styles.infoCard, { borderColor: "#8B5CF633", backgroundColor: "#0F0A1A" }]}>
                 <View style={styles.cardHeaderRow}>
                   <Ionicons name="clipboard-outline" size={14} color="#A78BFA" />
-                  <Text style={[styles.cardTitle, { color: "#A78BFA" }]}>ملاحظات التمريض</Text>
+                  <Text style={[styles.cardTitle, { color: "#A78BFA" }]}>{t("nursingNotes")}</Text>
                 </View>
                 {result.nursingNotes.map((n, i) => (
                   <View key={i} style={styles.noteRow}>

@@ -1,0 +1,110 @@
+# Local / on-premise deployment.
+#
+#   cp .env.example .env   # then fill in the secrets
+#   docker compose up --build
+#
+# The web app is the only service published to the host. The clinical engine is
+# deliberately not: it is reached solely through the API server's /bnp-api
+# gateway, which authenticates every request as an individual nurse.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bnp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bnp}
+      POSTGRES_DB: ${POSTGRES_DB:-bnp}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bnp} -d ${POSTGRES_DB:-bnp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  engine-migrate:
+    build:
+      context: .
+      dockerfile: artifacts/clinical-ai-engine/Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bnp}:${POSTGRES_PASSWORD:-bnp}@postgres:5432/${POSTGRES_DB:-bnp}
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required - generate with openssl rand -hex 32}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  clinical-ai-engine:
+    build:
+      context: .
+      dockerfile: artifacts/clinical-ai-engine/Dockerfile
+    environment:
+      # Migrations are applied by the engine-migrate job above, so the engine
+      # refuses to start against an unmigrated database instead of racing on DDL.
+      AUTO_MIGRATE: "0"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bnp}:${POSTGRES_PASSWORD:-bnp}@postgres:5432/${POSTGRES_DB:-bnp}
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required - generate with openssl rand -hex 32}"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      DB_POOL_MIN: ${DB_POOL_MIN:-1}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+    volumes:
+      # Persist the FAISS index so a restart does not re-embed the whole corpus.
+      - engine-index:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      engine-migrate:
+        condition: service_completed_successfully
+    # No published ports: gateway-only access.
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    command: ["node", "./dist/migrate.mjs"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bnp}:${POSTGRES_PASSWORD:-bnp}@postgres:5432/${POSTGRES_DB:-bnp}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api-server:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bnp}:${POSTGRES_PASSWORD:-bnp}@postgres:5432/${POSTGRES_DB:-bnp}
+      # Must match the engine's JWT_SECRET, or gateway-minted tokens are rejected.
+      ENGINE_JWT_SECRET: "${ENGINE_JWT_SECRET:?ENGINE_JWT_SECRET is required and must equal JWT_SECRET}"
+      ENGINE_URL: http://clinical-ai-engine:8000
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      ISSUER_URL: ${ISSUER_URL:-https://replit.com/oidc}
+      REPL_ID: ${REPL_ID:-}
+      PORT: "8080"
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: artifacts/bestnursingai/Dockerfile
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - api-server
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  engine-index:

@@ -47,3 +47,27 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Secrets — never commit. See .env.example for the variables that are needed.
+.env
+.env.*
+!.env.example
+
+# Clinical AI Engine runtime state.
+# The FAISS index is regenerated from the bnp_chunks table on startup
+# (services/embeddings.py sync_from_db). It is pickled data containing the
+# extracted text of clinical documents, and it is loaded with
+# allow_dangerous_deserialization=True — a repo-resident copy is exactly the
+# attacker-influenceable path that makes that dangerous.
+artifacts/clinical-ai-engine/data/*
+# The formulary import CSV is exempt: plain text, no deserialization risk, and
+# it is a reviewed deliverable — the extracted hospital formulary with per-row
+# source pages, regenerable via tools/extract_formulary_pdfs.py.
+!artifacts/clinical-ai-engine/data/formulary/
+*.pkl
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/

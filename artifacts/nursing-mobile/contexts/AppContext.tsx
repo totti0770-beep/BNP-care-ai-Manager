@@ -65,55 +65,13 @@ interface AppContextValue extends AppState {
 
 const STORAGE_KEY = "nursing_ai_app_state";
 
+// No seed documents. The catalogue previously shipped six fabricated Arabic
+// titles with invented page counts, which read as the live corpus. The real
+// corpus lives in the clinical engine and is listed from it.
 const defaultDocuments: Record<Category, Document[]> = {
-  pharmacy: [
-    {
-      id: "ph1",
-      name: "الدليل الدوائي السعودي 2024",
-      category: "pharmacy",
-      uploadedAt: "2024-01-15",
-      pages: 312,
-    },
-    {
-      id: "ph2",
-      name: "بروتوكولات الجرعات الحرجة",
-      category: "pharmacy",
-      uploadedAt: "2024-02-20",
-      pages: 87,
-    },
-  ],
-  policies: [
-    {
-      id: "po1",
-      name: "سياسة نظافة اليدين",
-      category: "policies",
-      uploadedAt: "2024-01-10",
-      pages: 24,
-    },
-    {
-      id: "po2",
-      name: "بروتوكول منع السقوط",
-      category: "policies",
-      uploadedAt: "2024-03-05",
-      pages: 41,
-    },
-  ],
-  quality: [
-    {
-      id: "qu1",
-      name: "معايير JCIA 2024",
-      category: "quality",
-      uploadedAt: "2024-01-08",
-      pages: 210,
-    },
-    {
-      id: "qu2",
-      name: "أهداف سلامة المرضى IPSG",
-      category: "quality",
-      uploadedAt: "2024-02-14",
-      pages: 95,
-    },
-  ],
+  pharmacy: [],
+  policies: [],
+  quality: [],
 };
 
 const AppContext = createContext<AppContextValue | null>(null);

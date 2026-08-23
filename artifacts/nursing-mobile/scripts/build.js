@@ -67,10 +67,16 @@ function getDeploymentDomain() {
     return stripProtocol(process.env.EXPO_PUBLIC_DOMAIN);
   }
 
-  console.error(
-    "ERROR: No deployment domain found. Set REPLIT_INTERNAL_APP_DOMAIN, REPLIT_DEV_DOMAIN, or EXPO_PUBLIC_DOMAIN",
+  // Fall back rather than exit, so a clean checkout can build without Replit's
+  // environment. The resulting bundle points at localhost and is only useful
+  // for local development — set EXPO_PUBLIC_DOMAIN for anything shippable.
+  const fallback = "localhost:8080";
+  console.warn(
+    `WARNING: No deployment domain set (REPLIT_INTERNAL_APP_DOMAIN, ` +
+      `REPLIT_DEV_DOMAIN or EXPO_PUBLIC_DOMAIN). Falling back to ${fallback}. ` +
+      `This bundle will not reach a real backend.`,
   );
-  process.exit(1);
+  return fallback;
 }
 
 function prepareDirectories(timestamp) {
@@ -140,6 +146,10 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
     ...process.env,
     EXPO_PUBLIC_DOMAIN: expoPublicDomain,
     EXPO_PUBLIC_REPL_ID: expoPublicReplId,
+    // Expo's CLI otherwise calls its remote API to validate native module
+    // versions before bundling, which fails on any host without egress to
+    // expo.dev (CI runners, air-gapped hospital build environments).
+    EXPO_OFFLINE: process.env.EXPO_OFFLINE ?? "1",
   };
 
   if (expoPublicReplId) {

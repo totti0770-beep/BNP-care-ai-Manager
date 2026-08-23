@@ -173,10 +173,14 @@ components:
           type: string
         name:
           type: string
-        profileImage:
+          description: Display name derived from the OIDC profile, falling back to email then id.
+        email:
+          type: string
+        profileImageUrl:
           type: string
         roles:
           type: array
+          description: Authorization roles. Every user has at least "user".
           items:
             type: string
     AuthUserEnvelope:

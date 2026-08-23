@@ -1,0 +1,42 @@
+{
+  "sources": {
+    "ff2ce9e9-ADULT_PARENTERAL_DILUTION_MANUALJSH2026.pdf": "ef198246f1abb7e767db4b4453f627a9008edcf32a792b9e596bd4aaac658a7f",
+    "1b055ef0-Drug_..adult_IV_drip.pdf": "ba0fe17e3ccce66f9e29e2c92a49b2ca76c51002fe918195744b181f9d46633c"
+  },
+  "rows_written": 141,
+  "rows_dropped_unparseable": [],
+  "skipped_existing_formulary_entries": [
+    "amiodarone",
+    "ceftriaxone",
+    "furosemide",
+    "gentamicin",
+    "heparin",
+    "morphine",
+    "omeprazole",
+    "vancomycin"
+  ],
+  "skipped_duplicate_names": [
+    "aminophylline",
+    "dobutamine",
+    "dopamine",
+    "epinephrine",
+    "isoproterenol",
+    "lidocaine",
+    "nitroglycerin",
+    "norepinephrine",
+    "procainamide",
+    "vasopressin"
+  ],
+  "possible_duplicates": [
+    {
+      "new_name": "digoxine",
+      "existing_name": "digoxin",
+      "similarity": 0.875
+    },
+    {
+      "new_name": "heparine",
+      "existing_name": "heparin",
+      "similarity": 0.875
+    }
+  ]
+}
