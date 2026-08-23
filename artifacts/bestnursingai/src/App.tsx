@@ -74,7 +74,7 @@ function AppContent() {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
-      <main className={`flex-1 transition-all duration-300 overflow-auto ${sidebarOpen ? 'ml-80' : 'ml-0'}`}>
+      <main className={`flex-1 transition-all duration-300 overflow-auto ${sidebarOpen ? 'ms-80' : 'ms-0'}`}>
         {renderContent()}
       </main>
     </div>

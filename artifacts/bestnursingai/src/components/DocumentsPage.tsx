@@ -119,7 +119,7 @@ const DocumentsPage: React.FC = () => {
                 className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
                 disabled={isDeleting}
               >
-                <X className="w-4 h-4 mr-2" />
+                <X className="w-4 h-4 me-2" />
                 {t('cancel')}
               </Button>
               <Button
@@ -131,7 +131,7 @@ const DocumentsPage: React.FC = () => {
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    <Trash2 className="w-4 h-4 mr-2" />
+                    <Trash2 className="w-4 h-4 me-2" />
                     {t('deletePermanently')}
                   </>
                 )}
@@ -208,12 +208,12 @@ const DocumentsPage: React.FC = () => {
       {/* Search */}
       {engineDocuments.length > 0 && (
         <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('search')}
-            className="pl-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
+            className="ps-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
           />
         </div>
       )}
@@ -233,7 +233,7 @@ const DocumentsPage: React.FC = () => {
               onClick={() => fileInputRef.current?.click()}
               className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500"
             >
-              <Upload className="w-4 h-4 mr-2" />
+              <Upload className="w-4 h-4 me-2" />
               {t('uploadFirstDocument')}
             </Button>
           )}

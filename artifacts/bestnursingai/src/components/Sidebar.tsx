@@ -75,27 +75,27 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
     return (
       <button
         onClick={onToggle}
-        className="fixed top-4 left-4 z-50 p-2 bg-[#1a1a2e] rounded-lg border border-purple-500/30 text-white hover:bg-purple-600/20 transition-colors"
+        aria-label={t('openMenu')}
+        className="fixed top-4 start-4 z-50 p-2 bg-[#1a1a2e] rounded-lg border border-purple-500/30 text-white hover:bg-purple-600/20 transition-colors"
       >
-        <ChevronRight className="w-5 h-5" />
+        {/* The arrow points into the page, which is leftwards in Arabic. */}
+        <ChevronRight className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
     );
   }
 
   return (
-    <div className={`fixed inset-y-0 ${isRTL ? 'right-0' : 'left-0'} z-50 w-80 bg-[#0f0f1a] border-${isRTL ? 'l' : 'r'} border-purple-500/20 flex flex-col`}>
+    <div className="fixed inset-y-0 start-0 z-50 w-80 bg-[#0f0f1a] border-e border-purple-500/20 flex flex-col">
       <div className="p-4 border-b border-purple-500/20">
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={onToggle}
+            aria-label={t('closeMenu')}
             className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-gray-400" />
+            <X className="w-5 h-5 text-gray-400" aria-hidden="true" />
           </button>
           <h1 className="text-lg font-semibold text-white">{t('appName')}</h1>
-          <button className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors">
-            <span className="text-gray-400">...</span>
-          </button>
         </div>
 
         <div className="bg-[#1a1a2e] rounded-xl p-3 border border-purple-500/20">
@@ -136,7 +136,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
                 }`}
               >
                 <Icon className="w-5 h-5" />
-                <span className="flex-1 text-left">{item.label}</span>
+                <span className="flex-1 text-start">{item.label}</span>
                 {item.badge && (
                   <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center">
                     {item.badge}
@@ -174,7 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
                       }`}
                     >
                       <Icon className="w-5 h-5" />
-                      <span className="flex-1 text-left">{item.label}</span>
+                      <span className="flex-1 text-start">{item.label}</span>
                     </button>
                   );
                 })}
@@ -189,12 +189,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
           </h3>
           <div className="px-4 mb-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('search')}
-                className="w-full pl-9 pr-3 py-2 bg-[#1a1a2e] border border-purple-500/30 rounded-lg text-white placeholder:text-gray-500 text-sm focus:outline-none focus:border-purple-500"
+                className="w-full ps-9 pe-3 py-2 bg-[#1a1a2e] border border-purple-500/30 rounded-lg text-white placeholder:text-gray-500 text-sm focus:outline-none focus:border-purple-500"
               />
             </div>
           </div>
@@ -222,7 +222,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
           className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-gray-400 hover:bg-purple-600/10 hover:text-white transition-all"
         >
           <Globe className="w-5 h-5" />
-          <span className="flex-1 text-left">{t('language')}</span>
+          <span className="flex-1 text-start">{t('language')}</span>
           <span className="text-sm">{currentLanguage === 'en' ? t('english') : t('arabic')}</span>
         </button>
 
@@ -231,7 +231,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
           className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-gray-400 hover:bg-purple-600/10 hover:text-white transition-all"
         >
           {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          <span className="flex-1 text-left">{isDark ? t('light') : t('dark')}</span>
+          <span className="flex-1 text-start">{isDark ? t('light') : t('dark')}</span>
         </button>
 
         <button
@@ -239,7 +239,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
           className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-red-400 hover:bg-red-500/10 transition-all"
         >
           <LogOut className="w-5 h-5" />
-          <span className="flex-1 text-left">{t('logout')}</span>
+          <span className="flex-1 text-start">{t('logout')}</span>
         </button>
 
         <div className="flex justify-between items-center px-4 pt-2">

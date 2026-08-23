@@ -280,7 +280,7 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="flex-1 flex bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen">
-      <div className="w-64 border-r border-purple-500/20 bg-[#0f0f1a] p-4">
+      <div className="w-64 border-e border-purple-500/20 bg-[#0f0f1a] p-4">
         <h2 className="text-xl font-bold text-white mb-6">{t('settings')}</h2>
         <nav className="space-y-1">
           {sections.map((section) => {
@@ -296,7 +296,7 @@ const SettingsPage: React.FC = () => {
                 }`}
               >
                 <Icon className="w-5 h-5" />
-                <span className="flex-1 text-left">{section.label}</span>
+                <span className="flex-1 text-start">{section.label}</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             );

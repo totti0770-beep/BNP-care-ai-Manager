@@ -73,7 +73,7 @@ const AuditLogPage: React.FC = () => {
             variant="outline"
             className="border-purple-500/30 text-white hover:bg-purple-600/20"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className="w-4 h-4 me-2" />
             {t('refresh')}
           </Button>
           <Button
@@ -81,7 +81,7 @@ const AuditLogPage: React.FC = () => {
             variant="outline"
             className="border-purple-500/30 text-white hover:bg-purple-600/20"
           >
-            <Download className="w-4 h-4 mr-2" />
+            <Download className="w-4 h-4 me-2" />
             {t('export')}
           </Button>
         </div>
@@ -129,12 +129,12 @@ const AuditLogPage: React.FC = () => {
 
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('search')}
-            className="pl-9 bg-[#12122a] border-purple-500/20 text-white"
+            className="ps-9 bg-[#12122a] border-purple-500/20 text-white"
           />
         </div>
         {(['all', 'rejected', 'alerts'] as const).map((key) => (

@@ -93,12 +93,12 @@ const CitationsPage: React.FC = () => {
       )}
 
       <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('search')}
-          className="pl-10 bg-[#12122a] border-purple-500/20 text-white"
+          className="ps-10 bg-[#12122a] border-purple-500/20 text-white"
         />
       </div>
 

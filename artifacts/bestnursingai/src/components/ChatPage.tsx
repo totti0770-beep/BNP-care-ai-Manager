@@ -577,7 +577,7 @@ const ChatPage: React.FC = () => {
                 <button
                   key={s.en}
                   onClick={() => sendMessage(s.en)}
-                  className="flex flex-col items-start px-3 py-2.5 rounded-xl bg-[#1a1a2e] border border-purple-500/20 hover:border-purple-500/50 hover:bg-[#1f1f35] transition-all text-left"
+                  className="flex flex-col items-start px-3 py-2.5 rounded-xl bg-[#1a1a2e] border border-purple-500/20 hover:border-purple-500/50 hover:bg-[#1f1f35] transition-all text-start"
                 >
                   <span className="text-gray-300 text-xs leading-snug">{s.ar}</span>
                   <span className="text-gray-600 text-[10px] mt-0.5 leading-snug">{s.en}</span>
@@ -633,7 +633,7 @@ const ChatPage: React.FC = () => {
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                <span className="text-gray-500 text-xs ml-2">
+                <span className="text-gray-500 text-xs ms-2">
                   {isEngineAvailable ? 'Querying Clinical AI Engine...' : 'Processing clinical context...'}
                 </span>
               </div>

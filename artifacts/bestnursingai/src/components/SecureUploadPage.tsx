@@ -160,7 +160,7 @@ const SecureUploadPage: React.FC = () => {
           <div>
             <Label className="text-gray-300 mb-1 block text-sm">
               {t('digitalSignature')}
-              <span className="text-gray-500 text-xs ml-2">({t('optional')})</span>
+              <span className="text-gray-500 text-xs ms-2">({t('optional')})</span>
             </Label>
             <Input
               value={signature}
@@ -243,7 +243,7 @@ const SecureUploadPage: React.FC = () => {
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-white mb-3">
             {t('indexedDocumentsInDb')}
-            <span className="text-sm text-gray-400 font-normal ml-2">({engineDocuments.length})</span>
+            <span className="text-sm text-gray-400 font-normal ms-2">({engineDocuments.length})</span>
           </h3>
           <div className="space-y-2">
             {engineDocuments.map((doc) => (
