@@ -109,6 +109,41 @@ python artifacts/clinical-ai-engine/scripts/apply_jsh_formulary.py \
 
 Then confirm `GET /auth/audit-log/verify` still returns `valid: true`.
 
+## The `seed` service
+
+A fourth, one-shot service exists in the project. It runs the formulary replay and the
+post-deployment verification from *inside* Railway, which is how a deployment gets checked
+when the machine holding this repository cannot reach `*.up.railway.app`.
+
+It is now reduced to verification only — it runs `scripts/verify_deployment.py` against the
+public gateway on every deploy and exits — and its copy of `JWT_SECRET` has been cleared,
+because only the seeding step needed one. It still holds `BNP_PASSWORD` (as a reference to the
+gateway's bootstrap password) in order to exercise sign-in.
+
+**Delete it once you no longer want that check**, from the Railway dashboard; there is no API
+for removing a service. Until then it also posts a deployment status onto any open pull
+request for this branch, which is noise rather than signal.
+
+To run the seeding again — against a fresh database, say — restore its start command to:
+
+```
+sh -c 'set -e; TOKEN=$(python scripts/mint_operator_token.py --subject "$OPERATOR_SUBJECT" --username "$OPERATOR_USERNAME" --ttl 5400); python scripts/apply_jsh_formulary.py --base-url "$ENGINE_BASE" --token "$TOKEN" --csv data/formulary/jsh_workbooks_import.csv --csv data/formulary/corrections_import.csv --manifest data/formulary/jsh_workbooks_import.manifest.json --review-log data/formulary/pharmacist_review_log.csv --retirement-log data/formulary/retirement_log.csv; python scripts/verify_deployment.py --base-url "$GATEWAY_BASE"'
+```
+
+and set `ENGINE_BASE`, `OPERATOR_SUBJECT`, `OPERATOR_USERNAME` and `JWT_SECRET` again. Note
+that a *redeploy* reuses the previous build; a config change of this kind needs a fresh build,
+which a variable change (without `skipDeploys`) or a push will trigger.
+
+## First things to do on a new deployment
+
+1. **Sign in and change the password** (`POST /api/auth/password`, or the account screen), then
+   clear `BOOTSTRAP_ADMIN_PASSWORD` from the gateway's variables. It is read only when the
+   account does not yet exist, so clearing it changes nothing except who can read the
+   credential out of the deploy configuration.
+2. **Set `OPENAI_API_KEY`** on the engine and upload the clinical PDFs through the admin
+   document screen. Until then the engine is degraded by design and answers nothing.
+3. **Attach a volume at `/app/data`** on the engine so the index survives a restart.
+
 ## Deploying a change
 
 Both services are attached to the branch and rebuild on push. Nothing here needs a manual
