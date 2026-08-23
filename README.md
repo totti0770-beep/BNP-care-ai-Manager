@@ -11,11 +11,18 @@ model and refuse to answer.
 > validation, no compliance package, and no rotation of a signing key that is in this
 > repository's published history.
 >
-> The formulary itself is loaded and signed off: 638 drugs, of which 637 carry a
-> pharmacist's recorded approval against the hospital's P&T-approved 2026 formulary and
-> IV sterile preparations manual or its Adult Parenteral Dilution Manual, each row citing
-> its source page. One is still `pending` and the system shows no dose for it at all.
-> `/health` reports the tally and the review screen shows which are waiting.
+> The formulary itself is loaded and signed off. Replaying the full record —
+> `data/formulary/` — gives 638 drugs, of which 637 carry a pharmacist's recorded
+> approval against the hospital's P&T-approved 2026 formulary and IV sterile
+> preparations manual or its Adult Parenteral Dilution Manual, each row citing its
+> source page. One (`capreomycin`) is still `pending` and the system shows no dose for
+> it at all. `/health` reports the tally and the review screen shows which are waiting.
+>
+> A deployment seeded from the two P&T workbooks alone carries **627 drugs, all
+> approved**: the 11 remaining rows come from an automated extraction of the source
+> PDFs, are not covered by the committee's attribution, and several have garbled names.
+> Which set to load is a deliberate choice — see
+> [`docs/deployment/railway.md`](docs/deployment/railway.md).
 >
 > **No approved row carries a computed dose.** The source documents state dosing as prose,
 > and no number is parsed out of prose into a calculation field, so a nurse gets the
@@ -68,6 +75,20 @@ service account.
 | `lib/db` | Drizzle schema for `sessions` and `users` |
 
 ## Running it
+
+### Deployed (Railway)
+
+The topology that has actually been deployed — Postgres, a private engine, and one public
+gateway that serves both the API and the web app from a single origin — is documented in
+[`docs/deployment/railway.md`](docs/deployment/railway.md), along with the two things that
+are easy to get wrong (the `postgres` image supplies no `DATABASE_URL` of its own, and the
+platform healthcheck must point at `/livez` rather than the readiness endpoint).
+
+`artifacts/clinical-ai-engine/scripts/verify_deployment.py` checks a running deployment
+through its public URL: that the gateway reaches the engine, that an unauthenticated caller
+is refused, that sign-in works, and that the audit chain still verifies. It prints what each
+check returned rather than a pass badge, and it does not fail on a degraded engine — a
+deployment without an API key or a corpus is supposed to report degraded.
 
 ### Docker (recommended)
 
