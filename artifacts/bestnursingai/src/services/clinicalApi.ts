@@ -303,12 +303,25 @@ export interface ImportReport {
 }
 
 /** Admin-only. Returns null when unavailable or the caller is not an admin. */
+/**
+ * One page of the review queue, plus the counts across the whole formulary.
+ *
+ * `limit` and `offset` are always sent. The endpoint defaults to 200 rows and
+ * says nothing about the rest, so omitting them silently truncated a 627-drug
+ * formulary to its first 200 — and a pharmacist scrolling to the bottom of a
+ * `pending` queue would have concluded the review was finished.
+ */
 export async function listFormulary(
-  status?: ReviewStatus
+  status?: ReviewStatus,
+  page: { limit: number; offset: number } = { limit: 100, offset: 0 }
 ): Promise<FormularyListing | null> {
   try {
-    const query = status ? `?status=${status}` : "";
-    const res = await authFetch(`/formulary${query}`);
+    const params = new URLSearchParams({
+      limit: String(page.limit),
+      offset: String(page.offset),
+    });
+    if (status) params.set("status", status);
+    const res = await authFetch(`/formulary?${params}`);
     if (!res || !res.ok) return null;
     return res.json();
   } catch {

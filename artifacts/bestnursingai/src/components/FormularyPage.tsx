@@ -27,6 +27,9 @@ import {
 
 const EMPTY: FormularyCounts = { total: 0, approved: 0, pending: 0, rejected: 0 };
 
+/** Rows per request. The endpoint caps a page at 2000; this is a screenful. */
+const PAGE_SIZE = 100;
+
 /** Numeric columns arrive as strings from NUMERIC; show them as given. */
 const show = (value: string | number | null): string =>
   value === null || value === undefined ? '—' : String(value);
@@ -52,6 +55,7 @@ const FormularyPage: React.FC = () => {
   const [counts, setCounts] = useState<FormularyCounts>(EMPTY);
   const [filter, setFilter] = useState<ReviewStatus | 'all'>('pending');
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
 
   const [file, setFile] = useState<File | null>(null);
@@ -65,19 +69,39 @@ const FormularyPage: React.FC = () => {
   const [note, setNote] = useState('');
   const [sourceRef, setSourceRef] = useState('');
 
-  const refresh = useCallback(async () => {
-    setIsLoading(true);
-    const listing = await listFormulary(filter === 'all' ? undefined : filter);
-    if (listing === null) {
-      setUnavailable(true);
-      setDrugs([]);
-    } else {
-      setUnavailable(false);
-      setDrugs(listing.drugs);
-      setCounts(listing.summary);
-    }
-    setIsLoading(false);
-  }, [filter]);
+  /**
+   * Load one page, replacing the list or appending to it.
+   *
+   * The queue is the whole hospital formulary — several hundred drugs — and
+   * the endpoint returns at most a page at a time. Appending, with the count
+   * of what is loaded against the count of what exists shown above the list,
+   * is what stops a reviewer reading the end of a page as the end of the work.
+   */
+  const load = useCallback(
+    async (offset: number) => {
+      setIsLoading(true);
+      const status = filter === 'all' ? undefined : filter;
+      const listing = await listFormulary(status, { limit: PAGE_SIZE, offset });
+
+      if (listing === null) {
+        setUnavailable(true);
+        if (offset === 0) setDrugs([]);
+      } else {
+        setUnavailable(false);
+        setCounts(listing.summary);
+        setDrugs((current) =>
+          offset === 0 ? listing.drugs : [...current, ...listing.drugs],
+        );
+        // A short page is the end of the queue; a full one may not be.
+        setHasMore(listing.drugs.length === PAGE_SIZE);
+      }
+      setIsLoading(false);
+    },
+    [filter],
+  );
+
+  /** Reload from the top whenever the filter changes. */
+  const refresh = useCallback(() => load(0), [load]);
 
   useEffect(() => {
     void refresh();
@@ -256,7 +280,33 @@ const FormularyPage: React.FC = () => {
 
       {/* Drug list */}
       <section className="space-y-3">
-        {isLoading ? null : drugs.length === 0 ? (
+        {/* How much of the queue is on screen. Without this, the bottom of a
+            page is indistinguishable from the end of the work. */}
+        {!unavailable && drugs.length > 0 && (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {t('formularyShowing', {
+              shown: drugs.length,
+              total: filter === 'all' ? counts.total : counts[filter],
+            })}
+          </p>
+        )}
+
+        {isLoading && drugs.length === 0 ? (
+          // Placeholder rows, not a blank area: an empty list and a list that
+          // has not arrived look identical, and one of them means "no drugs".
+          <div aria-busy="true" aria-label={t('loading')}>
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="rounded-lg border p-4 mb-3 animate-pulse space-y-3"
+              >
+                <div className="h-4 w-1/3 rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+                <div className="h-3 w-1/2 rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+        ) : drugs.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('formularyEmpty')}</p>
         ) : (
           drugs.map((drug) => (
@@ -377,6 +427,17 @@ const FormularyPage: React.FC = () => {
               )}
             </article>
           ))
+        )}
+
+        {hasMore && (
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={isLoading}
+            onClick={() => void load(drugs.length)}
+          >
+            {isLoading ? t('loading') : t('formularyLoadMore')}
+          </Button>
         )}
       </section>
     </div>

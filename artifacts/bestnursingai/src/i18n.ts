@@ -127,6 +127,8 @@ const resources = {
         'This formulary is not fully signed off. Drugs still pending review produce no calculated dose.',
       formularyVerifiedBanner:
         'Every drug in this formulary has been reviewed and approved by a pharmacist.',
+      formularyShowing: 'Showing {{shown}} of {{total}}',
+      formularyLoadMore: 'Load more',
       formularyEmpty: 'No drugs match this filter.',
       formularyUnavailable: 'The formulary could not be loaded. Clinical queries are being refused.',
       formularyHighAlert: 'High alert',
@@ -426,6 +428,8 @@ const resources = {
         'هذا الدستور غير معتمد بالكامل. الأدوية التي ما زالت قيد المراجعة لا تُحسب لها جرعة.',
       formularyVerifiedBanner:
         'جميع أدوية هذا الدستور روجعت واعتُمدت من صيدلي.',
+      formularyShowing: 'عرض {{shown}} من {{total}}',
+      formularyLoadMore: 'تحميل المزيد',
       formularyEmpty: 'لا توجد أدوية مطابقة لهذا التصفية.',
       formularyUnavailable: 'تعذّر تحميل دستور الأدوية. يجري رفض الاستعلامات السريرية.',
       formularyHighAlert: 'عالي الخطورة',
