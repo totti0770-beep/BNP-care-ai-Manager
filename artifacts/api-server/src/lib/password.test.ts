@@ -90,3 +90,20 @@ describe("rejectWeakPassword", () => {
     expect(rejectWeakPassword("admin123-for-real")).toMatch(/guessable/);
   });
 });
+
+describe("changing a password", () => {
+  // The route's own checks are exercised against a real database; these lock
+  // the two properties that would silently weaken it if the helpers changed.
+  it("refuses a new password the bootstrap would have refused", () => {
+    // Same gate on both paths, or the change route becomes the way around it.
+    expect(rejectWeakPassword("password1234")).toBeTruthy();
+    expect(rejectWeakPassword("short")).toBeTruthy();
+    expect(rejectWeakPassword("a-much-better-passphrase-42")).toBeNull();
+  });
+
+  it("treats a null hash as unverifiable, not as no password required", async () => {
+    // An OIDC account has no password. If this returned true, any string would
+    // pass as the "current password" and the account would gain one.
+    expect(await verifyPassword("anything-at-all-here", null)).toBe(false);
+  });
+});

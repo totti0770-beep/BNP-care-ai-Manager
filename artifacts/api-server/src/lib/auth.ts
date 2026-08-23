@@ -2,7 +2,7 @@ import * as client from "openid-client";
 import crypto from "crypto";
 import { type Request, type Response } from "express";
 import { db, sessionsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { AuthUser } from "@workspace/api-zod";
 
 export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
@@ -67,6 +67,31 @@ export async function updateSession(
 
 export async function deleteSession(sid: string): Promise<void> {
   await db.delete(sessionsTable).where(eq(sessionsTable.sid, sid));
+}
+
+/**
+ * End every session belonging to a user, optionally sparing one.
+ *
+ * Used when a password changes. Rotating a credential while every session
+ * opened with the old one keeps working does not evict whoever the rotation
+ * was meant to evict — which is the whole reason someone changes a password
+ * they think has leaked.
+ *
+ * Sessions are JSONB rather than a column per field, so the user is matched
+ * inside the document. `sess->'user'->>'id'` is the same path toAuthUser
+ * writes.
+ */
+export async function deleteSessionsForUser(
+  userId: string,
+  keepSid?: string,
+): Promise<void> {
+  await db
+    .delete(sessionsTable)
+    .where(
+      keepSid
+        ? sql`${sessionsTable.sess}->'user'->>'id' = ${userId} AND ${sessionsTable.sid} <> ${keepSid}`
+        : sql`${sessionsTable.sess}->'user'->>'id' = ${userId}`,
+    );
 }
 
 export async function clearSession(

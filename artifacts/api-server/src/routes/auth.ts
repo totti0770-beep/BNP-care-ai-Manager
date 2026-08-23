@@ -9,10 +9,11 @@ import {
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { grantRolesFor, toAuthUser } from "../lib/authUser";
-import { verifyPassword } from "../lib/password";
+import { hashPassword, rejectWeakPassword, verifyPassword } from "../lib/password";
 import { loginRateLimit, resetLoginAttempts } from "../lib/loginRateLimit";
 import {
   clearSession,
+  deleteSessionsForUser,
   getOidcConfig,
   getSessionId,
   createSession,
@@ -266,6 +267,63 @@ router.post("/auth/login", loginRateLimit, async (req: Request, res: Response) =
   } catch (err) {
     req.log.error({ err }, "Credentials login failed");
     res.status(500).json({ error: "Login failed." });
+  }
+});
+
+router.post("/auth/password", async (req: Request, res: Response) => {
+  // Without this the bootstrap password is permanent: bootstrapAdmin refuses to
+  // overwrite an existing account, so nothing short of a database edit could
+  // change it — and the person handed that password reads it out of the deploy
+  // configuration, where anyone with the same access can read it too.
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+
+  const currentPassword =
+    typeof req.body?.currentPassword === "string" ? req.body.currentPassword : "";
+  const newPassword =
+    typeof req.body?.newPassword === "string" ? req.body.newPassword : "";
+
+  if (!currentPassword || !newPassword) {
+    res
+      .status(400)
+      .json({ error: "Both the current and the new password are required." });
+    return;
+  }
+
+  const weak = rejectWeakPassword(newPassword);
+  if (weak) {
+    res.status(400).json({ error: weak });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id));
+
+    // A null hash is an OIDC account: it has no password, and "no password set"
+    // must never be readable as "any current password will do".
+    if (!user || !(await verifyPassword(currentPassword, user.passwordHash ?? null))) {
+      res.status(401).json({ error: "The current password is not correct." });
+      return;
+    }
+
+    await db
+      .update(usersTable)
+      .set({ passwordHash: await hashPassword(newPassword), updatedAt: new Date() })
+      .where(eq(usersTable.id, user.id));
+
+    // Every other session dies. Changing a password that may have leaked is
+    // pointless if the sessions opened with it keep working.
+    await deleteSessionsForUser(user.id, getSessionId(req));
+
+    res.status(204).end();
+  } catch (err) {
+    req.log.error({ err }, "Password change failed");
+    res.status(500).json({ error: "Could not change the password." });
   }
 });
 
