@@ -85,7 +85,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
   }
 
   return (
-    <div className="fixed inset-y-0 start-0 z-50 w-80 bg-[#0f0f1a] border-e border-purple-500/20 flex flex-col">
+    <>
+      {/* Tapping away closes the overlay. Only below md, where the sidebar
+          covers the content rather than sitting beside it. */}
+      <button
+        type="button"
+        aria-label={t('closeMenu')}
+        onClick={onToggle}
+        className="fixed inset-0 z-40 bg-black/60 md:hidden"
+      />
+    <div className="fixed inset-y-0 start-0 z-50 w-80 max-w-[85vw] bg-[#0f0f1a] border-e border-purple-500/20 flex flex-col">
       <div className="p-4 border-b border-purple-500/20">
         <div className="flex items-center justify-between mb-4">
           <button
@@ -247,6 +256,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
         </div>
       </div>
     </div>
+    </>
   );
 };
 
