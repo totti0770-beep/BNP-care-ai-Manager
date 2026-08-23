@@ -160,11 +160,18 @@ def main():
         f"HTTP {status}: {body if status != 200 else body.get('valid')}",
     )
 
+    # The listing returns {summary, drugs}; the counts are in the summary, and
+    # reading them off the top level printed a bare "?" that looked like the
+    # endpoint had failed when it had not.
     status, body = c.call("GET", "/bnp-api/formulary?status=approved&limit=1")
-    if status == 200 and isinstance(body, dict):
-        c.note("approved drugs", str(body.get("total", body.get("count", "?"))))
-    else:
-        c.check("formulary listing", False, f"HTTP {status}")
+    summary = body.get("summary") if isinstance(body, dict) else None
+    c.check(
+        "formulary listing",
+        status == 200 and isinstance(summary, dict),
+        f"HTTP {status}",
+    )
+    if isinstance(summary, dict):
+        c.note("approved drugs", f"{summary.get('approved')} of {summary.get('total')}")
 
     print()
     if c.failures:
