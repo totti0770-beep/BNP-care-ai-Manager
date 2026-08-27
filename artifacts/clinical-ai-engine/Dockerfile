@@ -12,7 +12,7 @@ WORKDIR /app
 # psycopg2-binary ships wheels, but faiss and pypdf builds want a toolchain on
 # some architectures.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential curl \
+    && apt-get install -y --no-install-recommends build-essential curl gosu \
     && rm -rf /var/lib/apt/lists/*
 
 COPY artifacts/clinical-ai-engine/requirements.txt ./requirements.txt
@@ -26,7 +26,12 @@ COPY artifacts/clinical-ai-engine/ ./
 RUN mkdir -p /app/data && \
     useradd --create-home --uid 10001 engine && \
     chown -R engine:engine /app
-USER engine
+
+# Starts as root so the entrypoint can chown the mounted volume, then drops to
+# `engine` with gosu before exec'ing the server. Deliberately not `USER engine`:
+# a volume is attached root-owned and covers the build-time chown above, so a
+# non-root process cannot create the index directory inside it.
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 EXPOSE 8000
 
