@@ -79,10 +79,10 @@ const CitationsPage: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen p-6">
+    <div className="flex-1 flex flex-col dg-page min-h-screen p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white">{t('citations')}</h2>
-        <p className="text-gray-400 mt-1">{t('citationsDescription')}</p>
+        <h2 className="text-2xl font-bold text-[var(--dg-text)]">{t('citations')}</h2>
+        <p className="text-[var(--dg-muted)] mt-1">{t('citationsDescription')}</p>
       </div>
 
       {!isEngineAvailable && (
@@ -93,32 +93,32 @@ const CitationsPage: React.FC = () => {
       )}
 
       <div className="relative mb-6">
-        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--dg-muted)]" />
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('search')}
-          className="ps-10 bg-[#12122a] border-purple-500/20 text-white"
+          className="ps-10 bg-[var(--dg-surface)] border-[var(--dg-border)] text-[var(--dg-text)]"
         />
       </div>
 
       {isLoading ? (
-        <p className="text-gray-400">{t('loading')}</p>
+        <p className="text-[var(--dg-muted)]">{t('loading')}</p>
       ) : filtered.length === 0 ? (
-        <p className="text-gray-400">{t('noDocuments')}</p>
+        <p className="text-[var(--dg-muted)]">{t('noDocuments')}</p>
       ) : (
         <div className="space-y-3">
           {filtered.map((source) => (
             <div
               key={source.filename}
-              className="rounded-xl bg-[#12122a] border border-purple-500/20 p-4"
+              className="rounded-xl bg-[var(--dg-surface)] border border-[var(--dg-border)] p-4"
             >
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex items-start gap-3">
-                  <FileText className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                  <FileText className="w-5 h-5 text-[var(--dg-accent-strong)] flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-white font-medium">{source.filename}</p>
-                    <p className="text-gray-500 text-xs mt-1">
+                    <p className="text-[var(--dg-text)] font-medium">{source.filename}</p>
+                    <p className="text-[var(--dg-muted)] text-xs mt-1">
                       {source.chunkCount} {t('indexedSegments')} ·{' '}
                       {new Date(source.uploadDate).toLocaleDateString()}
                     </p>
@@ -126,9 +126,9 @@ const CitationsPage: React.FC = () => {
                 </div>
 
                 {source.citationCount > 0 && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-purple-600/15 border border-purple-500/30">
-                    <Quote className="w-3 h-3 text-purple-300" />
-                    <span className="text-purple-200 text-xs font-medium">
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[var(--dg-accent-soft)] border border-[var(--dg-border-strong)]">
+                    <Quote className="w-3 h-3 text-[var(--dg-accent-strong)]" />
+                    <span className="text-[var(--dg-accent-strong)] text-xs font-medium">
                       {t('citedNTimes', { count: source.citationCount })}
                     </span>
                   </div>
@@ -136,7 +136,7 @@ const CitationsPage: React.FC = () => {
               </div>
 
               {source.pagesCited.length > 0 && (
-                <p className="text-gray-500 text-xs mt-3 font-mono">
+                <p className="text-[var(--dg-muted)] text-xs mt-3 font-mono">
                   {t('pagesCited')}:{' '}
                   {source.pagesCited.slice(0, 20).join(', ')}
                   {source.pagesCited.length > 20 ? ' …' : ''}

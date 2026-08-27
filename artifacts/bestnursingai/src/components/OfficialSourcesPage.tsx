@@ -50,49 +50,49 @@ const OfficialSourcesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen p-6">
+    <div className="flex-1 flex flex-col dg-page min-h-screen p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Shield className="w-8 h-8 text-purple-400" />
+          <h2 className="text-2xl font-bold text-[var(--dg-text)] flex items-center gap-3">
+            <Shield className="w-8 h-8 text-[var(--dg-accent-strong)]" />
             {t('officialSources')}
           </h2>
-          <p className="text-gray-400 mt-1">{t('whitelistDescription')}</p>
+          <p className="text-[var(--dg-muted)] mt-1">{t('whitelistDescription')}</p>
         </div>
         {canManageSources && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500">
+              <Button className="dg-gradient hover:brightness-110">
                 <Plus className="w-4 h-4 me-2" />
                 {t('addSource')}
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-[#1a1a2e] border-purple-500/30 text-white">
+            <DialogContent className="bg-[var(--dg-surface)] border-[var(--dg-border-strong)] text-[var(--dg-text)]">
               <DialogHeader>
                 <DialogTitle>{t('addSource')}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label className="text-gray-300">{t('sourceName')}</Label>
+                  <Label className="text-[var(--dg-body)]">{t('sourceName')}</Label>
                   <Input
                     value={newSource.name}
                     onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
                     placeholder={t('enterSourceName')}
-                    className="bg-[#0f0f1a] border-purple-500/30 text-white"
+                    className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)]"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-gray-300">{t('publicKey')}</Label>
+                  <Label className="text-[var(--dg-body)]">{t('publicKey')}</Label>
                   <Input
                     value={newSource.publicKey}
                     onChange={(e) => setNewSource({ ...newSource, publicKey: e.target.value })}
                     placeholder={t('enterPublicKey')}
-                    className="bg-[#0f0f1a] border-purple-500/30 text-white"
+                    className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)]"
                   />
                 </div>
                 <Button
                   onClick={handleAddSource}
-                  className="w-full bg-gradient-to-r from-purple-600 to-violet-600"
+                  className="w-full dg-gradient"
                 >
                   {t('add')}
                 </Button>
@@ -103,12 +103,12 @@ const OfficialSourcesPage: React.FC = () => {
       </div>
 
       <div className="relative mb-6">
-        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--dg-muted)]" />
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('searchSources')}
-          className="ps-10 bg-[#1a1a2e] border-purple-500/30 text-white placeholder:text-gray-500"
+          className="ps-10 bg-[var(--dg-surface)] border-[var(--dg-border-strong)] text-[var(--dg-text)] placeholder:text-[var(--dg-faint)]"
         />
       </div>
 
@@ -125,13 +125,13 @@ const OfficialSourcesPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20">
-          <p className="text-gray-400 text-sm">{t('totalSources')}</p>
-          <p className="text-2xl font-bold text-white">{officialSources.length}</p>
+        <div className="bg-[var(--dg-surface)] rounded-xl p-4 border border-[var(--dg-border)]">
+          <p className="text-[var(--dg-muted)] text-sm">{t('totalSources')}</p>
+          <p className="text-2xl font-bold text-[var(--dg-text)]">{officialSources.length}</p>
         </div>
-        <div className="bg-[#1a1a2e] rounded-xl p-4 border border-purple-500/20">
-          <p className="text-gray-400 text-sm">{t('documentsRecorded')}</p>
-          <p className="text-2xl font-bold text-purple-400">{verifiedDocuments.length}</p>
+        <div className="bg-[var(--dg-surface)] rounded-xl p-4 border border-[var(--dg-border)]">
+          <p className="text-[var(--dg-muted)] text-sm">{t('documentsRecorded')}</p>
+          <p className="text-2xl font-bold text-[var(--dg-accent-strong)]">{verifiedDocuments.length}</p>
         </div>
       </div>
 
@@ -139,28 +139,28 @@ const OfficialSourcesPage: React.FC = () => {
         {filteredSources.map((source) => (
           <div
             key={source.id}
-            className="flex items-center justify-between p-4 rounded-xl bg-[#1a1a2e] border border-purple-500/20 hover:border-purple-500/40 transition-colors"
+            className="flex items-center justify-between p-4 rounded-xl bg-[var(--dg-surface)] border border-[var(--dg-border)] hover:border-[var(--dg-border-strong)] transition-colors"
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 rounded-lg dg-gradient flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-[var(--dg-text)]" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h4 className="text-white font-medium">{source.name}</h4>
+                  <h4 className="text-[var(--dg-text)] font-medium">{source.name}</h4>
                   {source.isActive ? (
                     <span className="px-2 py-0.5 rounded-full bg-green-600/20 text-green-400 text-xs">
                       {t('active')}
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full bg-gray-600/20 text-gray-400 text-xs">
+                    <span className="px-2 py-0.5 rounded-full bg-gray-600/20 text-[var(--dg-muted)] text-xs">
                       {t('inactive')}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <Key className="w-3 h-3 text-gray-500" />
-                  <p className="text-gray-400 text-sm font-mono">{source.publicKey.substring(0, 30)}...</p>
+                  <Key className="w-3 h-3 text-[var(--dg-muted)]" />
+                  <p className="text-[var(--dg-muted)] text-sm font-mono">{source.publicKey.substring(0, 30)}...</p>
                 </div>
               </div>
             </div>
@@ -182,16 +182,16 @@ const OfficialSourcesPage: React.FC = () => {
 
       {verifiedDocuments.length > 0 && (
         <div className="mt-8">
-          <h3 className="text-lg font-semibold text-white mb-4">{t('uploadRecord')}</h3>
+          <h3 className="text-lg font-semibold text-[var(--dg-text)] mb-4">{t('uploadRecord')}</h3>
           <div className="space-y-2">
             {verifiedDocuments.slice(0, 5).map((doc) => (
               <div
                 key={doc.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-[#0f0f1a] border border-purple-500/20"
+                className="flex items-center justify-between p-3 rounded-lg bg-[var(--dg-inset)] border border-[var(--dg-border)]"
               >
                 <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-gray-400" />
-                  <span className="text-white text-sm">{doc.name}</span>
+                  <FileText className="w-5 h-5 text-[var(--dg-muted)]" />
+                  <span className="text-[var(--dg-text)] text-sm">{doc.name}</span>
                 </div>
                 <span className="text-xs text-amber-400">{t('unverified')}</span>
               </div>

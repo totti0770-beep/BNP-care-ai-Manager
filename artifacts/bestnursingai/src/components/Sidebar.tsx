@@ -26,6 +26,7 @@ import {
   Pill,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import DgLogo from '@/components/DgLogo';
 
 interface SidebarProps {
   activeTab: string;
@@ -45,7 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
   const canManageSettings = hasPermission('settings.manage');
 
   const mainMenuItems = [
-    { id: 'new-chat', label: t('newChat'), icon: Plus, color: 'bg-gradient-to-r from-purple-600 to-violet-600' },
+    { id: 'new-chat', label: t('newChat'), icon: Plus, color: 'dg-gradient' },
     { id: 'home', label: t('home'), icon: Home },
     { id: 'chat', label: t('chat'), icon: MessageSquare },
     { id: 'upload', label: t('secureUpload'), icon: Upload },
@@ -76,7 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
       <button
         onClick={onToggle}
         aria-label={t('openMenu')}
-        className="fixed top-4 start-4 z-50 p-2 bg-[#1a1a2e] rounded-lg border border-purple-500/30 text-white hover:bg-purple-600/20 transition-colors"
+        className="fixed top-4 start-4 z-50 p-2 bg-[var(--dg-surface)] rounded-lg border border-[var(--dg-border-strong)] text-[var(--dg-text)] hover:bg-[var(--dg-accent-soft)] transition-colors"
       >
         {/* The arrow points into the page, which is leftwards in Arabic. */}
         <ChevronRight className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`} aria-hidden="true" />
@@ -94,35 +95,27 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
         onClick={onToggle}
         className="fixed inset-0 z-40 bg-black/60 md:hidden"
       />
-    <div className="fixed inset-y-0 start-0 z-50 w-80 max-w-[85vw] bg-[#0f0f1a] border-e border-purple-500/20 flex flex-col">
-      <div className="p-4 border-b border-purple-500/20">
+    <div className="fixed inset-y-0 start-0 z-50 w-80 max-w-[85vw] bg-[var(--dg-sidebar)] border-e border-[var(--dg-border)] flex flex-col">
+      <div className="p-4 border-b border-[var(--dg-border)]">
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={onToggle}
             aria-label={t('closeMenu')}
-            className="p-2 hover:bg-purple-600/20 rounded-lg transition-colors"
+            className="p-2 hover:bg-[var(--dg-accent-soft)] rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-gray-400" aria-hidden="true" />
+            <X className="w-5 h-5 text-[var(--dg-muted)]" aria-hidden="true" />
           </button>
-          <h1 className="text-lg font-semibold text-white">{t('appName')}</h1>
+          <h1 className="flex items-center gap-2 text-base font-bold text-[var(--dg-text)]" dir="ltr">
+            <DgLogo size={30} />
+            <span>
+              BNP <span className="text-[var(--dg-accent)]">DecisionGuard</span>
+            </span>
+          </h1>
         </div>
 
-        <div className="bg-[#1a1a2e] rounded-xl p-3 border border-purple-500/20">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-              <Stethoscope className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-medium text-sm">Nursing AI</p>
-              <p className="text-gray-400 text-xs">{t('appSubtitle')}</p>
-            </div>
-            <button
-              onClick={onToggle}
-              className="p-1 hover:bg-purple-600/20 rounded transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-400" />
-            </button>
-          </div>
+        <div className="bg-[var(--dg-elevated)] rounded-xl px-3 py-2.5 border border-[var(--dg-border)] flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[var(--dg-success)] shrink-0" aria-hidden="true" />
+          <p className="text-[var(--dg-muted)] text-xs leading-snug">{t('appSubtitle')}</p>
         </div>
       </div>
 
@@ -138,16 +131,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
                 onClick={() => onTabChange(item.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                   item.id === 'new-chat'
-                    ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-lg shadow-purple-500/25'
+                    ? 'dg-gradient text-white shadow-lg shadow-[0_6px_18px_rgba(0,166,166,0.28)]'
                     : isActive
-                    ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30'
-                    : 'text-gray-400 hover:bg-purple-600/10 hover:text-white'
+                    ? 'bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] border border-[var(--dg-border-strong)]'
+                    : 'text-[var(--dg-muted)] hover:bg-[var(--dg-accent-faint)] hover:text-[var(--dg-text)]'
                 }`}
               >
                 <Icon className="w-5 h-5" />
                 <span className="flex-1 text-start">{item.label}</span>
                 {item.badge && (
-                  <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center">
+                  <span className="w-6 h-6 rounded-full bg-[var(--dg-accent)] text-white text-xs flex items-center justify-center">
                     {item.badge}
                   </span>
                 )}
@@ -160,7 +153,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
           <div className="mt-6">
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between px-4 py-2 text-gray-500 text-xs font-semibold uppercase tracking-wider hover:text-gray-400 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-2 text-[var(--dg-muted)] text-xs font-semibold uppercase tracking-wider hover:text-[var(--dg-muted)] transition-colors"
             >
               <span>{t('advancedFeatures')}</span>
               <ChevronRight className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
@@ -178,8 +171,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
                       onClick={() => onTabChange(item.id)}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                         isActive
-                          ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30'
-                          : 'text-gray-400 hover:bg-purple-600/10 hover:text-white'
+                          ? 'bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] border border-[var(--dg-border-strong)]'
+                          : 'text-[var(--dg-muted)] hover:bg-[var(--dg-accent-faint)] hover:text-[var(--dg-text)]'
                       }`}
                     >
                       <Icon className="w-5 h-5" />
@@ -193,42 +186,42 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
         )}
 
         <div className="mt-6">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-4">
+          <h3 className="text-xs font-semibold text-[var(--dg-muted)] uppercase tracking-wider mb-3 px-4">
             {t('recentChats')}
           </h3>
           <div className="px-4 mb-3">
             <div className="relative">
-              <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--dg-muted)]" />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('search')}
-                className="w-full ps-9 pe-3 py-2 bg-[#1a1a2e] border border-purple-500/30 rounded-lg text-white placeholder:text-gray-500 text-sm focus:outline-none focus:border-purple-500"
+                className="w-full ps-9 pe-3 py-2 bg-[var(--dg-surface)] border border-[var(--dg-border-strong)] rounded-lg text-[var(--dg-text)] placeholder:text-[var(--dg-faint)] text-sm focus:outline-none focus:border-[var(--dg-accent)]"
               />
             </div>
           </div>
           <div className="px-4 py-8 text-center">
-            <p className="text-gray-500 text-sm">{t('noConversations')}</p>
+            <p className="text-[var(--dg-muted)] text-sm">{t('noConversations')}</p>
           </div>
         </div>
       </div>
 
-      <div className="p-4 border-t border-purple-500/20 space-y-3">
+      <div className="p-4 border-t border-[var(--dg-border)] space-y-3">
         {user && (
-          <div className="flex items-center gap-3 px-3 py-2 bg-[#1a1a2e] rounded-xl border border-purple-500/20">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
+          <div className="flex items-center gap-3 px-3 py-2 bg-[var(--dg-surface)] rounded-xl border border-[var(--dg-border)]">
+            <div className="w-8 h-8 rounded-full dg-gradient flex items-center justify-center">
+              <User className="w-4 h-4 text-[var(--dg-text)]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-medium truncate">{user.name}</p>
-              <p className="text-gray-400 text-xs truncate">{user.email}</p>
+              <p className="text-[var(--dg-text)] text-sm font-medium truncate">{user.name}</p>
+              <p className="text-[var(--dg-muted)] text-xs truncate">{user.email}</p>
             </div>
           </div>
         )}
 
         <button
           onClick={toggleLanguage}
-          className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-gray-400 hover:bg-purple-600/10 hover:text-white transition-all"
+          className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-[var(--dg-muted)] hover:bg-[var(--dg-accent-faint)] hover:text-[var(--dg-text)] transition-all"
         >
           <Globe className="w-5 h-5" />
           <span className="flex-1 text-start">{t('language')}</span>
@@ -237,7 +230,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
 
         <button
           onClick={toggleTheme}
-          className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-gray-400 hover:bg-purple-600/10 hover:text-white transition-all"
+          className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-[var(--dg-muted)] hover:bg-[var(--dg-accent-faint)] hover:text-[var(--dg-text)] transition-all"
         >
           {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           <span className="flex-1 text-start">{isDark ? t('light') : t('dark')}</span>
@@ -252,7 +245,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
         </button>
 
         <div className="flex justify-between items-center px-4 pt-2">
-          <span className="text-gray-500 text-xs">{t('version')}</span>
+          <span className="text-[var(--dg-muted)] text-xs">{t('version')}</span>
         </div>
       </div>
     </div>

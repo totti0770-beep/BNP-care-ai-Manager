@@ -85,13 +85,13 @@ const SecureUploadPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen p-6">
+    <div className="flex-1 flex flex-col dg-page min-h-screen p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <Shield className="w-8 h-8 text-purple-400" />
+        <h2 className="text-2xl font-bold text-[var(--dg-text)] flex items-center gap-3">
+          <Shield className="w-8 h-8 text-[var(--dg-accent-strong)]" />
           {t('secureUpload')}
         </h2>
-        <p className="text-gray-400 mt-1">{t('secureUploadDescription')}</p>
+        <p className="text-[var(--dg-muted)] mt-1">{t('secureUploadDescription')}</p>
       </div>
 
       {/* What upload actually does.
@@ -114,23 +114,23 @@ const SecureUploadPage: React.FC = () => {
               key={step.label}
               className={`rounded-xl p-4 border text-center ${
                 step.enforced
-                  ? 'bg-[#1a1a2e] border-purple-500/20'
+                  ? 'bg-[var(--dg-surface)] border-[var(--dg-border)]'
                   : 'bg-[#12121c] border-gray-600/30 opacity-70'
               }`}
             >
               <div
                 className={`w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center ${
-                  step.enforced ? 'bg-purple-600/20' : 'bg-gray-600/20'
+                  step.enforced ? 'bg-[var(--dg-accent-soft)]' : 'bg-gray-600/20'
                 }`}
               >
                 <Icon
-                  className={`w-6 h-6 ${step.enforced ? 'text-purple-400' : 'text-gray-500'}`}
+                  className={`w-6 h-6 ${step.enforced ? 'text-[var(--dg-accent-strong)]' : 'text-[var(--dg-muted)]'}`}
                 />
               </div>
-              <p className={`font-medium text-sm ${step.enforced ? 'text-white' : 'text-gray-400'}`}>
+              <p className={`font-medium text-sm ${step.enforced ? 'text-[var(--dg-text)]' : 'text-[var(--dg-muted)]'}`}>
                 {step.label}
               </p>
-              <p className={`text-xs mt-1 ${step.enforced ? 'text-gray-500' : 'text-amber-400/80'}`}>
+              <p className={`text-xs mt-1 ${step.enforced ? 'text-[var(--dg-muted)]' : 'text-amber-400/80'}`}>
                 {step.sub}
               </p>
             </div>
@@ -140,49 +140,49 @@ const SecureUploadPage: React.FC = () => {
 
       {/* Selected file preview */}
       {pendingFile ? (
-        <div className="bg-[#1a1a2e] rounded-xl p-6 border border-purple-500/30 mb-6 space-y-4">
+        <div className="bg-[var(--dg-surface)] rounded-xl p-6 border border-[var(--dg-border-strong)] mb-6 space-y-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0">
-              <FileText className="w-6 h-6 text-white" />
+              <FileText className="w-6 h-6 text-[var(--dg-text)]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-medium truncate">{pendingFile.name}</p>
-              <p className="text-gray-400 text-sm">
+              <p className="text-[var(--dg-text)] font-medium truncate">{pendingFile.name}</p>
+              <p className="text-[var(--dg-muted)] text-sm">
                 {(pendingFile.size / (1024 * 1024)).toFixed(2)} MB
               </p>
             </div>
-            <button onClick={cancelPending} className="text-gray-500 hover:text-red-400 transition-colors">
+            <button onClick={cancelPending} className="text-[var(--dg-muted)] hover:text-red-400 transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Optional signature */}
           <div>
-            <Label className="text-gray-300 mb-1 block text-sm">
+            <Label className="text-[var(--dg-body)] mb-1 block text-sm">
               {t('digitalSignature')}
-              <span className="text-gray-500 text-xs ms-2">({t('optional')})</span>
+              <span className="text-[var(--dg-muted)] text-xs ms-2">({t('optional')})</span>
             </Label>
             <Input
               value={signature}
               onChange={(e) => setSignature(e.target.value)}
               placeholder={t('enterDigitalSignature')}
-              className="bg-[#0f0f1a] border-purple-500/30 text-white font-mono text-sm"
+              className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)] font-mono text-sm"
             />
-            <p className="text-gray-500 text-xs mt-1">{t('signatureHelp')}</p>
+            <p className="text-[var(--dg-muted)] text-xs mt-1">{t('signatureHelp')}</p>
           </div>
 
           <div className="flex gap-3">
             <Button
               onClick={cancelPending}
               variant="outline"
-              className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
+              className="flex-1 border-gray-600 text-[var(--dg-body)] hover:bg-gray-800"
             >
               {t('cancel')}
             </Button>
             <Button
               onClick={handleUpload}
               disabled={isVerifying}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500"
+              className="flex-1 dg-gradient hover:brightness-110"
             >
               {isVerifying ? (
                 <span className="flex items-center gap-2">
@@ -206,8 +206,8 @@ const SecureUploadPage: React.FC = () => {
           onDrop={handleDrop}
           className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all cursor-pointer mb-6 ${
             isDragging
-              ? 'border-purple-500 bg-purple-600/10'
-              : 'border-purple-500/30 bg-[#1a1a2e]/50 hover:border-purple-500/50 hover:bg-[#1a1a2e]/80'
+              ? 'border-[var(--dg-accent)] bg-[var(--dg-accent-faint)]'
+              : 'border-[var(--dg-border-strong)] bg-[var(--dg-surface)]/50 hover:border-[var(--dg-border-strong)] hover:bg-[var(--dg-surface)]/80'
           } ${!canUpload && 'opacity-50 cursor-not-allowed'}`}
           onClick={() => canUpload && fileInputRef.current?.click()}
         >
@@ -219,19 +219,19 @@ const SecureUploadPage: React.FC = () => {
             className="hidden"
             disabled={!canUpload}
           />
-          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-            <Upload className="w-10 h-10 text-white" />
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl dg-gradient flex items-center justify-center">
+            <Upload className="w-10 h-10 text-[var(--dg-text)]" />
           </div>
-          <h3 className="text-xl font-semibold text-white mb-2">{t('dragDropSecure')}</h3>
-          <p className="text-gray-400 mb-4">{t('or')}</p>
+          <h3 className="text-xl font-semibold text-[var(--dg-text)] mb-2">{t('dragDropSecure')}</h3>
+          <p className="text-[var(--dg-muted)] mb-4">{t('or')}</p>
           <Button
             disabled={!canUpload}
-            className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500"
+            className="dg-gradient hover:brightness-110"
             onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
           >
             {t('browseSecure')}
           </Button>
-          <div className="mt-6 space-y-1 text-sm text-gray-500">
+          <div className="mt-6 space-y-1 text-sm text-[var(--dg-muted)]">
             <p>{t('maxFileSize')}: 50MB</p>
             <p>{t('supportedFormats')}: PDF only</p>
           </div>
@@ -241,9 +241,9 @@ const SecureUploadPage: React.FC = () => {
       {/* Uploaded documents list — from engine DB (persistent) */}
       {engineDocuments.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-white mb-3">
+          <h3 className="text-lg font-semibold text-[var(--dg-text)] mb-3">
             {t('indexedDocumentsInDb')}
-            <span className="text-sm text-gray-400 font-normal ms-2">({engineDocuments.length})</span>
+            <span className="text-sm text-[var(--dg-muted)] font-normal ms-2">({engineDocuments.length})</span>
           </h3>
           <div className="space-y-2">
             {engineDocuments.map((doc) => (
@@ -253,8 +253,8 @@ const SecureUploadPage: React.FC = () => {
               >
                 <FileText className="w-5 h-5 flex-shrink-0 text-green-400" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{doc.filename}</p>
-                  <p className="text-gray-400 text-xs">
+                  <p className="text-[var(--dg-text)] text-sm font-medium truncate">{doc.filename}</p>
+                  <p className="text-[var(--dg-muted)] text-xs">
                     {doc.chunk_count} {t('segments')} ·{' '}
                     {new Date(doc.upload_date).toLocaleDateString()} ·{' '}
                     <span className="text-green-400">{t('indexedPermanent')}</span>
@@ -266,7 +266,7 @@ const SecureUploadPage: React.FC = () => {
                     if (ok) toast.success(t('documentDeleted'));
                     else toast.error(t('documentDeleteFailed'));
                   }}
-                  className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors text-gray-500 hover:text-red-400"
+                  className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors text-[var(--dg-muted)] hover:text-red-400"
                   title={t('delete')}
                 >
                   <X className="w-4 h-4" />

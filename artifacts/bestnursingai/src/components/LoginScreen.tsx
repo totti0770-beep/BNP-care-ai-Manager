@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Stethoscope, ArrowRight, AlertTriangle, Loader2 } from 'lucide-react';
+import { ArrowRight, AlertTriangle, Loader2 } from 'lucide-react';
+import DgLogo from '@/components/DgLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,34 +35,37 @@ const LoginScreen: React.FC = () => {
   return (
     <div
       dir={isRTL ? 'rtl' : 'ltr'}
-      className="min-h-screen bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] flex items-center justify-center p-4"
+      className="min-h-screen dg-page flex items-center justify-center p-4"
     >
+      {/* The design's single soft teal orb behind the card. */}
       <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 w-[560px] h-[560px] bg-[var(--dg-accent-faint)] rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 mb-4 shadow-lg shadow-purple-500/25">
-            <Stethoscope className="w-10 h-10 text-white" aria-hidden="true" />
+          <div className="inline-flex mb-4 drop-shadow-[0_10px_24px_rgba(0,166,166,0.35)]">
+            <DgLogo size={96} />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">{t('appName')}</h1>
-          <p className="text-gray-400">{t('appSubtitle')}</p>
+          {/* The brand stays Latin in both locales, as designed. */}
+          <h1 className="text-4xl font-bold text-[var(--dg-text)] mb-2" dir="ltr">
+            BNP <span className="text-[var(--dg-accent)]">DecisionGuard</span>
+          </h1>
+          <p className="text-[var(--dg-muted)]">{t('appSubtitle')}</p>
         </div>
 
-        <div className="bg-[#1a1a2e]/80 backdrop-blur-xl rounded-2xl border border-purple-500/20 p-8 shadow-2xl">
-          <h2 className="text-xl font-semibold text-white mb-2 text-center">
+        <div className="bg-[var(--dg-surface)] rounded-[20px] border border-[var(--dg-border)] p-8 shadow-[var(--dg-shadow-card)]">
+          <h2 className="text-xl font-semibold text-[var(--dg-text)] mb-2 text-center">
             {t('welcomeBack')}
           </h2>
-          <p className="text-gray-400 text-sm text-center mb-6">
+          <p className="text-[var(--dg-muted)] text-sm text-center mb-6">
             {t('loginSubtitle', 'Sign in to access the nursing AI assistant')}
           </p>
 
           {oidcAvailable ? (
             <Button
               onClick={login}
-              className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/25"
+              className="w-full dg-gradient hover:brightness-110 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-[0_6px_18px_rgba(0,166,166,0.28)]"
             >
               <span className="flex items-center justify-center gap-2">
                 {t('signIn')}
@@ -83,7 +87,7 @@ const LoginScreen: React.FC = () => {
               )}
 
               <div className="mb-4">
-                <Label htmlFor="email" className="mb-2 block text-gray-300">
+                <Label htmlFor="email" className="mb-2 block text-[var(--dg-body)]">
                   {t('email', 'Email')}
                 </Label>
                 <Input
@@ -97,13 +101,13 @@ const LoginScreen: React.FC = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(error)}
-                  className="border-purple-500/30 bg-[#0f0f1a] text-white placeholder:text-gray-600"
+                  className="border-[var(--dg-border-strong)] bg-[var(--dg-inset)] text-[var(--dg-text)] placeholder:text-[var(--dg-faint)]"
                   placeholder="nurse@hospital.example"
                 />
               </div>
 
               <div className="mb-6">
-                <Label htmlFor="password" className="mb-2 block text-gray-300">
+                <Label htmlFor="password" className="mb-2 block text-[var(--dg-body)]">
                   {t('password', 'Password')}
                 </Label>
                 <Input
@@ -117,14 +121,14 @@ const LoginScreen: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(error)}
-                  className="border-purple-500/30 bg-[#0f0f1a] text-white"
+                  className="border-[var(--dg-border-strong)] bg-[var(--dg-inset)] text-[var(--dg-text)]"
                 />
               </div>
 
               <Button
                 type="submit"
                 disabled={submitting || !email || !password}
-                className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/25 disabled:opacity-50"
+                className="w-full dg-gradient hover:brightness-110 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-[0_6px_18px_rgba(0,166,166,0.28)] disabled:opacity-50"
               >
                 <span className="flex items-center justify-center gap-2">
                   {submitting ? (

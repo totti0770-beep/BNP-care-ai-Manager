@@ -34,8 +34,8 @@ function AppContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+      <div className="min-h-screen bg-[var(--dg-bg)] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-[var(--dg-border-strong)] border-t-[var(--dg-accent)] rounded-full animate-spin" />
       </div>
     );
   }
@@ -73,7 +73,7 @@ function AppContent() {
   };
 
   return (
-    <div className="flex h-screen bg-[#0a0a0f] overflow-hidden">
+    <div className="flex h-screen bg-[var(--dg-bg)] overflow-hidden">
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -106,9 +106,9 @@ function App() {
                 position="top-center"
                 toastOptions={{
                   style: {
-                    background: '#1a1a2e',
-                    color: '#fff',
-                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                    background: 'var(--dg-surface)',
+                    color: 'var(--dg-text)',
+                    border: '1px solid var(--dg-border-strong)',
                   },
                 }}
               />

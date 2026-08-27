@@ -80,13 +80,13 @@ const SettingsPage: React.FC = () => {
         return (
           <div className="space-y-6">
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-                <User className="w-10 h-10 text-white" />
+              <div className="w-20 h-20 rounded-full dg-gradient flex items-center justify-center">
+                <User className="w-10 h-10 text-[var(--dg-text)]" />
               </div>
               <div>
-                <h3 className="text-xl font-semibold text-white">{user?.name}</h3>
-                <p className="text-gray-400">{user?.email}</p>
-                <span className="inline-block mt-2 px-3 py-1 rounded-full bg-purple-600/20 text-purple-400 text-sm">
+                <h3 className="text-xl font-semibold text-[var(--dg-text)]">{user?.name}</h3>
+                <p className="text-[var(--dg-muted)]">{user?.email}</p>
+                <span className="inline-block mt-2 px-3 py-1 rounded-full bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] text-sm">
                   {user?.role}
                 </span>
               </div>
@@ -94,20 +94,20 @@ const SettingsPage: React.FC = () => {
 
             <div className="grid gap-4">
               <div className="space-y-2">
-                <Label className="text-gray-300">{t('email')}</Label>
+                <Label className="text-[var(--dg-body)]">{t('email')}</Label>
                 <Input
                   value={user?.email}
                   disabled
-                  className="bg-[#0f0f1a] border-purple-500/30 text-gray-400"
+                  className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-muted)]"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-gray-300">{t('password')}</Label>
+                <Label className="text-[var(--dg-body)]">{t('password')}</Label>
                 <Input
                   type="password"
                   value="********"
                   disabled
-                  className="bg-[#0f0f1a] border-purple-500/30 text-gray-400"
+                  className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-muted)]"
                 />
               </div>
             </div>
@@ -117,29 +117,29 @@ const SettingsPage: React.FC = () => {
       case 'language':
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white mb-4">{t('language')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--dg-text)] mb-4">{t('language')}</h3>
             <div className="space-y-2">
               <button
                 onClick={() => changeLanguage('en')}
                 className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
                   currentLanguage === 'en'
-                    ? 'border-purple-500 bg-purple-600/20'
-                    : 'border-purple-500/30 bg-[#0f0f1a] hover:bg-purple-600/10'
+                    ? 'border-[var(--dg-accent)] bg-[var(--dg-accent-soft)]'
+                    : 'border-[var(--dg-border-strong)] bg-[var(--dg-inset)] hover:bg-[var(--dg-accent-faint)]'
                 }`}
               >
-                <span className="text-white">English</span>
-                {currentLanguage === 'en' && <Check className="w-5 h-5 text-purple-400" />}
+                <span className="text-[var(--dg-text)]">English</span>
+                {currentLanguage === 'en' && <Check className="w-5 h-5 text-[var(--dg-accent-strong)]" />}
               </button>
               <button
                 onClick={() => changeLanguage('ar')}
                 className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
                   currentLanguage === 'ar'
-                    ? 'border-purple-500 bg-purple-600/20'
-                    : 'border-purple-500/30 bg-[#0f0f1a] hover:bg-purple-600/10'
+                    ? 'border-[var(--dg-accent)] bg-[var(--dg-accent-soft)]'
+                    : 'border-[var(--dg-border-strong)] bg-[var(--dg-inset)] hover:bg-[var(--dg-accent-faint)]'
                 }`}
               >
-                <span className="text-white">العربية</span>
-                {currentLanguage === 'ar' && <Check className="w-5 h-5 text-purple-400" />}
+                <span className="text-[var(--dg-text)]">العربية</span>
+                {currentLanguage === 'ar' && <Check className="w-5 h-5 text-[var(--dg-accent-strong)]" />}
               </button>
             </div>
           </div>
@@ -148,22 +148,22 @@ const SettingsPage: React.FC = () => {
       case 'permissions':
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white mb-4">{t('permissions')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--dg-text)] mb-4">{t('permissions')}</h3>
             <div className="space-y-2">
               {permissions.map((permission) => (
                 <div
                   key={permission.id}
-                  className="flex items-center justify-between p-4 rounded-xl bg-[#0f0f1a] border border-purple-500/30"
+                  className="flex items-center justify-between p-4 rounded-xl bg-[var(--dg-inset)] border border-[var(--dg-border-strong)]"
                 >
                   <div>
-                    <p className="text-white font-medium">{permission.name}</p>
-                    <p className="text-gray-400 text-sm">{permission.description}</p>
+                    <p className="text-[var(--dg-text)] font-medium">{permission.name}</p>
+                    <p className="text-[var(--dg-muted)] text-sm">{permission.description}</p>
                   </div>
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-medium ${
                       permission.enabled
                         ? 'bg-green-600/20 text-green-400'
-                        : 'bg-gray-600/20 text-gray-400'
+                        : 'bg-gray-600/20 text-[var(--dg-muted)]'
                     }`}
                   >
                     {permission.enabled ? t('granted') : t('notGranted')}
@@ -177,18 +177,18 @@ const SettingsPage: React.FC = () => {
       case 'notifications':
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white mb-4">{t('notifications')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--dg-text)] mb-4">{t('notifications')}</h3>
             <div className="space-y-4">
               {Object.entries(notifications).map(([key, value]) => (
                 <div
                   key={key}
-                  className="flex items-center justify-between p-4 rounded-xl bg-[#0f0f1a] border border-purple-500/30"
+                  className="flex items-center justify-between p-4 rounded-xl bg-[var(--dg-inset)] border border-[var(--dg-border-strong)]"
                 >
-                  <span className="text-white capitalize">{key} Notifications</span>
+                  <span className="text-[var(--dg-text)] capitalize">{key} Notifications</span>
                   <Switch
                     checked={value}
                     onCheckedChange={() => toggleNotification(key as keyof typeof notifications)}
-                    className="data-[state=checked]:bg-purple-600"
+                    className="data-[state=checked]:bg-[var(--dg-accent)]"
                   />
                 </div>
               ))}
@@ -199,29 +199,29 @@ const SettingsPage: React.FC = () => {
       case 'theme':
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white mb-4">{t('theme')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--dg-text)] mb-4">{t('theme')}</h3>
             <div className="grid grid-cols-2 gap-4">
               <button
                 onClick={() => setTheme('dark')}
                 className={`p-6 rounded-xl border transition-all ${
                   theme === 'dark'
-                    ? 'border-purple-500 bg-purple-600/20'
-                    : 'border-purple-500/30 bg-[#0f0f1a] hover:bg-purple-600/10'
+                    ? 'border-[var(--dg-accent)] bg-[var(--dg-accent-soft)]'
+                    : 'border-[var(--dg-border-strong)] bg-[var(--dg-inset)] hover:bg-[var(--dg-accent-faint)]'
                 }`}
               >
-                <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-[#0a0a0f] border border-purple-500/30" />
-                <span className="text-white">{t('dark')}</span>
+                <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-[var(--dg-bg)] border border-[var(--dg-border-strong)]" />
+                <span className="text-[var(--dg-text)]">{t('dark')}</span>
               </button>
               <button
                 onClick={() => setTheme('light')}
                 className={`p-6 rounded-xl border transition-all ${
                   theme === 'light'
-                    ? 'border-purple-500 bg-purple-600/20'
-                    : 'border-purple-500/30 bg-[#0f0f1a] hover:bg-purple-600/10'
+                    ? 'border-[var(--dg-accent)] bg-[var(--dg-accent-soft)]'
+                    : 'border-[var(--dg-border-strong)] bg-[var(--dg-inset)] hover:bg-[var(--dg-accent-faint)]'
                 }`}
               >
                 <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-gray-100 border border-gray-300" />
-                <span className="text-white">{t('light')}</span>
+                <span className="text-[var(--dg-text)]">{t('light')}</span>
               </button>
             </div>
           </div>
@@ -235,7 +235,7 @@ const SettingsPage: React.FC = () => {
         // buttons, which read as the real user list.
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">{t('userManagement')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--dg-text)]">{t('userManagement')}</h3>
 
             <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-600/10 border border-amber-500/30">
               <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
@@ -245,25 +245,25 @@ const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#0f0f1a] border border-purple-500/30">
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-3">
+            <div className="p-4 rounded-xl bg-[var(--dg-inset)] border border-[var(--dg-border-strong)]">
+              <p className="text-[var(--dg-muted)] text-xs uppercase tracking-wide mb-3">
                 {t('signedInAs')}
               </p>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-                  <User className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 rounded-full dg-gradient flex items-center justify-center">
+                  <User className="w-5 h-5 text-[var(--dg-text)]" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-white font-medium">{user?.name ?? '—'}</p>
+                  <p className="text-[var(--dg-text)] font-medium">{user?.name ?? '—'}</p>
                   {user?.email && (
-                    <p className="text-gray-400 text-sm">{user.email}</p>
+                    <p className="text-[var(--dg-muted)] text-sm">{user.email}</p>
                   )}
                 </div>
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-medium ${
                     user?.role === 'admin'
-                      ? 'bg-purple-600/20 text-purple-300'
-                      : 'bg-gray-600/20 text-gray-400'
+                      ? 'bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)]'
+                      : 'bg-gray-600/20 text-[var(--dg-muted)]'
                   }`}
                 >
                   {user?.role ?? 'user'}
@@ -279,9 +279,9 @@ const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen">
-      <div className="w-64 border-e border-purple-500/20 bg-[#0f0f1a] p-4">
-        <h2 className="text-xl font-bold text-white mb-6">{t('settings')}</h2>
+    <div className="flex-1 flex dg-page min-h-screen">
+      <div className="w-64 border-e border-[var(--dg-border)] bg-[var(--dg-inset)] p-4">
+        <h2 className="text-xl font-bold text-[var(--dg-text)] mb-6">{t('settings')}</h2>
         <nav className="space-y-1">
           {sections.map((section) => {
             const Icon = section.icon;
@@ -291,8 +291,8 @@ const SettingsPage: React.FC = () => {
                 onClick={() => setActiveSection(section.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   activeSection === section.id
-                    ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30'
-                    : 'text-gray-400 hover:bg-purple-600/10 hover:text-white'
+                    ? 'bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] border border-[var(--dg-border-strong)]'
+                    : 'text-[var(--dg-muted)] hover:bg-[var(--dg-accent-faint)] hover:text-[var(--dg-text)]'
                 }`}
               >
                 <Icon className="w-5 h-5" />

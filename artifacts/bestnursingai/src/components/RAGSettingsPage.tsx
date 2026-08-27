@@ -26,13 +26,13 @@ const StatusRow: React.FC<{
   value: string;
   ok?: boolean;
 }> = ({ icon, label, value, ok }) => (
-  <div className="flex items-center justify-between px-4 py-3 border-b border-purple-500/10 last:border-0">
+  <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--dg-divider)] last:border-0">
     <div className="flex items-center gap-3">
-      <span className="text-purple-400">{icon}</span>
-      <span className="text-gray-300 text-sm">{label}</span>
+      <span className="text-[var(--dg-accent-strong)]">{icon}</span>
+      <span className="text-[var(--dg-body)] text-sm">{label}</span>
     </div>
     <div className="flex items-center gap-2">
-      <span className="text-gray-100 text-sm font-medium">{value}</span>
+      <span className="text-[var(--dg-body)] text-sm font-medium">{value}</span>
       {ok !== undefined &&
         (ok ? (
           <CheckCircle2 className="w-4 h-4 text-green-400" />
@@ -56,11 +56,11 @@ const RAGSettingsPage: React.FC = () => {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">{SYSTEM_NAME}</h1>
-        <p className="text-gray-400 text-sm mt-1">{t('engineSubtitle')}</p>
+        <h1 className="text-2xl font-bold text-[var(--dg-text)]">{SYSTEM_NAME}</h1>
+        <p className="text-[var(--dg-muted)] text-sm mt-1">{t('engineSubtitle')}</p>
       </div>
 
-      <div className="rounded-xl bg-[#12122a] border border-purple-500/20 overflow-hidden">
+      <div className="rounded-xl bg-[var(--dg-surface)] border border-[var(--dg-border)] overflow-hidden">
         <StatusRow
           icon={<Cpu className="w-4 h-4" />}
           label="Engine"
