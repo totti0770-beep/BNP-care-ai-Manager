@@ -5,8 +5,8 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 const resources = {
   en: {
     translation: {
-      appName: 'BestNursingAI',
-      appSubtitle: 'Best Practice Engine',
+      appName: 'BNP DecisionGuard',
+      appSubtitle: 'Governed knowledge, verified decisions',
       login: 'Login',
       logout: 'Logout',
       openMenu: 'Open navigation menu',
@@ -308,8 +308,8 @@ const resources = {
   },
   ar: {
     translation: {
-      appName: 'BestNursingAI',
-      appSubtitle: 'محرك أفضل الممارسات',
+      appName: 'BNP DecisionGuard',
+      appSubtitle: 'منصة حوكمة المعرفة والقرار الموثق',
       login: 'تسجيل الدخول',
       logout: 'تسجيل الخروج',
       openMenu: 'فتح قائمة التنقل',

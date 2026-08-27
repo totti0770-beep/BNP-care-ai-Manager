@@ -100,8 +100,8 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
       {fromEngine && (
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
-            <Zap className="w-3 h-3 text-violet-400" />
-            <span className="text-violet-400 text-xs font-medium">{t('liveEngine')}</span>
+            <Zap className="w-3 h-3 text-[var(--dg-accent-strong)]" />
+            <span className="text-[var(--dg-accent-strong)] text-xs font-medium">{t('liveEngine')}</span>
           </div>
           {bnp.confidenceLabel && (
             <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
@@ -135,45 +135,45 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
       )}
 
       {/* Answer section */}
-      <div className="rounded-xl bg-[#12122a] border border-purple-500/20 overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-2 bg-purple-600/10 border-b border-purple-500/20">
-          <Activity className="w-3.5 h-3.5 text-purple-400" />
-          <span className="text-purple-300 text-xs font-semibold uppercase tracking-wide">{t('secAnswer')}</span>
+      <div className="rounded-xl bg-[var(--dg-surface)] border border-[var(--dg-border)] overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-2 bg-[var(--dg-accent-faint)] border-b border-[var(--dg-border)]">
+          <Activity className="w-3.5 h-3.5 text-[var(--dg-accent-strong)]" />
+          <span className="text-[var(--dg-accent-strong)] text-xs font-semibold uppercase tracking-wide">{t('secAnswer')}</span>
         </div>
         <div className="px-4 py-3">
-          <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line">{bnp.answer}</p>
+          <p className="text-[var(--dg-body)] text-sm leading-relaxed whitespace-pre-line">{bnp.answer}</p>
         </div>
       </div>
 
       {/* Dose section */}
       {bnp.dose && (
-        <div className="rounded-xl bg-[#12122a] border border-cyan-500/20 overflow-hidden">
+        <div className="rounded-xl bg-[var(--dg-surface)] border border-cyan-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-cyan-600/10 border-b border-cyan-500/20">
             <Pill className="w-3.5 h-3.5 text-cyan-400" />
             <span className="text-cyan-300 text-xs font-semibold uppercase tracking-wide">{t('secDose')}</span>
           </div>
           <div className="px-4 py-3">
-            <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line font-mono">{bnp.dose}</p>
+            <p className="text-[var(--dg-body)] text-sm leading-relaxed whitespace-pre-line font-mono">{bnp.dose}</p>
           </div>
         </div>
       )}
 
       {/* Indication section */}
       {bnp.indication && (
-        <div className="rounded-xl bg-[#12122a] border border-teal-500/20 overflow-hidden">
+        <div className="rounded-xl bg-[var(--dg-surface)] border border-teal-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-teal-600/10 border-b border-teal-500/20">
             <Stethoscope className="w-3.5 h-3.5 text-teal-400" />
             <span className="text-teal-300 text-xs font-semibold uppercase tracking-wide">{t('secIndication')}</span>
           </div>
           <div className="px-4 py-3">
-            <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line">{bnp.indication}</p>
+            <p className="text-[var(--dg-body)] text-sm leading-relaxed whitespace-pre-line">{bnp.indication}</p>
           </div>
         </div>
       )}
 
       {/* Safety Warning section */}
       {bnp.safetyWarning && (
-        <div className="rounded-xl bg-[#12122a] border border-red-500/30 overflow-hidden">
+        <div className="rounded-xl bg-[var(--dg-surface)] border border-red-500/30 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-red-600/10 border-b border-red-500/20">
             <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
             <span className="text-red-300 text-xs font-semibold uppercase tracking-wide">{t('secSafetyWarning')}</span>
@@ -186,7 +186,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
 
       {/* Safety Alerts list */}
       {bnp.safetyAlerts && bnp.safetyAlerts.length > 0 && (
-        <div className="rounded-xl bg-[#12122a] border border-orange-500/30 overflow-hidden">
+        <div className="rounded-xl bg-[var(--dg-surface)] border border-orange-500/30 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-orange-600/10 border-b border-orange-500/20">
             <ShieldAlert className="w-3.5 h-3.5 text-orange-400" />
             <span className="text-orange-300 text-xs font-semibold uppercase tracking-wide">{t('secSafetyAlerts')}</span>
@@ -202,7 +202,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
       {/* Contraindications & Interactions */}
       {((bnp.contraindications && bnp.contraindications.length > 0) ||
         (bnp.interactions && bnp.interactions.length > 0)) && (
-        <div className="rounded-xl bg-[#12122a] border border-yellow-500/20 overflow-hidden">
+        <div className="rounded-xl bg-[var(--dg-surface)] border border-yellow-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-yellow-600/10 border-b border-yellow-500/20">
             <XCircle className="w-3.5 h-3.5 text-yellow-400" />
             <span className="text-yellow-300 text-xs font-semibold uppercase tracking-wide">{t('secClinicalFlags')}</span>
@@ -213,7 +213,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
                 <p className="text-yellow-400 text-xs font-semibold mb-1.5">Contraindications</p>
                 <ul className="space-y-0.5">
                   {bnp.contraindications.map((c, i) => (
-                    <li key={i} className="text-gray-300 text-xs flex items-center gap-1.5">
+                    <li key={i} className="text-[var(--dg-body)] text-xs flex items-center gap-1.5">
                       <span className="text-yellow-500">•</span> {c}
                     </li>
                   ))}
@@ -227,7 +227,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
                 </p>
                 <ul className="space-y-0.5">
                   {bnp.interactions.map((d, i) => (
-                    <li key={i} className="text-gray-300 text-xs flex items-center gap-1.5">
+                    <li key={i} className="text-[var(--dg-body)] text-xs flex items-center gap-1.5">
                       <span className="text-yellow-500">⇄</span> {d}
                     </li>
                   ))}
@@ -240,15 +240,15 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
 
       {/* Nursing Notes */}
       {bnp.nursingNotes && bnp.nursingNotes.length > 0 && (
-        <div className="rounded-xl bg-[#12122a] border border-violet-500/20 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2 bg-violet-600/10 border-b border-violet-500/20">
-            <ClipboardList className="w-3.5 h-3.5 text-violet-400" />
-            <span className="text-violet-300 text-xs font-semibold uppercase tracking-wide">{t('secNursingNotes')}</span>
+        <div className="rounded-xl bg-[var(--dg-surface)] border border-[var(--dg-border)] overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--dg-accent-faint)] border-b border-[var(--dg-border)]">
+            <ClipboardList className="w-3.5 h-3.5 text-[var(--dg-accent-strong)]" />
+            <span className="text-[var(--dg-accent-strong)] text-xs font-semibold uppercase tracking-wide">{t('secNursingNotes')}</span>
           </div>
           <ul className="px-4 py-3 space-y-1.5">
             {bnp.nursingNotes.map((note, i) => (
-              <li key={i} className="flex items-start gap-2 text-gray-300 text-xs leading-relaxed">
-                <CheckCircle2 className="w-3 h-3 text-violet-400 mt-0.5 flex-shrink-0" />
+              <li key={i} className="flex items-start gap-2 text-[var(--dg-body)] text-xs leading-relaxed">
+                <CheckCircle2 className="w-3 h-3 text-[var(--dg-accent-strong)] mt-0.5 flex-shrink-0" />
                 {note}
               </li>
             ))}
@@ -258,7 +258,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
 
       {/* Sources */}
       {bnp.sources.length > 0 && (
-        <div className="rounded-xl bg-[#12122a] border border-green-500/20 overflow-hidden">
+        <div className="rounded-xl bg-[var(--dg-surface)] border border-green-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-green-600/10 border-b border-green-500/20">
             <BookOpen className="w-3.5 h-3.5 text-green-400" />
             <span className="text-green-300 text-xs font-semibold uppercase tracking-wide">{t('secSources')}</span>
@@ -268,12 +268,12 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
               <div key={i} className="flex items-start gap-2">
                 <span className="text-green-500 text-xs mt-0.5">[{i + 1}]</span>
                 <div>
-                  <p className="text-gray-300 text-xs">{src.documentName}</p>
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-[var(--dg-body)] text-xs">{src.documentName}</p>
+                  <p className="text-[var(--dg-muted)] text-xs">
                     Page {src.pageNumber} · Relevance: {(src.similarity * 100).toFixed(0)}%
                   </p>
                   {src.excerpt && (
-                    <p className="text-gray-600 text-xs mt-0.5 line-clamp-2 italic">"{src.excerpt}"</p>
+                    <p className="text-[var(--dg-muted)] text-xs mt-0.5 line-clamp-2 italic">"{src.excerpt}"</p>
                   )}
                 </div>
               </div>
@@ -335,51 +335,51 @@ function PatientContextPanel({
     onChange({ ...opts, otherDrugs: opts.otherDrugs?.filter((_, idx) => idx !== i) });
 
   return (
-    <div className="border border-purple-500/20 rounded-xl p-4 bg-[#12122a] space-y-4">
-      <p className="text-purple-300 text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
+    <div className="border border-[var(--dg-border)] rounded-xl p-4 bg-[var(--dg-surface)] space-y-4">
+      <p className="text-[var(--dg-accent-strong)] text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
         <UserCircle className="w-3.5 h-3.5" /> Patient Context (optional — enables safety checks)
       </p>
 
       {/* Weight + Age */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-gray-400 text-xs mb-1 block">Weight (kg)</label>
+          <label className="text-[var(--dg-muted)] text-xs mb-1 block">Weight (kg)</label>
           <Input
             type="number"
             min={1} max={300}
             placeholder="e.g. 70"
             value={opts.patientWeightKg ?? ''}
             onChange={e => onChange({ ...opts, patientWeightKg: e.target.value ? Number(e.target.value) : undefined })}
-            className="bg-[#0f0f1a] border-purple-500/30 text-white text-sm h-8"
+            className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)] text-sm h-8"
           />
         </div>
         <div>
-          <label className="text-gray-400 text-xs mb-1 block">Age (years)</label>
+          <label className="text-[var(--dg-muted)] text-xs mb-1 block">Age (years)</label>
           <Input
             type="number"
             min={0} max={120}
             placeholder="e.g. 45"
             value={opts.age ?? ''}
             onChange={e => onChange({ ...opts, age: e.target.value ? Number(e.target.value) : undefined })}
-            className="bg-[#0f0f1a] border-purple-500/30 text-white text-sm h-8"
+            className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)] text-sm h-8"
           />
         </div>
       </div>
 
       {/* Conditions */}
       <div>
-        <label className="text-gray-400 text-xs mb-1 block">Patient Conditions (for contraindication check)</label>
+        <label className="text-[var(--dg-muted)] text-xs mb-1 block">Patient Conditions (for contraindication check)</label>
         <div className="flex gap-2">
           <Input
             placeholder="e.g. severe liver disease"
             value={conditionInput}
             onChange={e => setConditionInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCondition(); } }}
-            className="bg-[#0f0f1a] border-purple-500/30 text-white text-sm h-8 flex-1"
+            className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)] text-sm h-8 flex-1"
           />
           <button
             onClick={addCondition}
-            className="w-8 h-8 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-lg bg-[var(--dg-accent-soft)] hover:bg-[var(--dg-border-strong)] text-[var(--dg-accent-strong)] flex items-center justify-center transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -398,18 +398,18 @@ function PatientContextPanel({
 
       {/* Other drugs */}
       <div>
-        <label className="text-gray-400 text-xs mb-1 block">Other Medications (for interaction check)</label>
+        <label className="text-[var(--dg-muted)] text-xs mb-1 block">Other Medications (for interaction check)</label>
         <div className="flex gap-2">
           <Input
             placeholder="e.g. warfarin, aspirin"
             value={drugInput}
             onChange={e => setDrugInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDrug(); } }}
-            className="bg-[#0f0f1a] border-purple-500/30 text-white text-sm h-8 flex-1"
+            className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)] text-sm h-8 flex-1"
           />
           <button
             onClick={addDrug}
-            className="w-8 h-8 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-lg bg-[var(--dg-accent-soft)] hover:bg-[var(--dg-border-strong)] text-[var(--dg-accent-strong)] flex items-center justify-center transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -513,12 +513,12 @@ const ChatPage: React.FC = () => {
 
   // Engine status badge
   const engineBadge = isChecking ? (
-    <span className="px-3 py-1 rounded-full bg-gray-600/20 text-gray-400 text-xs flex items-center gap-1">
+    <span className="px-3 py-1 rounded-full bg-gray-600/20 text-[var(--dg-muted)] text-xs flex items-center gap-1">
       <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
       Connecting...
     </span>
   ) : isEngineAvailable ? (
-    <span className="px-3 py-1 rounded-full bg-violet-600/20 text-violet-300 text-xs flex items-center gap-1">
+    <span className="px-3 py-1 rounded-full bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] text-xs flex items-center gap-1">
       <Zap className="w-3 h-3" />
       Live Engine · {indexedChunks} chunks{openaiEnabled ? ' · GPT-4o' : ''}
     </span>
@@ -530,17 +530,17 @@ const ChatPage: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] h-screen">
+    <div className="flex-1 flex flex-col dg-page h-screen">
 
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-purple-500/20">
+      <div className="flex items-center justify-between p-4 border-b border-[var(--dg-border)]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-            <Bot className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-lg dg-gradient flex items-center justify-center">
+            <Bot className="w-5 h-5 text-[var(--dg-text)]" />
           </div>
           <div>
-            <h2 className="text-white font-semibold">{SYSTEM_NAME}</h2>
-            <p className="text-gray-400 text-xs">
+            <h2 className="text-[var(--dg-text)] font-semibold">{SYSTEM_NAME}</h2>
+            <p className="text-[var(--dg-muted)] text-xs">
               {t('engineSubtitle')}
             </p>
           </div>
@@ -554,20 +554,20 @@ const ChatPage: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-2">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center mb-4 shadow-lg shadow-purple-500/20">
-              <Bot className="w-10 h-10 text-white" />
+            <div className="w-20 h-20 rounded-2xl dg-gradient flex items-center justify-center mb-4 shadow-lg shadow-[rgba(0,166,166,0.2)]">
+              <Bot className="w-10 h-10 text-[var(--dg-text)]" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-1">{SYSTEM_NAME}</h3>
-            <p className="text-gray-400 text-sm mb-1">
+            <h3 className="text-xl font-semibold text-[var(--dg-text)] mb-1">{SYSTEM_NAME}</h3>
+            <p className="text-[var(--dg-muted)] text-sm mb-1">
               {isEngineAvailable
                 ? `متصل بالمحرك السريري · ${indexedChunks} مقطع مفهرس`
                 : t('engineUnavailableBody')}
             </p>
-            <p className="text-gray-600 text-xs mb-4">
+            <p className="text-[var(--dg-muted)] text-xs mb-4">
               حساب الجرعات · تحذيرات السلامة · مراجع موثّقة
             </p>
             {voiceSupported && (
-              <div className="flex items-center gap-1.5 text-xs text-purple-400/70 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1.5 mb-5">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--dg-accent-strong)]/70 bg-[var(--dg-accent-faint)] border border-[var(--dg-border)] rounded-full px-3 py-1.5 mb-5">
                 <Mic className="w-3 h-3" />
                 يمكنك التحدث بسؤالك بالضغط على زر الميكروفون
               </div>
@@ -577,10 +577,10 @@ const ChatPage: React.FC = () => {
                 <button
                   key={s.en}
                   onClick={() => sendMessage(s.en)}
-                  className="flex flex-col items-start px-3 py-2.5 rounded-xl bg-[#1a1a2e] border border-purple-500/20 hover:border-purple-500/50 hover:bg-[#1f1f35] transition-all text-start"
+                  className="flex flex-col items-start px-3 py-2.5 rounded-xl bg-[var(--dg-surface)] border border-[var(--dg-border)] hover:border-[var(--dg-border-strong)] hover:bg-[var(--dg-elevated)] transition-all text-start"
                 >
-                  <span className="text-gray-300 text-xs leading-snug">{s.ar}</span>
-                  <span className="text-gray-600 text-[10px] mt-0.5 leading-snug">{s.en}</span>
+                  <span className="text-[var(--dg-body)] text-xs leading-snug">{s.ar}</span>
+                  <span className="text-[var(--dg-muted)] text-[10px] mt-0.5 leading-snug">{s.en}</span>
                 </button>
               ))}
             </div>
@@ -590,27 +590,27 @@ const ChatPage: React.FC = () => {
             <div key={msg.id} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
                 msg.sender === 'user'
-                  ? 'bg-gradient-to-br from-purple-500 to-violet-600'
+                  ? 'dg-gradient'
                   : msg.bnp?.safetyAlert
                   ? 'bg-gradient-to-br from-red-600 to-orange-600'
                   : msg.bnp?.notFound
                   ? 'bg-gradient-to-br from-yellow-600 to-orange-500'
                   : msg.fromEngine
-                  ? 'bg-gradient-to-br from-violet-600 to-purple-700'
+                  ? 'dg-gradient'
                   : 'bg-gradient-to-br from-gray-600 to-gray-700'
               }`}>
-                {msg.sender === 'user' ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-white" />}
+                {msg.sender === 'user' ? <User className="w-4 h-4 text-[var(--dg-text)]" /> : <Bot className="w-4 h-4 text-[var(--dg-text)]" />}
               </div>
 
               <div className={`max-w-[78%] ${msg.sender === 'user' ? 'items-end' : 'items-start'} flex flex-col`}>
                 {msg.sender === 'user' ? (
-                  <div className="bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-2xl rounded-tr-sm px-4 py-3">
+                  <div className="dg-gradient text-white rounded-2xl rounded-tr-sm px-4 py-3">
                     <p className="text-sm">{msg.content}</p>
                   </div>
                 ) : (
                   msg.bnp && <BNPResponseCard bnp={msg.bnp} fromEngine={msg.fromEngine} />
                 )}
-                <span className="text-xs text-gray-600 mt-1 px-1">
+                <span className="text-xs text-[var(--dg-muted)] mt-1 px-1">
                   {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
@@ -623,17 +623,17 @@ const ChatPage: React.FC = () => {
           <div className="flex gap-3">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
               isEngineAvailable
-                ? 'bg-gradient-to-br from-violet-600 to-purple-700'
+                ? 'dg-gradient'
                 : 'bg-gradient-to-br from-gray-600 to-gray-700'
             }`}>
-              <Bot className="w-4 h-4 text-white" />
+              <Bot className="w-4 h-4 text-[var(--dg-text)]" />
             </div>
-            <div className="bg-[#1a1a2e] rounded-2xl px-4 py-3 border border-purple-500/20">
+            <div className="bg-[var(--dg-surface)] rounded-2xl px-4 py-3 border border-[var(--dg-border)]">
               <div className="flex gap-1 items-center">
-                <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                <span className="text-gray-500 text-xs ms-2">
+                <span className="w-2 h-2 bg-[var(--dg-accent)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-[var(--dg-accent)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-[var(--dg-accent)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="text-[var(--dg-muted)] text-xs ms-2">
                   {isEngineAvailable ? 'Querying Clinical AI Engine...' : 'Processing clinical context...'}
                 </span>
               </div>
@@ -644,21 +644,21 @@ const ChatPage: React.FC = () => {
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-purple-500/20 space-y-2">
+      <div className="p-4 border-t border-[var(--dg-border)] space-y-2">
         {/* Patient context toggle */}
         {isEngineAvailable && (
           <button
             onClick={() => setShowPatientCtx(v => !v)}
             className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
               hasPatientCtx
-                ? 'border-purple-500/60 bg-purple-600/15 text-purple-300'
-                : 'border-purple-500/20 bg-transparent text-gray-500 hover:text-gray-300 hover:border-purple-500/40'
+                ? 'border-[var(--dg-accent)]/60 bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)]'
+                : 'border-[var(--dg-border)] bg-transparent text-[var(--dg-muted)] hover:text-[var(--dg-body)] hover:border-[var(--dg-border-strong)]'
             }`}
           >
             <UserCircle className="w-3.5 h-3.5" />
             Patient Context
             {hasPatientCtx && (
-              <span className="bg-purple-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
+              <span className="bg-[var(--dg-accent)] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
                 {(patientOpts.conditions?.length ?? 0) + (patientOpts.otherDrugs?.length ?? 0) +
                   (patientOpts.patientWeightKg ? 1 : 0) + (patientOpts.age ? 1 : 0)}
               </span>
@@ -672,8 +672,8 @@ const ChatPage: React.FC = () => {
           <PatientContextPanel opts={patientOpts} onChange={setPatientOpts} />
         )}
 
-        <div className={`flex items-center gap-2 bg-[#1a1a2e] rounded-xl border p-2 transition-all duration-300 ${
-          isListening ? 'border-red-500/60 shadow-[0_0_12px_rgba(239,68,68,0.2)]' : 'border-purple-500/30'
+        <div className={`flex items-center gap-2 bg-[var(--dg-surface)] rounded-xl border p-2 transition-all duration-300 ${
+          isListening ? 'border-red-500/60 shadow-[0_0_12px_rgba(239,68,68,0.2)]' : 'border-[var(--dg-border-strong)]'
         }`}>
           {/* Mic button */}
           {voiceSupported && (
@@ -684,7 +684,7 @@ const ChatPage: React.FC = () => {
               className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
                 isListening
                   ? 'bg-red-500/20 text-red-400 animate-pulse hover:bg-red-500/30'
-                  : 'bg-purple-600/20 text-purple-400 hover:bg-purple-600/30'
+                  : 'bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] hover:bg-[var(--dg-border-strong)]'
               } disabled:opacity-40`}
             >
               {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -695,18 +695,18 @@ const ChatPage: React.FC = () => {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={isListening ? '🎤 جارٍ الاستماع...' : 'Ask a clinical question... (include drug name for safety checks)'}
-            className="flex-1 bg-transparent border-0 text-white placeholder:text-gray-500 focus-visible:ring-0 shadow-none text-sm"
+            className="flex-1 bg-transparent border-0 text-[var(--dg-text)] placeholder:text-[var(--dg-faint)] focus-visible:ring-0 shadow-none text-sm"
             disabled={isTyping}
           />
           <Button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || isTyping}
-            className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white px-4"
+            className="dg-gradient hover:brightness-110 text-white px-4"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <p className="text-center text-gray-600 text-xs">
+        <p className="text-center text-[var(--dg-muted)] text-xs">
           {SYSTEM_NAME} · RAG-Only · No Hallucination · Sources Always Cited
         </p>
       </div>

@@ -140,7 +140,7 @@
   --chart-4: red; /*replace with H S L */
   --chart-5: red; /*replace with H S L */
 
-  --app-font-sans: 'Inter', sans-serif;
+  --app-font-sans: 'Inter', 'Cairo', 'Tajawal', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
   --radius: .5rem; /* 8px */
@@ -391,59 +391,98 @@
     inset: -1px;
   }
 }
+
 /* ═══════════════════════════════════════════════════════
-   LIGHT MODE — BestNursingAI
-   Applied when <html data-theme="light"> is set
+   BNP DecisionGuard design tokens (Figma OnemVilIELvND43M7ahdIJ)
+   Dark is the default; <html data-theme="light"> overrides.
+   Components reference these via arbitrary values, e.g.
+   bg-[var(--dg-surface)], so both themes share one markup.
    ═══════════════════════════════════════════════════════ */
+:root {
+  --dg-bg: #05111f;
+  --dg-bg-2: #081a2e;
+  --dg-surface: #0a1c30;
+  --dg-sidebar: #07182b;
+  --dg-elevated: #0d2138;
+  --dg-inset: #05111f;
 
-/* ── Main backgrounds ─────────────────────────────────── */
-[data-theme="light"] .bg-\[\#0a0a0f\],
-[data-theme="light"] .bg-\[\#0a0a0f\]\/50 { background-color: #f8fafc; }
-[data-theme="light"] .bg-\[\#0f0f1a\] { background-color: #ffffff; }
-[data-theme="light"] .bg-\[\#1a1a2e\] { background-color: #ede9fe; }
-[data-theme="light"] .bg-\[\#1a1a2e\]\/50 { background-color: rgba(237,233,254,0.5); }
-[data-theme="light"] .bg-\[\#1a1a2e\]\/80 { background-color: rgba(237,233,254,0.8); }
-[data-theme="light"] .bg-\[\#2d1b4e\] { background-color: #ddd6fe; }
-[data-theme="light"] .bg-\[\#16213e\] { background-color: #f1f5f9; }
+  --dg-text: #ffffff;
+  --dg-body: #d9e1e8;
+  --dg-muted: #94a3b8;
+  --dg-faint: #6b788c;
 
-/* ── Gradient overrides ───────────────────────────────── */
-[data-theme="light"] .from-\[\#0a0a0f\] { --tw-gradient-from: #f8fafc var(--tw-gradient-from-position); }
-[data-theme="light"] .via-\[\#1a1a2e\] { --tw-gradient-via: #ede9fe var(--tw-gradient-via-position); }
-[data-theme="light"] .via-\[\#0f0f1a\] { --tw-gradient-via: #ffffff var(--tw-gradient-via-position); }
-[data-theme="light"] .to-\[\#0f0f1a\] { --tw-gradient-to: #ffffff var(--tw-gradient-to-position); }
-[data-theme="light"] .to-\[\#1a1a2e\] { --tw-gradient-to: #ede9fe var(--tw-gradient-to-position); }
-[data-theme="light"] .from-\[\#0f0f1a\] { --tw-gradient-from: #ffffff var(--tw-gradient-from-position); }
+  --dg-navy: #061b3a;
+  --dg-accent: #00a6a6;
+  --dg-accent-strong: #2bc4c4;
+  --dg-accent-soft: rgba(0, 166, 166, 0.15);
+  --dg-accent-faint: rgba(0, 166, 166, 0.08);
 
-/* ── Text colors ─────────────────────────────────────── */
-[data-theme="light"] .text-white { color: #1e1b4b; }
-[data-theme="light"] .text-gray-400 { color: #6b7280; }
-[data-theme="light"] .text-gray-500 { color: #4b5563; }
-[data-theme="light"] .text-gray-600 { color: #374151; }
+  --dg-border: rgba(0, 166, 166, 0.18);
+  --dg-border-strong: rgba(0, 166, 166, 0.3);
+  --dg-divider: rgba(0, 166, 166, 0.15);
 
-/* Placeholders */
-[data-theme="light"] .placeholder\:text-gray-500::placeholder { color: #9ca3af; }
-[data-theme="light"] .placeholder\:text-gray-400::placeholder { color: #6b7280; }
+  --dg-success: #33c773;
+  --dg-success-soft: rgba(51, 199, 115, 0.15);
+  --dg-warn: #f2c759;
+  --dg-warn-soft: rgba(217, 166, 38, 0.1);
+  --dg-warn-border: rgba(217, 166, 38, 0.3);
 
-/* ── Borders ─────────────────────────────────────────── */
-[data-theme="light"] .border-purple-500\/20 { border-color: rgba(139, 92, 246, 0.35); }
-[data-theme="light"] .border-purple-500\/30 { border-color: rgba(139, 92, 246, 0.45); }
-[data-theme="light"] .border-purple-500\/40 { border-color: rgba(139, 92, 246, 0.55); }
-[data-theme="light"] .border-purple-500\/10 { border-color: rgba(139, 92, 246, 0.20); }
-
-/* ── Sidebar ─────────────────────────────────────────── */
-[data-theme="light"] .hover\:bg-purple-600\/10:hover { background-color: rgba(124, 58, 237, 0.08); }
-[data-theme="light"] .hover\:bg-purple-600\/20:hover { background-color: rgba(124, 58, 237, 0.15); }
-[data-theme="light"] .bg-purple-600\/20 { background-color: rgba(124, 58, 237, 0.15); }
-
-/* ── Inputs ──────────────────────────────────────────── */
-[data-theme="light"] input,
-[data-theme="light"] textarea {
-  background-color: #ffffff;
-  color: #1e1b4b;
-  border-color: rgba(139, 92, 246, 0.4);
+  --dg-shadow-card: 0 16px 40px rgba(0, 0, 0, 0.4);
+  --dg-shadow-cta: 0 6px 18px rgba(0, 166, 166, 0.28);
 }
 
-/* ── Scrollbar ───────────────────────────────────────── */
-[data-theme="light"] ::-webkit-scrollbar-track { background: #f1f5f9; }
-[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.4); }
+[data-theme="light"] {
+  --dg-bg: #eef2f6;
+  --dg-bg-2: #f8fafc;
+  --dg-surface: #ffffff;
+  --dg-sidebar: #ffffff;
+  --dg-elevated: #f8fafc;
+  --dg-inset: #f8fafc;
 
+  --dg-text: #0f172a;
+  --dg-body: #1e293b;
+  --dg-muted: #63738c;
+  --dg-faint: #8b99ad;
+
+  /* Slightly darker accent for contrast on white. */
+  --dg-accent-strong: #008a8a;
+  --dg-accent-faint: rgba(0, 166, 166, 0.06);
+
+  --dg-border: #d9e1e8;
+  --dg-border-strong: rgba(0, 166, 166, 0.45);
+  --dg-divider: #d9e1e8;
+
+  --dg-success: #1f9d55;
+  --dg-warn: #b07d10;
+  --dg-warn-soft: rgba(217, 166, 38, 0.12);
+
+  --dg-shadow-card: 0 16px 40px rgba(15, 23, 41, 0.08);
+}
+
+/* The page background: a barely-there 148° sweep, not a flat fill. */
+.dg-page {
+  background-image: linear-gradient(
+    148deg,
+    var(--dg-bg) 0%,
+    var(--dg-bg-2) 36%,
+    var(--dg-bg) 71%
+  );
+}
+
+/* Brand gradient, used for CTAs, active nav and the user's chat bubble.
+   Identical in both themes — text on it is always white. */
+.dg-gradient {
+  background-image: linear-gradient(90deg, var(--dg-navy) 0%, var(--dg-accent) 100%);
+}
+
+/* Arabic renders in Cairo, Latin and numerals in Inter: the stack is
+   per-glyph, and Inter carries no Arabic glyphs to shadow Cairo's. */
+[data-theme="light"] input,
+[data-theme="light"] textarea {
+  background-color: var(--dg-inset);
+  color: var(--dg-text);
+  border-color: var(--dg-border);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track { background: #f1f5f9; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0, 166, 166, 0.4); }

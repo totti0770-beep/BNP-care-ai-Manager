@@ -73,20 +73,20 @@ const AuditLogPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#0f0f1a] min-h-screen p-6">
+    <div className="flex-1 flex flex-col dg-page min-h-screen p-6">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-            <ClipboardList className="w-8 h-8 text-purple-400" />
+          <h2 className="text-2xl font-bold text-[var(--dg-text)] flex items-center gap-3">
+            <ClipboardList className="w-8 h-8 text-[var(--dg-accent-strong)]" />
             {t('auditLog')}
           </h2>
-          <p className="text-gray-400 mt-1">{t('auditLogDescription')}</p>
+          <p className="text-[var(--dg-muted)] mt-1">{t('auditLogDescription')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             onClick={() => void refresh()}
             variant="outline"
-            className="border-purple-500/30 text-white hover:bg-purple-600/20"
+            className="border-[var(--dg-border-strong)] text-[var(--dg-text)] hover:bg-[var(--dg-accent-soft)]"
           >
             <RefreshCw className="w-4 h-4 me-2" />
             {t('refresh')}
@@ -95,7 +95,7 @@ const AuditLogPage: React.FC = () => {
             onClick={() => void handleExport()}
             disabled={isExporting}
             variant="outline"
-            className="border-purple-500/30 text-white hover:bg-purple-600/20"
+            className="border-[var(--dg-border-strong)] text-[var(--dg-text)] hover:bg-[var(--dg-accent-soft)]"
           >
             <Download className="w-4 h-4 me-2" />
             {t('export')}
@@ -145,12 +145,12 @@ const AuditLogPage: React.FC = () => {
 
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--dg-muted)]" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('search')}
-            className="ps-9 bg-[#12122a] border-purple-500/20 text-white"
+            className="ps-9 bg-[var(--dg-surface)] border-[var(--dg-border)] text-[var(--dg-text)]"
           />
         </div>
         {(['all', 'rejected', 'alerts'] as const).map((key) => (
@@ -160,8 +160,8 @@ const AuditLogPage: React.FC = () => {
             onClick={() => setFilter(key)}
             className={
               filter === key
-                ? 'bg-purple-600 hover:bg-purple-700'
-                : 'border-purple-500/30 text-white hover:bg-purple-600/20'
+                ? 'dg-gradient hover:brightness-110'
+                : 'border-[var(--dg-border-strong)] text-[var(--dg-text)] hover:bg-[var(--dg-accent-soft)]'
             }
           >
             {t(`auditFilter_${key}`)}
@@ -178,15 +178,15 @@ const AuditLogPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <p className="text-gray-400">{t('loading')}</p>
+        <p className="text-[var(--dg-muted)]">{t('loading')}</p>
       ) : filteredLogs.length === 0 ? (
-        <p className="text-gray-400">{t('auditLogEmpty')}</p>
+        <p className="text-[var(--dg-muted)]">{t('auditLogEmpty')}</p>
       ) : (
         <div className="space-y-3">
           {filteredLogs.map((log) => (
             <div
               key={log.id}
-              className="rounded-xl bg-[#12122a] border border-purple-500/20 p-4"
+              className="rounded-xl bg-[var(--dg-surface)] border border-[var(--dg-border)] p-4"
             >
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2 text-sm">
@@ -195,21 +195,21 @@ const AuditLogPage: React.FC = () => {
                   ) : (
                     <CheckCircle className="w-4 h-4 text-green-400" />
                   )}
-                  <span className="text-white font-medium">{log.username}</span>
-                  <span className="text-gray-500">·</span>
-                  <span className="text-gray-400 font-mono text-xs">
+                  <span className="text-[var(--dg-text)] font-medium">{log.username}</span>
+                  <span className="text-[var(--dg-muted)]">·</span>
+                  <span className="text-[var(--dg-muted)] font-mono text-xs">
                     {log.sessionId}
                   </span>
                 </div>
-                <span className="text-gray-500 text-xs">
+                <span className="text-[var(--dg-muted)] text-xs">
                   {log.timestamp.toLocaleString()}
                 </span>
               </div>
 
-              <p className="text-gray-200 text-sm mt-3">{log.query}</p>
+              <p className="text-[var(--dg-body)] text-sm mt-3">{log.query}</p>
 
               {log.answer && (
-                <p className="text-gray-400 text-sm mt-2 whitespace-pre-line line-clamp-4">
+                <p className="text-[var(--dg-muted)] text-sm mt-2 whitespace-pre-line line-clamp-4">
                   {log.answer}
                 </p>
               )}
@@ -234,7 +234,7 @@ const AuditLogPage: React.FC = () => {
                   {log.citations.map((c, i) => (
                     <span
                       key={i}
-                      className="inline-flex items-center gap-1 text-xs text-gray-400 bg-purple-600/10 border border-purple-500/20 rounded px-2 py-0.5"
+                      className="inline-flex items-center gap-1 text-xs text-[var(--dg-muted)] bg-[var(--dg-accent-faint)] border border-[var(--dg-border)] rounded px-2 py-0.5"
                     >
                       <FileText className="w-3 h-3" />
                       {c.document_name} · p.{c.page_number}
@@ -243,7 +243,7 @@ const AuditLogPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500 font-mono">
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--dg-muted)] font-mono">
                 {log.confidenceLabel && <span>confidence: {log.confidenceLabel}</span>}
                 {log.model && <span>model: {log.model}</span>}
                 {log.drugDbVersion && <span>drug-db: {log.drugDbVersion}</span>}
