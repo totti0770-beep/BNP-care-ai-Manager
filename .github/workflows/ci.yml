@@ -90,8 +90,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      # A JWT signing key was committed to this repository once. This is the
-      # gate that would have caught it.
+      # A JWT signing key was committed to this repository once, and this job
+      # did not catch it — its own log showed the reason:
+      #
+      #   git log -p -U0 --no-merges --first-parent <head>^..<head>
+      #   1 commits scanned. no leaks found
+      #
+      # The action's default range is the event's own commits, so `fetch-depth: 0`
+      # fetched a history nothing then read. The gate caught secrets arriving in a
+      # push and was blind to every secret already there.
+      #
+      # GITLEAKS_ENABLE_COMMENTS=false because the scan below covers history the
+      # PR did not introduce; annotating those lines on someone's PR is noise.
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+
+      # The full history, which is where a leaked key actually lives. One known
+      # finding is allowlisted by exact fingerprint in .gitleaks.toml; anything
+      # else fails the build. Both halves were proven before this landed: the
+      # scan fails without that entry, passes with it, and still fails on a
+      # planted canary secret in a different file.
+      - name: Secret scan — full history
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.29.0/gitleaks_8.29.0_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks git . --no-banner --redact -c .gitleaks.toml

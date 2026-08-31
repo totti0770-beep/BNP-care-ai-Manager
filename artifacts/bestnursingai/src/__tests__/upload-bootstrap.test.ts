@@ -97,3 +97,14 @@ describe('the browser-only provenance surface is gone', () => {
     }
   });
 });
+
+describe('providers are mounted once', () => {
+  it('does not wrap App in a second AuthProvider', () => {
+    // Two instances each ran useReplitAuth(), so every page load fetched
+    // /api/auth/user twice and two independent session states existed. Only the
+    // inner one was ever read.
+    const main = code('main.tsx');
+    expect(main).not.toMatch(/<AuthProvider>/);
+    expect(code('App.tsx')).toMatch(/<AuthProvider>/);
+  });
+});
