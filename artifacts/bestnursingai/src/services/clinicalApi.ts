@@ -65,6 +65,8 @@ export interface EngineHealth {
   drug_db_version?: string;
   drug_db_review_status?: string;
   formulary?: FormularyCounts;
+  /** Present only when status is "degraded": why, in the engine's own words. */
+  problems?: string[];
 }
 
 // ── Transport ─────────────────────────────────────────────────────────────────
@@ -90,9 +92,14 @@ export async function checkHealth(): Promise<EngineHealth | null> {
       credentials: "include",
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return null;
-    const health: EngineHealth = await res.json();
-    return health.status === "ok" ? health : null;
+    // A degraded engine answers 503 with a full body naming its `problems`.
+    // Collapsing that into null made "the engine cannot answer clinically yet"
+    // indistinguishable from "the engine is unreachable" — and the first of
+    // those is the normal state of a fresh deployment with no corpus, in which
+    // uploading a document is exactly what the operator needs to do. Return the
+    // body whenever there is one; the caller decides what the status permits.
+    if (!res.ok && res.status !== 503) return null;
+    return (await res.json()) as EngineHealth;
   } catch {
     return null;
   }

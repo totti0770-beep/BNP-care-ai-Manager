@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDocumentVerification } from '@/contexts/DocumentVerificationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBackend } from '@/contexts/BackendContext';
 import {
@@ -22,14 +21,19 @@ import { toast } from 'sonner';
 
 const SecureUploadPage: React.FC = () => {
   const { t } = useTranslation();
-  const { verifyDocument, officialSources } = useDocumentVerification();
   const { hasPermission } = useAuth();
-  const { isEngineAvailable, uploadToEngine, engineDocuments, removeFromEngine, refreshDocuments } = useBackend();
+  const {
+    isEngineReachable,
+    engineProblems,
+    uploadToEngine,
+    engineDocuments,
+    removeFromEngine,
+    refreshDocuments,
+  } = useBackend();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isDragging, setIsDragging] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [signature, setSignature] = useState('');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const canUpload = hasPermission('documents.manage');
@@ -58,30 +62,35 @@ const SecureUploadPage: React.FC = () => {
     e.target.value = '';
   };
 
+  /**
+   * Index the file in the engine, and report what actually happened.
+   *
+   * This used to run only `if (isEngineAvailable)` and fall through silently
+   * otherwise, recording the file in a browser-memory list instead. Because
+   * /health reports `degraded` until a corpus exists, that branch was never
+   * taken on a fresh deployment: the upload made no request at all, showed no
+   * error, and left an operator believing a document had been accepted. The
+   * engine only has to be reachable for indexing to be possible, and a failure
+   * is now always visible.
+   */
   const handleUpload = async () => {
     if (!pendingFile) return;
     setIsVerifying(true);
-
-    // Upload to engine first (real indexing)
-    if (isEngineAvailable) {
+    try {
       const result = await uploadToEngine(pendingFile);
       if (result) {
         toast.success(t('indexedSegmentsToast', { count: result.chunks }));
+        setPendingFile(null);
       } else {
         toast.error(t('uploadFailedEngine'));
       }
+    } finally {
+      setIsVerifying(false);
     }
-
-    // Always also record locally (for UI display)
-    await verifyDocument(pendingFile, signature);
-    setIsVerifying(false);
-    setSignature('');
-    setPendingFile(null);
   };
 
   const cancelPending = () => {
     setPendingFile(null);
-    setSignature('');
   };
 
   return (
@@ -154,21 +163,6 @@ const SecureUploadPage: React.FC = () => {
             <button onClick={cancelPending} className="text-[var(--dg-muted)] hover:text-red-400 transition-colors">
               <X className="w-5 h-5" />
             </button>
-          </div>
-
-          {/* Optional signature */}
-          <div>
-            <Label className="text-[var(--dg-body)] mb-1 block text-sm">
-              {t('digitalSignature')}
-              <span className="text-[var(--dg-muted)] text-xs ms-2">({t('optional')})</span>
-            </Label>
-            <Input
-              value={signature}
-              onChange={(e) => setSignature(e.target.value)}
-              placeholder={t('enterDigitalSignature')}
-              className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)] font-mono text-sm"
-            />
-            <p className="text-[var(--dg-muted)] text-xs mt-1">{t('signatureHelp')}</p>
           </div>
 
           <div className="flex gap-3">
@@ -277,17 +271,31 @@ const SecureUploadPage: React.FC = () => {
         </div>
       )}
 
-      {/* The "whitelisted sources" chips were rendered as green ticks, which
-          read as verified trust anchors for MOH/WHO/ANA. Nothing validates a
-          signature against them, so they are stated as a pending configuration
-          rather than an enforced control. */}
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-600/10 border border-amber-500/30">
-        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-        <div className="text-sm">
-          <p className="text-amber-200 font-medium">{t('provenanceNotEnforced')}</p>
-          <p className="text-amber-200/80 mt-1">{t('provenanceNotEnforcedBody')}</p>
+      {/* Why the assistant still refuses clinical questions, in the engine's
+          own words. An empty corpus is the expected state here, not a fault —
+          and uploading is what clears it, so the message must not read as a
+          reason the screen cannot be used. */}
+      {engineProblems.length > 0 && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-600/10 border border-amber-500/30">
+          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="text-amber-200 font-medium">{t('engineNotReadyYet')}</p>
+            <ul className="text-amber-200/80 mt-1 list-disc list-inside">
+              {engineProblems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Reachability is the one thing that genuinely blocks indexing. */}
+      {!isEngineReachable && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-600/10 border border-red-500/30">
+          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-200">{t('engineUnreachableUpload')}</p>
+        </div>
+      )}
 
       {!canUpload && (
         <div className="mt-6 p-4 rounded-xl bg-yellow-600/10 border border-yellow-500/30 flex items-center gap-3">

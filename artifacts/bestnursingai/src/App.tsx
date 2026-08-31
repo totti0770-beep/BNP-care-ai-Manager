@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
-import { DocumentVerificationProvider } from '@/contexts/DocumentVerificationContext';
 import { AuditLogProvider } from '@/contexts/AuditLogContext';
 import { BackendProvider } from '@/contexts/BackendContext';
 import { Toaster } from '@/components/ui/sonner';
@@ -13,7 +12,6 @@ import ChatPage from '@/components/ChatPage';
 import DocumentsPage from '@/components/DocumentsPage';
 import CitationsPage from '@/components/CitationsPage';
 import SettingsPage from '@/components/SettingsPage';
-import OfficialSourcesPage from '@/components/OfficialSourcesPage';
 import AuditLogPage from '@/components/AuditLogPage';
 import FormularyPage from '@/components/FormularyPage';
 import RAGSettingsPage from '@/components/RAGSettingsPage';
@@ -59,8 +57,6 @@ function AppContent() {
         return <CitationsPage />;
       case 'settings':
         return <SettingsPage />;
-      case 'official-sources':
-        return <OfficialSourcesPage />;
       case 'audit-log':
         return <AuditLogPage />;
       case 'formulary':
@@ -106,7 +102,6 @@ function App() {
     <ThemeProvider>
     <LanguageProvider>
       <AuditLogProvider>
-        <DocumentVerificationProvider>
             <BackendProvider>
               <AppContent />
               <Toaster
@@ -120,7 +115,6 @@ function App() {
                 }}
               />
             </BackendProvider>
-        </DocumentVerificationProvider>
       </AuditLogProvider>
     </LanguageProvider>
     </ThemeProvider>
