@@ -30,6 +30,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       root.removeAttribute('data-theme');
     }
+    // Two switches, because two systems read the theme. `data-theme` drives the
+    // --dg-* palette (and through it every shadcn token). The `dark` class is
+    // what Tailwind's `dark:` variant matches — index.css declares
+    // `@custom-variant dark (&:is(.dark *))` — so without it the `dark:`
+    // utilities inside components/ui/ never apply.
+    root.classList.toggle('dark', theme === 'dark');
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {}

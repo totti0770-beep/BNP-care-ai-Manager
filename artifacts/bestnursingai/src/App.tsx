@@ -81,10 +81,17 @@ function AppContent() {
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
       {/* Below md the sidebar overlays the content instead of pushing it —
-          there is no room to push into. */}
+          there is no room to push into.
+
+          When the sidebar is closed it collapses to a button pinned at
+          `fixed top-4 start-4` (Sidebar.tsx). Nothing reserved space for it, so
+          on a phone in Arabic it sat directly on top of the page title — the
+          inline start edge is the right edge in RTL, which is exactly where the
+          heading begins. Reserving the strip vertically rather than inline
+          keeps every screen's layout identical in both directions. */}
       <main
         className={`flex-1 transition-all duration-300 overflow-auto ${
-          sidebarOpen ? 'ms-0 md:ms-80' : 'ms-0'
+          sidebarOpen ? 'ms-0 md:ms-80' : 'ms-0 pt-16'
         }`}
       >
         {renderContent()}
