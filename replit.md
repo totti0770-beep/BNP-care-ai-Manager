@@ -21,7 +21,7 @@ Web app uses Replit Auth (OpenID Connect/PKCE) via the Express API server.
 
 **Ports:** API server runs on port 8080 (Replit-assigned). Vite proxy forwards `/api` → `http://localhost:8080`.
 
-**User shape from Replit:** `{ id, name, profileImage, roles }`. Mapped to app `User`: `role='admin'` if `roles` includes `'admin'`, else `role='user'`.
+**User shape (`AuthUser`, `lib/api-spec/openapi.yaml:168`):** `{ id, name, roles }` required, `email` and `profileImageUrl` optional. Mapped to app `User`: `role='admin'` if `roles` includes `'admin'`, else `role='user'`.
 
 ## SafetyEngine (Clinical AI Engine)
 
@@ -29,14 +29,14 @@ Rule-based medication safety layer integrated into query pipeline (`services/dru
 
 | Check | Trigger | Result |
 |---|---|---|
-| High-risk flag | Drug in `DRUG_DB` with `high_risk: True` | 🔴 Alert in `safety_alerts` |
+| High-risk flag | Formulary row with `high_risk = true` | 🔴 Alert in `safety_alerts` |
 | Contraindications | Patient `conditions` intersect drug `contraindications` | ⚠️ Alert in `safety_alerts` |
 | Drug interactions | `other_drugs` list intersect drug `interactions` | ⚠️ Alert in `safety_alerts` |
-| Overdose HARD BLOCK | `dose_per_kg × weight > adult_max_dose_mg` | ❌ `rejected=True`, answer blocked |
+| Overdose HARD BLOCK | `dose_per_kg × weight` over the row's threshold | ❌ `rejected=True`, answer blocked. Fires only where an approved row carries those figures — rows imported from the P&T workbooks state dosing as prose and carry none, so no number is computed for them. |
 | Nursing notes | Always generated for drug queries | Admin checklist in `nursing_notes` |
 
-**DRUG_DB high-risk drugs:** heparin, morphine, insulin, warfarin.
-**DRUG_DB fields:** `adult_max_dose_mg` (per-dose hard block), `adult_max_daily_mg`, `contraindications`, `interactions`, `high_risk`, `frequency`.
+**High-risk drugs** are flagged per row by `bnp_drug_formulary.high_risk`, not by a list in code.
+**Drug data lives in the database, not in Python.** `bnp_drug_formulary` (`alembic/versions/0003_drug_formulary.py`) carries the clinical fields plus provenance (`source_name`, `source_ref`) and governance (`review_status`, `reviewed_by`, `reviewer_license`). Only an `approved` row may have a dose quoted for it; read through `services/formulary.py`. The former `DRUG_DB` dict literal no longer exists.
 
 Query response extended fields: `contraindications`, `interactions`, `nursing_notes`, `safety_alerts`, `rejected`, `rejection_reason`.
 
@@ -85,17 +85,19 @@ Updated interfaces: `EngineQueryResponse` (clinicalApi.ts), `BNPResponse` (Close
 ```text
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
-│   ├── api-server/         # Express API server
+│   ├── api-server/         # Express gateway: sessions, /api, the /bnp-api proxy, the built SPA
+│   ├── clinical-ai-engine/ # FastAPI RAG engine (Python) — never exposed publicly
 │   ├── bestnursingai/      # BestNursingAI React+Vite web app
 │   └── nursing-mobile/     # Expo mobile nursing AI assistant (Arabic RTL)
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
+│   ├── api-client-react/   # Generated React Query hooks (only its AuthUser type is imported)
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
+│   ├── replit-auth-web/    # useAuth() hook for the web app
 │   └── db/                 # Drizzle ORM schema + DB connection
 ├── scripts/                # Utility scripts (single workspace package)
 │   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
+├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, scripts)
 ├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
 ├── tsconfig.json           # Root TS project references
 └── package.json            # Root package with hoisted devDeps
@@ -185,9 +187,11 @@ BestNursingAI — a full-featured nursing AI assistant web app. React+Vite, dark
 - ChatPage uses the real engine only. The browser-side ClosedLoopRAG fallback was
   deleted: it performed weight-based dose arithmetic on hardcoded text and presented it
   with citations. When the engine is unavailable the app refuses to answer.
-- Upload pages index PDFs into the real FAISS engine + record locally for UI display
+- The upload page indexes PDFs into the real FAISS engine and reports the outcome. It
+  keeps no browser-side copy: a local recorder used to sit in the success path and make a
+  failed upload look like a completed one.
 
-**Authentication:** Replit OIDC only. The demo credential login was removed when
+**Authentication:** Replit OIDC where an issuer is configured, plus an email/password sign-in (`POST /api/auth/login`, `routes/auth.ts:223`) for deployments without one — `GET /api/auth/methods` tells the client which are available. Passwords are hashed with node's scrypt (`lib/password.ts`). The demo credential login was removed when
 Replit Auth landed, and the shared `clinicadmin` engine credential that both clients
 embedded has been removed too — the API server now mints a per-user engine token
 server-side. Admin role is granted from the `ADMIN_EMAILS` environment variable.
@@ -248,7 +252,7 @@ models/
 - `GET  /health` — service health + indexed chunk count
 - `GET  /docs` — Swagger UI (FastAPI auto-generated)
 
-**Security:** JWT HS256 (JWT_SECRET env var), SHA-256 password hashing (passlib sha256_crypt)
+**Security:** JWT HS256 (`JWT_SECRET`, no default — the engine refuses to start without it). Passwords use passlib with **bcrypt**; `sha256_crypt` is retained as deprecated so legacy hashes still verify (`routers/auth.py:35`).
 
 **Response format (mandatory BNP format):**
 ```
