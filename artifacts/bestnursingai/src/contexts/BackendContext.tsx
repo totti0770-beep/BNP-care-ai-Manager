@@ -97,7 +97,23 @@ function mapQueryType(t: string): "medication" | "protocol" | "general" {
 // ── Context shape ─────────────────────────────────────────────────────────────
 
 interface BackendContextType {
+  /**
+   * The engine can answer a clinical question: it has a corpus, embeddings and
+   * a formulary. Gate clinical output on this, and nothing else.
+   */
   isEngineAvailable: boolean;
+  /**
+   * The engine is up and answering HTTP, whether or not it is clinically ready.
+   *
+   * These were one flag, and that produced a deadlock: /health reports 503
+   * `degraded` while `indexed_chunks == 0`, so a fresh deployment had uploads
+   * disabled — and uploading is the only way to stop being at zero. The system
+   * could not bootstrap its own corpus through its own interface, and the
+   * upload screen failed silently while doing it.
+   */
+  isEngineReachable: boolean;
+  /** Why the engine cannot answer clinically, verbatim from /health. */
+  engineProblems: string[];
   isChecking: boolean;
   indexedChunks: number;
   openaiEnabled: boolean;
@@ -116,6 +132,8 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [isEngineAvailable, setIsEngineAvailable] = useState(false);
+  const [isEngineReachable, setIsEngineReachable] = useState(false);
+  const [engineProblems, setEngineProblems] = useState<string[]>([]);
   const [isChecking, setIsChecking] = useState(true);
   const [indexedChunks, setIndexedChunks] = useState(0);
   const [openaiEnabled, setOpenaiEnabled] = useState(false);
@@ -134,10 +152,14 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
     (async () => {
       setIsChecking(true);
       const health = await checkHealth();
-      if (health && health.status === "ok") {
-        setIsEngineAvailable(true);
+      if (health) {
+        // A body came back at all, so the engine is up and the gateway can
+        // reach it — enough to list and upload documents.
+        setIsEngineReachable(true);
         setIndexedChunks(health.indexed_chunks);
         setOpenaiEnabled(health.openai_enabled);
+        setEngineProblems(health.problems ?? []);
+        setIsEngineAvailable(health.status === "ok");
         await refreshDocuments();
       }
       setIsChecking(false);
@@ -156,30 +178,44 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const uploadToEngine = useCallback(
     async (file: File): Promise<{ filename: string; chunks: number } | null> => {
-      if (!isEngineAvailable) return null;
+      // Reachable, not ready: indexing the first document is precisely what
+      // moves the engine from degraded to ready, so gating this on readiness
+      // is what made the corpus impossible to bootstrap.
+      if (!isEngineReachable) return null;
       const result = await apiUpload(file);
       if (!result) return null;
-      setIndexedChunks((prev) => prev + result.chunks_indexed);
+      const chunks = indexedChunks + result.chunks_indexed;
+      setIndexedChunks(chunks);
+      // The engine may have just become able to answer. Re-read rather than
+      // infer it, so the flag reflects the engine's own verdict.
+      const health = await checkHealth();
+      if (health) {
+        setEngineProblems(health.problems ?? []);
+        setIsEngineAvailable(health.status === "ok");
+        setIndexedChunks(health.indexed_chunks);
+      }
       await refreshDocuments();
       return { filename: result.filename, chunks: result.chunks_indexed };
     },
-    [isEngineAvailable, refreshDocuments]
+    [isEngineReachable, indexedChunks, refreshDocuments]
   );
 
   const removeFromEngine = useCallback(
     async (documentId: string): Promise<boolean> => {
-      if (!isEngineAvailable) return false;
+      if (!isEngineReachable) return false;
       const ok = await apiDeleteDoc(documentId);
       if (ok) await refreshDocuments();
       return ok;
     },
-    [isEngineAvailable, refreshDocuments]
+    [isEngineReachable, refreshDocuments]
   );
 
   return (
     <BackendContext.Provider
       value={{
         isEngineAvailable,
+        isEngineReachable,
+        engineProblems,
         isChecking,
         indexedChunks,
         openaiEnabled,
