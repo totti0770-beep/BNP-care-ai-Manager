@@ -1,0 +1,45 @@
+# Secret-scanning configuration.
+#
+# CI scans this repository's FULL history, not just the commits being pushed.
+# That distinction matters: gitleaks-action's default range is the event's own
+# commits, so a secret already in history is invisible to it — the repository's
+# own JWT signing key sat in `.replit` since April and every green Secret scan
+# stepped over it, while the workflow described that job as "the gate that would
+# have caught it."
+#
+# Scanning full history means the one known leak below would fail every run
+# forever, so it is allowlisted by exact fingerprint. This is not a dismissal:
+#
+#   - The value is BURNED. This repository is public, so the blob is readable by
+#     anyone, and rewriting history would not un-publish it.
+#   - The deployment does not use it. Railway holds freshly generated secrets.
+#   - Rotating it wherever it may still run is tracked in
+#     docs/security/jwt-rotation.md, and is a human task, not a CI one.
+#
+# The allowlist is one fingerprint, not a path or a rule. Any *other* secret —
+# including a different one in the same file, or this rule firing anywhere else —
+# still fails the build. Never widen this to a path or a regex to make a run
+# green: that turns the gate off for everything it was built to catch.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+# AND, not the default OR. Without this every criterion below stands alone, so
+# `regexes` would allowlist any line mentioning JWT_SECRET anywhere in the
+# repository — turning the gate off for exactly the thing it guards. A planted
+# canary proved that hole before this line existed.
+condition = "AND"
+description = """
+The JWT signing key committed to .replit at f899a8a (2026-04-05) and removed
+later. Publicly readable, superseded, and tracked for rotation — see
+docs/security/jwt-rotation.md. Allowlisted so a full-history scan can run at
+all; it is not evidence that the exposure was resolved.
+"""
+# Fingerprint format: <commit>:<file>:<rule>:<line>
+commits = ["f899a8ab54fab1c146ebfffc1d3a8872a93b8140"]
+paths = ['''^\.replit$''']
+regexTarget = "line"
+# Both conditions must hold for the finding to be allowed, so the same rule
+# firing on .replit in any other commit is still a failure.
+regexes = ['''JWT_SECRET''']
