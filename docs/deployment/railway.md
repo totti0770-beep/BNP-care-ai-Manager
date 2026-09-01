@@ -126,9 +126,29 @@ public gateway on every deploy and exits — and its copy of `JWT_SECRET` has be
 because only the seeding step needed one. It still holds `BNP_PASSWORD` (as a reference to the
 gateway's bootstrap password) in order to exercise sign-in.
 
-**Delete it once you no longer want that check**, from the Railway dashboard; there is no API
-for removing a service. Until then it also posts a deployment status onto any open pull
-request for this branch, which is noise rather than signal.
+**Delete it once you no longer want that check**, from the Railway dashboard. Until then it
+also posts a deployment status onto any open pull request for this branch, which is noise
+rather than signal.
+
+### Deleting a service or a project cannot be automated — this is deliberate
+
+Nothing in an agent session can delete a Railway service, and repeated attempts only look like
+they worked. There is no `delete-service` MCP tool. The Railway agent has `removeServiceTool`,
+which returns
+
+```
+{"status":"applied","message":"Service has been marked for removal."}
+```
+
+— language that reads like success and is not. It stages the removal into a patch; applying it
+needs `commitStagedChangesTool`, which **refuses destructive commits by design** and directs
+the caller to the dashboard. Two separate deletion attempts (this service, and the superseded
+`bnp-clinical-ai-engine` project) both ended with the target still online and still serving.
+
+So: deletion is a dashboard action, always. **Settings → Danger → Delete.** The confirmation
+box requires typing the service or project name, which is the likeliest reason a half-finished
+attempt leaves everything in place. Verify afterwards with `list-services` or `list-projects`
+rather than trusting any report of success — including one from an agent.
 
 To run the seeding again — against a fresh database, say — restore its start command to:
 
