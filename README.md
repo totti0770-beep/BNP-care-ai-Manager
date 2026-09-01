@@ -329,8 +329,18 @@ Engineering work is not the remaining blocker. These are:
 - The audit hash chain is computed by the application, so it detects tampering by anyone
   without database write access at the moment of writing. A fully independent guarantee needs
   append-only storage or external anchoring.
-- Document "verification" in the web app records a checksum but does **not** validate any
-  signature. Uploads are marked unverified, and no document is attributed to an official source.
+- **The Do Not Crush List cannot be indexed.** Its pages are scanned images with no
+  extractable text, so ingest refuses it: `services/pdf_processor.py` raises
+  `No readable text found in the PDF.` and `routers/documents.py` returns that as a 422. The
+  refusal is visible rather than silent, which is the correct behaviour — but the document
+  stays out of the corpus until someone supplies a text-bearing export or a spreadsheet.
+  OCR is deliberately **not** in the ingest path: nothing downstream reviews what it produces,
+  and a misrecognised drug name inside a list of drugs that must not be crushed is a
+  patient-safety hazard, not a formatting defect.
+- **Two guideline documents are not yet loaded**: the Electrolytes Replacement Guideline and
+  the Injectable Drugs Compatibility & Stability manual. The corpus a deployment holds is
+  whatever has been uploaded through the admin screen; it is not tracked in this repository,
+  and the engine reports its own count at `/health`.
 - Retrieved source text is fenced and the model is told to treat it as data, but that is a
   mitigation, not a guarantee. Upload is admin-only for this reason.
 - `license` is set to UNLICENSED pending a decision; it previously claimed MIT.

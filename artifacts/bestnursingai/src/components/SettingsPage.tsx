@@ -9,6 +9,7 @@ import {
   Shield,
   Palette,
   Users,
+  KeyRound,
   ChevronRight,
   Check,
   ShieldAlert,
@@ -28,7 +29,7 @@ interface Permission {
 
 const SettingsPage: React.FC = () => {
   const { t } = useTranslation();
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, oidcAvailable, changePassword } = useAuth();
   const { currentLanguage, changeLanguage } = useLanguage();
   const [activeSection, setActiveSection] = useState('profile');
 
@@ -59,8 +60,48 @@ const SettingsPage: React.FC = () => {
   // was inert.
   const { theme, setTheme } = useTheme();
 
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+
+    // Checked here so a typo costs a round trip to nothing. The server applies
+    // the real policy (lib/password.ts rejectWeakPassword); this only catches
+    // the one mistake the server cannot see, since it receives a single value.
+    if (newPassword !== confirmPassword) {
+      setPasswordError(t('passwordsDoNotMatch'));
+      return;
+    }
+
+    setChangingPassword(true);
+    const error = await changePassword(currentPassword, newPassword);
+    setChangingPassword(false);
+
+    if (error) {
+      setPasswordError(error);
+      return;
+    }
+
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    toast.success(t('passwordChanged'));
+  };
+
   const sections = [
     { id: 'profile', label: t('profile'), icon: User },
+    // Hidden where the server has a hosted OIDC issuer: those accounts have no
+    // password, and the endpoint would answer "the current password is not
+    // correct" — true of a null hash, and misleading to someone who never set
+    // one. `oidcAvailable` is the closest signal the client has; a per-user
+    // `hasPassword` on the auth-user contract would be exact, and is not added
+    // here because no deployment currently configures both.
+    ...(!oidcAvailable ? [{ id: 'security', label: t('security'), icon: KeyRound }] : []),
     { id: 'language', label: t('language'), icon: Globe },
     { id: 'permissions', label: t('permissions'), icon: Shield },
     { id: 'theme', label: t('theme'), icon: Palette },
@@ -94,16 +135,71 @@ const SettingsPage: React.FC = () => {
                   className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-muted)]"
                 />
               </div>
+            </div>
+          </div>
+        );
+
+      case 'security':
+        return (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-[var(--dg-text)] mb-4">{t('security')}</h3>
+            <p className="text-[var(--dg-muted)] text-sm">{t('passwordRules')}</p>
+            <form onSubmit={handleChangePassword} className="grid gap-4 max-w-md">
               <div className="space-y-2">
-                <Label className="text-[var(--dg-body)]">{t('password')}</Label>
+                <Label className="text-[var(--dg-body)]" htmlFor="current-password">
+                  {t('currentPassword')}
+                </Label>
                 <Input
+                  id="current-password"
                   type="password"
-                  value="********"
-                  disabled
-                  className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-muted)]"
+                  autoComplete="current-password"
+                  dir="ltr"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)]"
                 />
               </div>
-            </div>
+              <div className="space-y-2">
+                <Label className="text-[var(--dg-body)]" htmlFor="new-password">
+                  {t('newPassword')}
+                </Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  dir="ltr"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[var(--dg-body)]" htmlFor="confirm-password">
+                  {t('confirmPassword')}
+                </Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  dir="ltr"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)]"
+                />
+              </div>
+              {passwordError && (
+                <p role="alert" className="text-sm text-[var(--dg-danger)]">
+                  {passwordError}
+                </p>
+              )}
+              <Button
+                type="submit"
+                disabled={changingPassword}
+                className="dg-gradient text-[var(--dg-text)] w-fit"
+              >
+                {changingPassword ? t('saving') : t('changePassword')}
+              </Button>
+            </form>
           </div>
         );
 

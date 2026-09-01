@@ -24,6 +24,15 @@ interface AuthContextType {
    * ordinary outcome of a form, not an exception.
    */
   loginWithPassword: (email: string, password: string) => Promise<string | null>;
+  /**
+   * Change the signed-in user's password. Same contract as loginWithPassword:
+   * an error message to show, or null on success. The server invalidates every
+   * other session on success, so the caller should say so.
+   */
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -99,6 +108,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const changePassword = async (
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/auth/password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      // 204, no body. The session that made the request survives; every other
+      // one is deleted server-side, so there is nothing to reload here.
+      if (res.ok) return null;
+
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      return body?.error ?? 'Could not change the password. Please try again.';
+    } catch {
+      return 'Could not reach the server. Check your connection and try again.';
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -110,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasPermission,
         oidcAvailable,
         loginWithPassword,
+        changePassword,
       }}
     >
       {children}
