@@ -322,8 +322,10 @@ Engineering work is not the remaining blocker. These are:
   (`lib/db/drizzle/` via drizzle-kit, `artifacts/clinical-ai-engine/alembic/` via Alembic).
   The engine still lacks a tenant/facility column, so a multi-hospital deployment needs a
   migration with an explicit backfill.
-- The FAISS index is rebuilt in full on every document upload, and re-embedded from the
-  database when it and the `bnp_chunks` table disagree on count.
+- Uploading and retiring a document both touch the index incrementally — an upload embeds
+  only the new chunks, and a retirement removes vectors by id without embedding anything.
+  The one remaining full re-embed is the recovery path: when the index and the `bnp_chunks`
+  table disagree on count at startup, the index is rebuilt from the database.
 - Rate limiting and metrics are per-process and in-memory; a multi-instance deployment needs
   a shared store for both.
 - The audit hash chain is computed by the application, so it detects tampering by anyone
@@ -341,6 +343,12 @@ Engineering work is not the remaining blocker. These are:
   the Injectable Drugs Compatibility & Stability manual. The corpus a deployment holds is
   whatever has been uploaded through the admin screen; it is not tracked in this repository,
   and the engine reports its own count at `/health`.
+- **The corpus is curated, and its shape is a decision rather than an accident.** On
+  2026-09-01 the five JSH parenteral-dilution manuals were deliberately retired in favour of
+  the consolidated JSH Drug Formulary 2026. Noted because the engine's document list and this
+  repository cannot be reconciled by reading either one, and the gap otherwise looks like data
+  loss to whoever next compares them. This records *that* the decision was taken, not that the
+  formulary covers the same clinical ground — nobody has assessed that here.
 - Retrieved source text is fenced and the model is told to treat it as data, but that is a
   mitigation, not a guarantee. Upload is admin-only for this reason.
 - `license` is set to UNLICENSED pending a decision; it previously claimed MIT.
