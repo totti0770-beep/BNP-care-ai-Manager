@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   User,
   Globe,
   Shield,
-  Bell,
   Palette,
   Users,
   ChevronRight,
@@ -16,7 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 interface Permission {
@@ -52,24 +51,18 @@ const SettingsPage: React.FC = () => {
     enabled: hasPermission(p.name),
   }));
 
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: false,
-    updates: true,
-    security: true,
-  });
-
-  const [theme, setTheme] = useState('dark');
-
-  const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications({ ...notifications, [key]: !notifications[key] });
-  };
+  // The theme comes from ThemeContext, which is what actually sets `data-theme`
+  // and the `dark` class on the document. This screen used to hold its own
+  // `useState('dark')`, so its picker highlighted a button and changed nothing
+  // while the sidebar's toggle — the one wired to the context — worked. Two
+  // sources of truth for one setting, and the more authoritative-looking one
+  // was inert.
+  const { theme, setTheme } = useTheme();
 
   const sections = [
     { id: 'profile', label: t('profile'), icon: User },
     { id: 'language', label: t('language'), icon: Globe },
     { id: 'permissions', label: t('permissions'), icon: Shield },
-    { id: 'notifications', label: t('notifications'), icon: Bell },
     { id: 'theme', label: t('theme'), icon: Palette },
     ...(hasPermission('users.manage') ? [{ id: 'users', label: t('userManagement'), icon: Users }] : []),
   ];
@@ -168,28 +161,6 @@ const SettingsPage: React.FC = () => {
                   >
                     {permission.enabled ? t('granted') : t('notGranted')}
                   </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 'notifications':
-        return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-[var(--dg-text)] mb-4">{t('notifications')}</h3>
-            <div className="space-y-4">
-              {Object.entries(notifications).map(([key, value]) => (
-                <div
-                  key={key}
-                  className="flex items-center justify-between p-4 rounded-xl bg-[var(--dg-inset)] border border-[var(--dg-border-strong)]"
-                >
-                  <span className="text-[var(--dg-text)] capitalize">{key} Notifications</span>
-                  <Switch
-                    checked={value}
-                    onCheckedChange={() => toggleNotification(key as keyof typeof notifications)}
-                    className="data-[state=checked]:bg-[var(--dg-accent)]"
-                  />
                 </div>
               ))}
             </div>

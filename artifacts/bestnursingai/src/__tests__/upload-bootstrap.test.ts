@@ -108,3 +108,22 @@ describe('providers are mounted once', () => {
     expect(code('App.tsx')).toMatch(/<AuthProvider>/);
   });
 });
+
+describe('the settings screen shows nothing that does not work', () => {
+  const page = code('components/SettingsPage.tsx');
+
+  it('drives the theme through ThemeContext, not a local copy', () => {
+    // It held its own `useState('dark')`, so the picker highlighted a button
+    // and changed nothing while the sidebar's toggle worked. Two sources of
+    // truth for one setting, and the authoritative-looking one was inert.
+    expect(page).toMatch(/useTheme\(\)/);
+    expect(page).not.toMatch(/useState\(['"]dark['"]\)/);
+  });
+
+  it('has no notification settings', () => {
+    // Four toggles configuring a system that does not exist: a grep for
+    // nodemailer|sendgrid|smtp|firebase|expo-notifications|webpush across
+    // artifacts/ and lib/ returns nothing.
+    expect(page).not.toMatch(/notifications/i);
+  });
+});
