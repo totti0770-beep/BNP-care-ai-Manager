@@ -343,6 +343,12 @@ Engineering work is not the remaining blocker. These are:
   the Injectable Drugs Compatibility & Stability manual. The corpus a deployment holds is
   whatever has been uploaded through the admin screen; it is not tracked in this repository,
   and the engine reports its own count at `/health`.
+- **The corpus is curated, and its shape is a decision rather than an accident.** On
+  2026-09-01 the five JSH parenteral-dilution manuals were deliberately retired in favour of
+  the consolidated JSH Drug Formulary 2026. Noted because the engine's document list and this
+  repository cannot be reconciled by reading either one, and the gap otherwise looks like data
+  loss to whoever next compares them. This records *that* the decision was taken, not that the
+  formulary covers the same clinical ground — nobody has assessed that here.
 - Retrieved source text is fenced and the model is told to treat it as data, but that is a
   mitigation, not a guarantee. Upload is admin-only for this reason.
 - `license` is set to UNLICENSED pending a decision; it previously claimed MIT.
