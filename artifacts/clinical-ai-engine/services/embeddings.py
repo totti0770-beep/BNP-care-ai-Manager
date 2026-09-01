@@ -287,34 +287,73 @@ class HybridRetriever:
         logger.info(f"Indexed {len(chunks)} chunks for '{document_name}'")
 
     def remove_document(self, document_id: str):
-        """Remove all chunks for a document and rebuild the full index."""
+        """
+        Stop serving a document's chunks, and drop its vectors from the index.
+
+        This used to rebuild the index with `FAISS.from_documents`, which
+        re-embeds every *remaining* chunk — so retiring one document cost a
+        full-corpus embedding pass. On 2026-09-01 that asked OpenAI for 220,906
+        tokens in a single request, hit the account's tokens-per-minute limit,
+        and returned a 500 to the operator; a delete that did succeed took 16
+        seconds. FAISS can remove vectors by id without embedding anything, so
+        it now does.
+
+        `self.chunks` is set before the index is touched, and deliberately so.
+        `hybrid_search` answers from `self.chunks` and discards any FAISS hit
+        whose chunk_id is not in it, so that assignment — not the vector
+        removal — is what makes a retired document stop being retrievable. When
+        the rebuild raised, this method returned before reaching it, and a
+        document the database had already marked retired stayed in the served
+        corpus until the next restart.
+        """
         before = len(self.chunks)
         remaining = [c for c in self.chunks if c["document_id"] != document_id]
         if len(remaining) == before:
             return  # Nothing to remove
 
-        vectorstore = None
-        if remaining:
-            from langchain_community.vectorstores import FAISS
-            from langchain_core.documents import Document
-            lc_docs = [
-                Document(
-                    page_content=c["content"],
-                    metadata={k: v for k, v in c.items() if k != "content"},
-                )
-                for c in remaining
-            ]
-            # NOTE: this re-embeds every remaining chunk, so deleting one
-            # document costs a full-corpus embedding pass. Acceptable while
-            # corpora are small; externalising the index (pgvector) is the fix.
-            vectorstore = FAISS.from_documents(lc_docs, self._embeddings)
-
+        # No network call here any more, so there is nothing to keep outside the
+        # lock; the whole transition is local and atomic.
         with self._lock:
             self.chunks = remaining
-            self._vectorstore = vectorstore
+            if not remaining:
+                self._vectorstore = None
+            elif self._vectorstore is not None:
+                self._drop_vectors(document_id)
             self._rebuild_bm25()
             self._save_state()
         logger.info(f"Removed document {document_id}. Remaining chunks: {len(remaining)}")
+
+    def _drop_vectors(self, document_id: str):
+        """
+        Delete one document's vectors from the live index. Caller holds the lock.
+
+        Failure is logged and swallowed. Orphaned vectors are inert — a hit on
+        one is dropped by `hybrid_search` because its chunk_id is no longer in
+        `self.chunks` — and the count mismatch they leave behind is repaired by
+        `sync_from_db` on the next start. Raising here would undo the point of
+        the method: the corpus has already been updated, and the caller has
+        already committed the retirement to the database.
+        """
+        from langchain_core.documents import Document
+
+        store = self._vectorstore
+        try:
+            # Resolved from the store rather than assumed to be our chunk_ids:
+            # the index on the production volume was built without explicit
+            # ids, and `delete` raises on an id it does not hold.
+            ids = [
+                doc_id
+                for doc_id in list(store.index_to_docstore_id.values())
+                if isinstance((doc := store.docstore.search(doc_id)), Document)
+                and doc.metadata.get("document_id") == document_id
+            ]
+            if ids:
+                store.delete(ids)
+        except Exception as e:
+            logger.error(
+                f"Could not drop vectors for {document_id}: {e}. The chunks are "
+                "no longer served; the index will be reconciled on next start."
+            )
 
     # ── Search ────────────────────────────────────────────────────────────────
     def hybrid_search(self, query: str, top_k: int = 5) -> List[dict]:

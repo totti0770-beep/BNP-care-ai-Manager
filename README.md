@@ -322,8 +322,10 @@ Engineering work is not the remaining blocker. These are:
   (`lib/db/drizzle/` via drizzle-kit, `artifacts/clinical-ai-engine/alembic/` via Alembic).
   The engine still lacks a tenant/facility column, so a multi-hospital deployment needs a
   migration with an explicit backfill.
-- The FAISS index is rebuilt in full on every document upload, and re-embedded from the
-  database when it and the `bnp_chunks` table disagree on count.
+- Uploading and retiring a document both touch the index incrementally — an upload embeds
+  only the new chunks, and a retirement removes vectors by id without embedding anything.
+  The one remaining full re-embed is the recovery path: when the index and the `bnp_chunks`
+  table disagree on count at startup, the index is rebuilt from the database.
 - Rate limiting and metrics are per-process and in-memory; a multi-instance deployment needs
   a shared store for both.
 - The audit hash chain is computed by the application, so it detects tampering by anyone
