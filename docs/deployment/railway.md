@@ -23,6 +23,12 @@ nginx upstream over Railway's IPv6-only private network. One origin avoids both.
 `http://engine.railway.internal:8000` over the private network. A public engine domain
 re-opens exactly the hole the gateway exists to close.
 
+It also publishes `/metrics`, which the engine serves unauthenticated by design — a scraper
+generally cannot present a user credential, and the body is counters only, never questions or
+answers. With no public domain the only route to it is `/bnp-api/metrics` through the
+gateway, which refuses an unauthenticated caller. That is the invariant the endpoint's design
+assumes; generating a domain removes it.
+
 ## Configuration
 
 Set on **`postgres`** — the `postgres` image does not provide a `DATABASE_URL` of its own,

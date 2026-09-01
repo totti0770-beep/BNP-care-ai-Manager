@@ -128,6 +128,17 @@ write failures, latency, and retriever state. Refusal rate is the number worth a
 is how a knowledge-base gap shows up, and a system refusing everything otherwise looks quiet.
 It exposes counters only, never questions or answers.
 
+`/metrics` is unauthenticated on purpose — a scraper generally cannot present a user
+credential. **That is safe only while the engine has no public domain**, which is how both
+deployment descriptors ship it: `artifacts/clinical-ai-engine/.replit-artifact/artifact.toml`
+sets `paths = []`, and the engine publishes no ports under `docker-compose.yml`. The only
+route in is `/bnp-api/metrics` through the gateway, which refuses an unauthenticated caller,
+so the endpoint is reachable by a signed-in user and by nobody else.
+
+Giving the engine a public domain would publish `/metrics` to the internet. The body is
+counters, not clinical data, so the exposure is small — but it is a change in exposure, and
+it should be made deliberately rather than as a side effect of adding a domain.
+
 ### Checks
 
 ```bash
@@ -298,6 +309,13 @@ Engineering work is not the remaining blocker. These are:
 
 ## Known limitations
 
+- **The mobile app is source-complete and unpublished.** `artifacts/nursing-mobile` builds
+  (`pnpm run build` runs its Expo export) and carries a `.replit-artifact/artifact.toml`, but
+  nothing deploys it: `.replit` registers only `api-server`, `bestnursingai` and
+  `clinical-ai-engine`, and `docker-compose.yml` has no service for it. Publishing it needs
+  `EXPO_PUBLIC_DOMAIN` and `EXPO_PUBLIC_REPL_ID` set, a host for the static export, and
+  registration in `.replit` or a compose service. Its EN/AR parity is covered by tests, so it
+  is not abandoned code — it is finished code with no deployment target.
 - The engine runs single-worker. The retriever is a process-global singleton with no
   cross-process locking, so `--workers > 1` will diverge.
 - Both schemas have versioned migrations, applied by one-shot jobs before their services start
