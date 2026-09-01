@@ -104,6 +104,23 @@ Is the original Replit deployment — the one whose `.replit` carried this value
 running, still serving, and still using it? Nothing in the codebase can determine that. It
 needs someone with Replit access to check and rotate there specifically.
 
+**The check, in three steps.** Each one can end it; only reaching the third makes this urgent.
+
+1. Open the Replit workspace for this project. Is there a **published Deployment** at all, as
+   opposed to just the editor? If there is none, the burned value runs nowhere and this item
+   is closed — record that and stop.
+2. If there is one: is it **running**, rather than stopped or suspended? A suspended
+   deployment signs nothing. Stopping it permanently is an equally good answer to this
+   question, and a faster one than rotating.
+3. If it is running: open **Secrets** and compare `JWT_SECRET` against the blob at
+   `git show f899a8a:.replit` line 56. If they differ, someone already rotated it and this is
+   closed. If they match, follow the Procedure above — and note that on Replit the two names
+   (`JWT_SECRET` and `ENGINE_JWT_SECRET`) must be set to the same new value together, because
+   the gateway signs with one and the engine verifies with the other.
+
+Do not compare by eye across a screen share or paste either value into a chat, an issue, or a
+commit. Comparing first and last four characters is enough to tell them apart.
+
 A fresh Docker deployment is not affected: `JWT_SECRET` has no default anywhere in the
 current tree, and both the engine (`routers/auth.py`) and the api-server
 (`engineToken.ts`) refuse to start or mint without it. A publicly known key is worse than
