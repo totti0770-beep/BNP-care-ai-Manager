@@ -98,6 +98,17 @@ router.get("/auth/user", (req: Request, res: Response) => {
 });
 
 router.get("/login", async (req: Request, res: Response) => {
+  // Without a hosted issuer there is nowhere to redirect, and getOidcConfig()
+  // throws rather than returning null — REPL_ID is asserted non-null inside it.
+  // The web app assumes OIDC until its probe of /api/auth/methods answers, so on
+  // a password-only deployment the first paint can still offer this route; it
+  // did, and the user got a 500. Sending them back to the app renders the
+  // credentials form, which is the affordance that actually works here.
+  if (!oidcConfigured()) {
+    res.redirect(getSafeReturnTo(req.query.returnTo));
+    return;
+  }
+
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
 
@@ -189,18 +200,38 @@ router.get("/callback", async (req: Request, res: Response) => {
 });
 
 router.get("/logout", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
   const origin = getOrigin(req);
 
-  const sid = getSessionId(req);
-  await clearSession(res, sid);
+  // Clear the session FIRST, and unconditionally. The order is the whole fix.
+  //
+  // This used to call getOidcConfig() above this line, which runs OIDC
+  // discovery against REPL_ID. On a deployment without a hosted issuer that
+  // throws — so the handler answered 500 having never reached clearSession, and
+  // the user stayed signed in. They saw an error and reasonably assumed nothing
+  // had happened; what had happened was nothing, which is the problem. On a
+  // shared clinical workstation that hands the next person the previous nurse's
+  // session. Signing out must not depend on a remote call succeeding.
+  await clearSession(res, getSessionId(req));
 
-  const endSessionUrl = oidc.buildEndSessionUrl(config, {
-    client_id: process.env.REPL_ID!,
-    post_logout_redirect_uri: origin,
-  });
+  if (!oidcConfigured()) {
+    res.redirect(origin);
+    return;
+  }
 
-  res.redirect(endSessionUrl.href);
+  try {
+    const config = await getOidcConfig();
+    const endSessionUrl = oidc.buildEndSessionUrl(config, {
+      client_id: process.env.REPL_ID!,
+      post_logout_redirect_uri: origin,
+    });
+    res.redirect(endSessionUrl.href);
+  } catch (err) {
+    // The local session is already gone, so the sign-out succeeded. Ending the
+    // provider's session too is best-effort; failing it must not report a
+    // completed sign-out as an error.
+    req.log.error({ err }, "OIDC end-session failed; local session was cleared");
+    res.redirect(origin);
+  }
 });
 
 // ── Credentials login ────────────────────────────────────────────────────────
