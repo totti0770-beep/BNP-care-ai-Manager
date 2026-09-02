@@ -123,8 +123,35 @@ when the machine holding this repository cannot reach `*.up.railway.app`.
 
 It is now reduced to verification only — it runs `scripts/verify_deployment.py` against the
 public gateway on every deploy and exits — and its copy of `JWT_SECRET` has been cleared,
-because only the seeding step needed one. It still holds `BNP_PASSWORD` (as a reference to the
-gateway's bootstrap password) in order to exercise sign-in.
+because only the seeding step needed one.
+
+#### Six of its checks stopped running on 2026-09-02
+
+`BNP_EMAIL` and `BNP_PASSWORD` are references to the gateway's `BOOTSTRAP_ADMIN_*` variables,
+and those were deliberately blanked once the admin account existed. The references now resolve
+to empty, so the verifier skips everything behind a session. It does not pretend otherwise —
+it prints
+
+```
+[INFO] sign-in — skipped — set BNP_EMAIL and BNP_PASSWORD to exercise it
+```
+
+and exits 0. But "all checks passed" now asserts less than it did before that date, so read a
+green run accordingly:
+
+| Still runs | No longer runs |
+|---|---|
+| gateway `/api/healthz` | sign-in with a password |
+| the SPA being served | roles derived from `ADMIN_EMAILS` |
+| advertised sign-in methods | the session surviving the response |
+| **the engine refusing an unauthenticated caller** | **the gateway actually reaching the engine** |
+| no session existing before sign-in | **the audit chain verifying** |
+| | the approved-drug count |
+
+That loss is the price of not keeping an admin password in the deploy config, and it is the
+right trade — but it is a real reduction in coverage, not a no-op. Restoring those checks
+properly means a dedicated verification account with its own credentials; it does **not** mean
+pointing these two variables back at the bootstrap ones.
 
 **Delete it once you no longer want that check**, from the Railway dashboard. Until then it
 also posts a deployment status onto any open pull request for this branch, which is noise
