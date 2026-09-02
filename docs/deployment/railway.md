@@ -123,8 +123,35 @@ when the machine holding this repository cannot reach `*.up.railway.app`.
 
 It is now reduced to verification only — it runs `scripts/verify_deployment.py` against the
 public gateway on every deploy and exits — and its copy of `JWT_SECRET` has been cleared,
-because only the seeding step needed one. It still holds `BNP_PASSWORD` (as a reference to the
-gateway's bootstrap password) in order to exercise sign-in.
+because only the seeding step needed one.
+
+#### Six of its checks stopped running on 2026-09-02
+
+`BNP_EMAIL` and `BNP_PASSWORD` are references to the gateway's `BOOTSTRAP_ADMIN_*` variables,
+and those were deliberately blanked once the admin account existed. The references now resolve
+to empty, so the verifier skips everything behind a session. It does not pretend otherwise —
+it prints
+
+```
+[INFO] sign-in — skipped — set BNP_EMAIL and BNP_PASSWORD to exercise it
+```
+
+and exits 0. But "all checks passed" now asserts less than it did before that date, so read a
+green run accordingly:
+
+| Still runs | No longer runs |
+|---|---|
+| gateway `/api/healthz` | sign-in with a password |
+| the SPA being served | roles derived from `ADMIN_EMAILS` |
+| advertised sign-in methods | the session surviving the response |
+| **the engine refusing an unauthenticated caller** | **the gateway actually reaching the engine** |
+| no session existing before sign-in | **the audit chain verifying** |
+| | the approved-drug count |
+
+That loss is the price of not keeping an admin password in the deploy config, and it is the
+right trade — but it is a real reduction in coverage, not a no-op. Restoring those checks
+properly means a dedicated verification account with its own credentials; it does **not** mean
+pointing these two variables back at the bootstrap ones.
 
 **Delete it once you no longer want that check**, from the Railway dashboard. Until then it
 also posts a deployment status onto any open pull request for this branch, which is noise
@@ -141,14 +168,26 @@ which returns
 ```
 
 — language that reads like success and is not. It stages the removal into a patch; applying it
-needs `commitStagedChangesTool`, which **refuses destructive commits by design** and directs
-the caller to the dashboard. Two separate deletion attempts (this service, and the superseded
-`bnp-clinical-ai-engine` project) both ended with the target still online and still serving.
+needs `commitStagedChangesTool`, and that step answers, verbatim:
 
-So: deletion is a dashboard action, always. **Settings → Danger → Delete.** The confirmation
-box requires typing the service or project name, which is the likeliest reason a half-finished
-attempt leaves everything in place. Verify afterwards with `list-services` or `list-projects`
-rather than trusting any report of success — including one from an agent.
+```
+{"status":"awaiting_user_action","message":"These staged changes require two-factor
+verification, which isn't available over an API/MCP token. Apply them from the Railway
+dashboard."}
+```
+
+The block is Railway's two-factor gate on destructive changes, and an API or MCP token cannot
+satisfy it — granting the token a wider role does not change that (verified 2026-09-02 with
+the project owner's own account: same refusal). Three separate attempts (this service twice,
+and the superseded `bnp-clinical-ai-engine` project) all ended with the target still online
+and still serving.
+
+So: deletion is a dashboard action, always. Either apply the staged change the agent left
+behind (the environment shows pending changes; applying them prompts for the second factor),
+or go direct: **Settings → Danger → Delete.** The confirmation box requires typing the service
+or project name exactly, and the second-factor prompt has to be completed — dismissing either
+leaves everything in place. Verify afterwards with `list-services` or `list-projects` rather
+than trusting any report of success — including one from an agent.
 
 To run the seeding again — against a fresh database, say — restore its start command to:
 
