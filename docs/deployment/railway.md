@@ -141,14 +141,26 @@ which returns
 ```
 
 — language that reads like success and is not. It stages the removal into a patch; applying it
-needs `commitStagedChangesTool`, which **refuses destructive commits by design** and directs
-the caller to the dashboard. Two separate deletion attempts (this service, and the superseded
-`bnp-clinical-ai-engine` project) both ended with the target still online and still serving.
+needs `commitStagedChangesTool`, and that step answers, verbatim:
 
-So: deletion is a dashboard action, always. **Settings → Danger → Delete.** The confirmation
-box requires typing the service or project name, which is the likeliest reason a half-finished
-attempt leaves everything in place. Verify afterwards with `list-services` or `list-projects`
-rather than trusting any report of success — including one from an agent.
+```
+{"status":"awaiting_user_action","message":"These staged changes require two-factor
+verification, which isn't available over an API/MCP token. Apply them from the Railway
+dashboard."}
+```
+
+The block is Railway's two-factor gate on destructive changes, and an API or MCP token cannot
+satisfy it — granting the token a wider role does not change that (verified 2026-09-02 with
+the project owner's own account: same refusal). Three separate attempts (this service twice,
+and the superseded `bnp-clinical-ai-engine` project) all ended with the target still online
+and still serving.
+
+So: deletion is a dashboard action, always. Either apply the staged change the agent left
+behind (the environment shows pending changes; applying them prompts for the second factor),
+or go direct: **Settings → Danger → Delete.** The confirmation box requires typing the service
+or project name exactly, and the second-factor prompt has to be completed — dismissing either
+leaves everything in place. Verify afterwards with `list-services` or `list-projects` rather
+than trusting any report of success — including one from an agent.
 
 To run the seeding again — against a fresh database, say — restore its start command to:
 
