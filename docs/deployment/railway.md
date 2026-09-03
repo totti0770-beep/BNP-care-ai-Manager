@@ -173,6 +173,14 @@ To bring the check back, restore the start command below **and** clear `watchPat
 set the variables again. Restoring the variables alone does nothing, because the watch pattern
 stops the build.
 
+**A `redeploy` will not pick up a changed start command.** It re-runs the previous deployment
+from that deployment's own snapshot, so it reuses the old build *and* the old deploy config.
+Retiring this service showed it plainly: after the start command had been replaced, a redeploy
+still ran the old verifier, which then failed on the blanked `GATEWAY_BASE` with
+`ValueError: unknown url type: '/api/healthz'`. To make a config change take effect, trigger a
+fresh deployment — a variable change without `skipDeploys` does it, and so does a push where
+`watchPatterns` still matches.
+
 ### Deleting a service or a project cannot be automated — this is deliberate
 
 Nothing in an agent session can delete a Railway service, and repeated attempts only look like
