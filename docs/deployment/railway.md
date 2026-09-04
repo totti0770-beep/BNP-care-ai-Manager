@@ -153,9 +153,33 @@ right trade — but it is a real reduction in coverage, not a no-op. Restoring t
 properly means a dedicated verification account with its own credentials; it does **not** mean
 pointing these two variables back at the bootstrap ones.
 
-**Delete it once you no longer want that check**, from the Railway dashboard. Until then it
-also posts a deployment status onto any open pull request for this branch, which is noise
-rather than signal.
+#### It was retired on 2026-09-02, without being deleted
+
+Deleting it needs two-factor verification from the dashboard (see below), which no API or MCP
+token can supply. So it was made inert instead, from a session, in three changes that need no
+second factor:
+
+| Change | Effect |
+|---|---|
+| `watchPatterns` set to `.railway/seed-is-retired-never-matches/**` | no push to `main` matches, so merging no longer rebuilds it |
+| start command replaced with an `echo` and `exit 0` | a deploy prints why it is retired and stops; it runs no verification and signs in as nobody |
+| all eight of its variables blanked | it holds no `JWT_SECRET`, no bootstrap password, no operator identity |
+
+The service still exists, and its config still names this repository as its source. What it no
+longer does is rebuild on every merge, hold a secret, or write audit rows. **Deleting it
+outright is still worth doing** when someone is at the dashboard; nothing depends on it.
+
+To bring the check back, restore the start command below **and** clear `watchPatterns`, then
+set the variables again. Restoring the variables alone does nothing, because the watch pattern
+stops the build.
+
+**A `redeploy` will not pick up a changed start command.** It re-runs the previous deployment
+from that deployment's own snapshot, so it reuses the old build *and* the old deploy config.
+Retiring this service showed it plainly: after the start command had been replaced, a redeploy
+still ran the old verifier, which then failed on the blanked `GATEWAY_BASE` with
+`ValueError: unknown url type: '/api/healthz'`. To make a config change take effect, trigger a
+fresh deployment — a variable change without `skipDeploys` does it, and so does a push where
+`watchPatterns` still matches.
 
 ### Deleting a service or a project cannot be automated — this is deliberate
 
