@@ -19,6 +19,14 @@ export interface EngineQueryResponse {
   query_type: "drug" | "protocol" | "general";
   answer: string;
   dose?: string | null;
+  /**
+   * The same content as `dose`, split into the labelled fields the hospital's
+   * workbooks were built from. `dose` stays the flat string; this is what lets
+   * the panel show the bedside fields and collapse the reference ones.
+   */
+  dose_sections?: Array<{ label: string; text: string; primary: boolean }> | null;
+  /** Why no number was computed. Sent only alongside `dose_sections`. */
+  dose_notice?: string | null;
   indication?: string | null;
   safety_warning?: string | null;
   safety_alert: boolean;

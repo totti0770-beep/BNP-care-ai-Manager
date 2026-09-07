@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BNPResponse, SYSTEM_NAME } from '@/types/bnp';
+import { BNPResponse, DoseSection, SYSTEM_NAME } from '@/types/bnp';
 import { useBackend } from '@/contexts/BackendContext';
 import {
   Send, Bot, User, Shield, AlertTriangle, BookOpen,
@@ -82,6 +82,79 @@ const SUGGESTED = [
   { en: 'Fall prevention assessment', ar: 'تقييم الوقاية من السقوط' },
 ];
 
+// The engine labels regimen fields in English, from the closed set its own
+// workbook converter writes. Translating the heading touches no clinical text —
+// the value underneath is the hospital's, verbatim, in either language.
+const REGIMEN_LABEL_KEYS: Record<string, string> = {
+  'Therapeutic class': 'regTherapeuticClass',
+  'Indications': 'regIndications',
+  'Dosage form and strength': 'regDosageForm',
+  'Adult dosing': 'regAdultDosing',
+  'Pediatric dosing': 'regPediatricDosing',
+  'Renal/hepatic adjustment': 'regRenalHepatic',
+  'Administration': 'regAdministration',
+  'Prescriber authority': 'regPrescriberAuthority',
+  'Additional notes': 'regAdditionalNotes',
+  'Package size / initial strength': 'regPackageSize',
+  'Final concentration': 'regFinalConcentration',
+  'Final volume': 'regFinalVolume',
+  'Diluents': 'regDiluents',
+  'Preparation, administration and stability': 'regPreparation',
+};
+
+function RegimenField({ section }: { section: DoseSection }) {
+  const { t } = useTranslation();
+  const key = REGIMEN_LABEL_KEYS[section.label];
+  return (
+    <div>
+      {section.label && (
+        <div className="text-cyan-300/70 text-[11px] font-semibold uppercase tracking-wide mb-0.5">
+          {key ? t(key) : section.label}
+        </div>
+      )}
+      {/* The regimen is English clinical text with figures in it, so it reads
+          left-to-right even when the page does not. */}
+      <p dir="ltr" className="text-[var(--dg-body)] text-sm leading-relaxed whitespace-pre-line">
+        {section.text}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A reference regimen, as fields rather than as a wall of text.
+ *
+ * The bedside fields are open; the reference ones are one click away. Nothing is
+ * truncated — vancomycin's regimen is 6,162 characters and every one of them is
+ * still reachable here.
+ */
+function DoseSections({ sections }: { sections: DoseSection[] }) {
+  const { t } = useTranslation();
+  const [showAll, setShowAll] = useState(false);
+
+  const bedside = sections.filter((s) => s.primary);
+  // A regimen with nothing marked primary would otherwise render an empty panel
+  // with everything hidden behind a toggle. Show all of it instead.
+  const open = bedside.length ? bedside : sections;
+  const rest = bedside.length ? sections.filter((s) => !s.primary) : [];
+
+  return (
+    <div className="space-y-3">
+      {open.map((s, i) => <RegimenField key={`open-${i}`} section={s} />)}
+      {showAll && rest.map((s, i) => <RegimenField key={`rest-${i}`} section={s} />)}
+      {rest.length > 0 && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="flex items-center gap-1.5 text-xs text-cyan-300/80 hover:text-cyan-200 transition-colors"
+        >
+          {showAll ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {showAll ? t('doseHideDetails') : t('doseShowDetails', { count: rest.length })}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── BNP structured response renderer ─────────────────────────────────────────
 function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: boolean }) {
   const { t } = useTranslation();
@@ -146,14 +219,25 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
       </div>
 
       {/* Dose section */}
-      {bnp.dose && (
+      {(bnp.doseSections?.length || bnp.dose) && (
         <div className="rounded-xl bg-[var(--dg-surface)] border border-cyan-500/20 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-cyan-600/10 border-b border-cyan-500/20">
             <Pill className="w-3.5 h-3.5 text-cyan-400" />
             <span className="text-cyan-300 text-xs font-semibold uppercase tracking-wide">{t('secDose')}</span>
           </div>
-          <div className="px-4 py-3">
-            <p className="text-[var(--dg-body)] text-sm leading-relaxed whitespace-pre-line font-mono">{bnp.dose}</p>
+          <div className="px-4 py-3 space-y-3">
+            {bnp.doseSections?.length ? (
+              <>
+                {bnp.doseNotice && (
+                  <p className="text-[var(--dg-body)] text-sm leading-relaxed">{bnp.doseNotice}</p>
+                )}
+                <DoseSections sections={bnp.doseSections} />
+              </>
+            ) : (
+              // An engine that does not send sections yet, or a computed dose,
+              // which is a short line and needs no structure.
+              <p className="text-[var(--dg-body)] text-sm leading-relaxed whitespace-pre-line">{bnp.dose}</p>
+            )}
           </div>
         </div>
       )}

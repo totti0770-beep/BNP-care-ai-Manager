@@ -66,6 +66,8 @@ function mapToBNP(engine: Awaited<ReturnType<typeof apiQuery>>): BNPResponse {
   return {
     answer: engine.answer,
     dose: engine.dose ?? undefined,
+    doseSections: engine.dose_sections?.length ? engine.dose_sections : undefined,
+    doseNotice: engine.dose_notice ?? undefined,
     indication: engine.indication ?? undefined,
     safetyWarning: engine.safety_warning ?? undefined,
     safetyAlert: engine.safety_alert,

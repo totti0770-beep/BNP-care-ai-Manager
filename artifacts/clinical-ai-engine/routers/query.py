@@ -317,6 +317,8 @@ def query(
     interactions: list = []
     nursing_notes: list = []
     dose_str = None
+    dose_sections = None
+    dose_notice = None
     safety_warning = None
     indication = None
     hard_blocked = False
@@ -410,10 +412,22 @@ def query(
             dose_parts = []
             if drug_result.calculated_dose:
                 dose_parts.append(drug_result.calculated_dose)
-            dose_parts.append(f"Safe range: {drug_result.safe_range}")
+            # `safe_range` carries three different things depending on the path,
+            # and this caption used to claim all three were a range. The worst
+            # case was a 6 KB quoted monograph announced as "Safe range".
+            if drug_result.calculated_dose is None:
+                # A coverage notice, which explains itself.
+                dose_parts.append(drug_result.safe_range)
+            elif drug_result.regimen_sections:
+                dose_parts.append(f"Reference regimen: {drug_result.safe_range}")
+            else:
+                dose_parts.append(f"Safe range: {drug_result.safe_range}")
             if drug_result.overdose_threshold:
                 dose_parts.append(f"Overdose threshold: {drug_result.overdose_threshold}")
             dose_str = "\n".join(dose_parts)
+            dose_sections = drug_result.regimen_sections or None
+            if dose_sections:
+                dose_notice = drug_result.calculated_dose
 
             if drug_result.warnings:
                 safety_warning = "\n".join(f"• {w}" for w in drug_result.warnings)
@@ -512,6 +526,8 @@ def query(
         query_type=query_type,
         answer=answer,
         dose=dose_str,
+        dose_sections=dose_sections,
+        dose_notice=dose_notice,
         indication=indication,
         safety_warning=safety_warning,
         safety_alert=safety_alert,
