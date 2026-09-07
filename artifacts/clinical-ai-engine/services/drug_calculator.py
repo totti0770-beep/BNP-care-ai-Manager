@@ -17,7 +17,7 @@ import re
 from typing import List, Optional, Tuple
 
 from models.formulary import PEDIATRIC_AGE_LIMIT, DrugEntry
-from models.schemas import DrugDoseResult
+from models.schemas import DrugDoseResult, RegimenSection
 
 __all__ = [
     "PEDIATRIC_AGE_LIMIT",
@@ -53,6 +53,95 @@ REJECTED_NOTICE_AR = (
     "⛔ راجع صيدلي بيانات هذا الدواء ورفضها. لم تُحسب أي جرعة. "
     "استخدم دستور أدوية المنشأة."
 )
+
+# Said when the entry carries no numeric figures at all. The old wording here
+# was "is dosed in {unit}s per protocol", written when this branch only caught
+# drugs dosed in international units. The JSH P&T import set auto_calculate=no
+# on all 627 rows, so that sentence began giving 620 milligram-dosed drugs a
+# reason that is not the reason: nobody signed off a number, which is a
+# different thing from the unit.
+NO_FIGURES_NOTICE = (
+    "⚠️ Dose not calculated — this entry carries no pharmacist-signed numeric "
+    "dose. Follow the reference regimen below and the physician order."
+)
+NO_FIGURES_NOTICE_AR = (
+    "⚠️ لم تُحسب الجرعة — لا يحمل هذا السجل جرعة رقمية معتمدة من صيدلي. "
+    "اتبع النظام المرجعي أدناه وأمر الطبيب."
+)
+
+# The separator and the labels below mirror tools/convert_jsh_workbooks.py: its
+# `labelled()` joins with " | " and its two workbook readers emit exactly these
+# names. Splitting is therefore mechanical, not inference over prose.
+#
+# Matching against a closed set — rather than splitting on any ": " — is
+# deliberate. Regimen values are full of colons ("Usual dosage range: Note: ..."),
+# and a seeded row's free text would otherwise be chopped at the first one.
+REGIMEN_SEPARATOR = " | "
+
+_FORMULARY_LABELS = (
+    "Therapeutic class",
+    "Indications",
+    "Dosage form and strength",
+    "Adult dosing",
+    "Pediatric dosing",
+    "Renal/hepatic adjustment",
+    "Administration",
+    "Prescriber authority",
+    "Additional notes",
+)
+
+_IV_MANUAL_LABELS = (
+    "Package size / initial strength",
+    "Final concentration",
+    "Final volume",
+    "Diluents",
+    "Preparation, administration and stability",
+)
+
+KNOWN_REGIMEN_LABELS = frozenset(_FORMULARY_LABELS + _IV_MANUAL_LABELS)
+
+# What a nurse needs while drawing up the dose, as opposed to what she needs to
+# look up. The rest is not hidden, only collapsed by the client.
+PRIMARY_REGIMEN_LABELS = frozenset({
+    "Adult dosing",
+    "Pediatric dosing",
+    "Renal/hepatic adjustment",
+    "Final concentration",
+    "Final volume",
+    "Diluents",
+    "Preparation, administration and stability",
+})
+
+
+def split_regimen(text: Optional[str]) -> List[RegimenSection]:
+    """
+    A reference regimen split back into the labelled fields it was built from.
+
+    An unrecognised segment is returned whole and marked primary. Not knowing
+    what a piece of clinical text is, is a reason to show it, never to fold it
+    away.
+    """
+    if not text or not text.strip():
+        return []
+
+    sections: List[RegimenSection] = []
+    for segment in text.split(REGIMEN_SEPARATOR):
+        segment = segment.strip()
+        if not segment:
+            continue
+        label, separator, body = segment.partition(": ")
+        if separator and label in KNOWN_REGIMEN_LABELS and body.strip():
+            sections.append(
+                RegimenSection(
+                    label=label,
+                    text=body.strip(),
+                    primary=label in PRIMARY_REGIMEN_LABELS,
+                )
+            )
+        else:
+            sections.append(RegimenSection(label="", text=segment, primary=True))
+    return sections
+
 
 
 def _notice(arabic: str, english: str, question: str) -> str:
@@ -314,13 +403,13 @@ def calculate_dose(
         return DrugDoseResult(
             drug_name=entry.generic_name.title(),
             patient_weight_kg=weight,
-            calculated_dose=(
-                f"Not calculated — {entry.generic_name} is dosed in "
-                f"{unit}s per protocol"
+            calculated_dose=_notice(
+                NO_FIGURES_NOTICE_AR, NO_FIGURES_NOTICE, query
             ),
             safe_range=reference,
             overdose_threshold=None,
             warnings=warnings,
+            regimen_sections=split_regimen(reference),
         )
 
     is_pediatric = age is not None and age < PEDIATRIC_AGE_LIMIT

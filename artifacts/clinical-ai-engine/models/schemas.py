@@ -72,6 +72,26 @@ class Citation(BaseModel):
     document_id: Optional[str] = None
 
 
+class RegimenSection(BaseModel):
+    """
+    One labelled field of a reference regimen.
+
+    `tools/convert_jsh_workbooks.py` assembles a drug's regimen as
+    `Label: value | Label: value` from the hospital's workbook columns, which for
+    vancomycin runs to 6,162 characters across 11 fields. Flattening that into a
+    single string and captioning it "Safe range" is what produced a wall of text
+    in the nurse's dose panel. Sending it back apart lets a client show the
+    bedside fields and keep the reference ones one click away.
+
+    `primary` marks the fields a nurse needs while preparing a dose. It is never
+    a licence to drop the rest: everything the source said still travels.
+    """
+
+    label: str
+    text: str
+    primary: bool
+
+
 class DrugDoseResult(BaseModel):
     drug_name: str
     patient_weight_kg: Optional[float]
@@ -79,6 +99,9 @@ class DrugDoseResult(BaseModel):
     safe_range: str
     overdose_threshold: Optional[str]
     warnings: List[str]
+    # Empty whenever `safe_range` is a computed range or a coverage notice —
+    # only a quoted reference regimen has fields to split.
+    regimen_sections: List[RegimenSection] = []
 
 
 class SafetyCheckResult(BaseModel):
@@ -102,6 +125,13 @@ class QueryResponse(BaseModel):
     query_type: QueryType
     answer: str
     dose: Optional[str] = None
+    # The same content as `dose`, kept apart. `dose` stays the flat string every
+    # existing client reads; a client that understands sections renders these.
+    dose_sections: Optional[List[RegimenSection]] = None
+    # The one line saying why no number was computed. Sent only alongside
+    # `dose_sections`, because a client rendering the sections is not rendering
+    # the flat `dose` string that otherwise carries it.
+    dose_notice: Optional[str] = None
     indication: Optional[str] = None
     safety_warning: Optional[str] = None
     safety_alert: bool = False
