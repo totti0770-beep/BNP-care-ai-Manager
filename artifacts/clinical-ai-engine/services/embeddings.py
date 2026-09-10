@@ -356,10 +356,18 @@ class HybridRetriever:
             )
 
     # ── Search ────────────────────────────────────────────────────────────────
-    def hybrid_search(self, query: str, top_k: int = 5) -> List[dict]:
+    def hybrid_search(
+        self, query: str, top_k: int = 5, candidate_k: Optional[int] = None
+    ) -> List[dict]:
         """
         Hybrid search: 60% semantic (LangChain FAISS) + 40% keyword (BM25).
         Returns list of chunk dicts with 'relevance_score'.
+
+        `candidate_k` widens the FAISS pool without widening the result. Only
+        the top `k` documents get a non-zero semantic score, so a caller that
+        intends to rerank the results needs more candidates than it will keep.
+        BM25 already scores the whole corpus. Defaults to `top_k`, which
+        reproduces the previous behaviour exactly.
         """
         if not self.is_available:
             raise EmbeddingsUnavailable(
@@ -379,7 +387,7 @@ class HybridRetriever:
             return []
 
         n = len(chunks)
-        k = min(top_k, n)
+        k = min(max(top_k, candidate_k or 0), n)
 
         # chunk_id -> position, so scoring is O(k) rather than a linear scan per hit.
         index_of = {c.get("chunk_id"): i for i, c in enumerate(chunks)}

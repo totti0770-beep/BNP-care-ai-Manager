@@ -19,9 +19,22 @@ import hashlib
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request
-from models.schemas import QueryRequest, QueryResponse, QueryType, Citation
+from models.schemas import (
+    Citation,
+    ClinicalIntent,
+    QueryRequest,
+    QueryResponse,
+    QueryType,
+)
 from models.database import db_cursor
 from services.clinical_router import classify_query
+from services.clinical_intent import (
+    classify_intent,
+    monitoring_note,
+    required_variables,
+    retrieval_keywords,
+    sections_for_intent,
+)
 from services.drug_calculator import (
     calculate_dose,
     extract_weight,
@@ -30,7 +43,12 @@ from services.drug_calculator import (
 )
 from services.formulary import get_formulary
 from models.formulary import CoverageStatus
-from services.safety_layer import check_retrieval, check_answer, is_high_risk
+from services.safety_layer import (
+    check_answer,
+    check_dose_is_grounded,
+    check_retrieval,
+    is_high_risk,
+)
 from services.embeddings import get_retriever, EmbeddingsUnavailable
 from services.metrics import metrics
 from services.context_validator import validate_context
@@ -150,6 +168,12 @@ def query(
     # It is recorded in the audit table, which is access-controlled.
     logger.info(f"[{session_id}] Query type: {query_type} | chars={len(question)}")
 
+    # ── Step 1c: Clinical intent ─────────────────────────────────────────────
+    # Orthogonal to query_type: DRUG still decides whether the safety layer
+    # runs, intent decides which part of the drug's record answers the question.
+    intent = classify_intent(question)
+    logger.info(f"[{session_id}] Clinical intent: {intent.value}")
+
     # ── Step 1b: Translate Arabic query for FAISS/BM25 search ────────────────
     # Documents are in English — Arabic embeddings won't match English content.
     # We translate drug names and clinical terms to English for retrieval only;
@@ -158,10 +182,25 @@ def query(
     if search_query != question:
         logger.info(f"[{session_id}] Arabic query translated for retrieval")
 
+    # Bias retrieval toward the part of the corpus this intent needs. The index
+    # carries no section labels, so this is keyword weighting of the query
+    # string for BM25 — the same lever translate_for_search already uses. It is
+    # not metadata filtering and must not be described as such.
+    intent_terms = retrieval_keywords(intent)
+    if intent_terms:
+        search_query = f"{search_query} {' '.join(intent_terms)}".strip()
+
     # ── Step 2: Hybrid retrieval ──────────────────────────────────────────────
     retriever = get_retriever()
     try:
-        chunks = retriever.hybrid_search(search_query, top_k=body.top_k)
+        # A wider FAISS pool than we keep, so the keyword bias has something to
+        # act on. `top_confidence` below is still the best score in the result,
+        # so this cannot push a query past a safety gate it would have failed.
+        chunks = retriever.hybrid_search(
+            search_query,
+            top_k=body.top_k,
+            candidate_k=min(body.top_k * 3, 20) if intent_terms else None,
+        )
     except EmbeddingsUnavailable as e:
         # Fail closed: without working retrieval there is no grounded answer to
         # give, and a plausible ungrounded one is the dangerous outcome.
@@ -257,6 +296,7 @@ def query(
         return QueryResponse(
             session_id=session_id,
             query_type=query_type,
+            intent=intent,
             answer=_msg(
                 "لم يُعثر على معلومات كافية في قاعدة المعرفة للإجابة على هذا السؤال. "
                 "يرجى رفع البروتوكول السريري أو الوثيقة الدوائية المناسبة.",
@@ -293,6 +333,7 @@ def query(
         return QueryResponse(
             session_id=session_id,
             query_type=query_type,
+            intent=intent,
             answer=_msg(
                 "لم يُعثر على المعلومات في المصادر الطبية المتاحة.",
                 "Not found in provided medical sources.",
@@ -319,6 +360,10 @@ def query(
     dose_str = None
     dose_sections = None
     dose_notice = None
+    missing_variables: List[str] = []
+    approved_dose = None
+    coverage_note = None
+    drug_result = None
     safety_warning = None
     indication = None
     hard_blocked = False
@@ -343,6 +388,24 @@ def query(
         age = body.age if body.age is not None else extract_age(question)
 
         coverage = entry.coverage if entry else CoverageStatus.NOT_IN_FORMULARY
+
+        # The model has never seen the formulary, so it cannot know that a drug
+        # is unapproved and has, until now, been free to answer as though it
+        # were. One line of English, for the prompt only.
+        coverage_note = {
+            CoverageStatus.NOT_IN_FORMULARY: (
+                "This drug is not in the hospital formulary. No dose, "
+                "contraindication or interaction check was performed."
+            ),
+            CoverageStatus.PENDING_REVIEW: (
+                "This drug's formulary entry is pending pharmacist review. "
+                "No dose has been approved."
+            ),
+            CoverageStatus.REJECTED: (
+                "This drug's formulary entry was reviewed and rejected by a "
+                "pharmacist. No dose has been approved."
+            ),
+        }.get(coverage)
 
         # State the coverage boundary explicitly. An empty contraindication list
         # reads as "none known", which is the opposite of the truth, and a
@@ -407,30 +470,74 @@ def query(
             has_interactions = len([a for a in safety_alerts if "Interaction" in a]) > 0
             nursing_notes = SafetyEngine.get_nursing_notes(entry, has_interactions)
 
+        # What this question needs and does not have. Resolved against the entry,
+        # so a value that would change nothing is never demanded.
+        missing_variables = required_variables(
+            intent, entry, weight=weight, age=age
+        )
+
         drug_result = calculate_dose(entry, question, weight, age)
         if drug_result:
-            dose_parts = []
-            if drug_result.calculated_dose:
-                dose_parts.append(drug_result.calculated_dose)
-            # `safe_range` carries three different things depending on the path,
-            # and this caption used to claim all three were a range. The worst
-            # case was a 6 KB quoted monograph announced as "Safe range".
-            if drug_result.calculated_dose is None:
-                # A coverage notice, which explains itself.
-                dose_parts.append(drug_result.safe_range)
-            elif drug_result.regimen_sections:
-                dose_parts.append(f"Reference regimen: {drug_result.safe_range}")
+            approved_dose = drug_result.calculated_dose
+
+            if missing_variables:
+                # Asked for a calculation without the values it needs. Refusing
+                # to guess is the point: the previous behaviour took the adult
+                # branch silently, and warned only when a weight happened to be
+                # present. No figure, and no regimen dump either — the nurse
+                # asked for a number, not for the record.
+                dose_str = None
+                dose_sections = None
+                dose_notice = _msg(
+                    "لحساب الجرعة بدقة، النظام يحتاج القيم التالية:",
+                    "To calculate this dose from approved data, the system needs:",
+                    question,
+                )
+                approved_dose = None
             else:
-                dose_parts.append(f"Safe range: {drug_result.safe_range}")
-            if drug_result.overdose_threshold:
-                dose_parts.append(f"Overdose threshold: {drug_result.overdose_threshold}")
-            dose_str = "\n".join(dose_parts)
-            dose_sections = drug_result.regimen_sections or None
-            if dose_sections:
-                dose_notice = drug_result.calculated_dose
+                # Narrow the regimen to the fields this question asked about.
+                # Done here rather than in calculate_dose so the calculator keeps
+                # returning the whole record — nothing is lost, and the intent
+                # only decides what travels for this one answer.
+                dose_sections = _sections_for(drug_result.regimen_sections, intent)
+
+                dose_parts = []
+                if drug_result.calculated_dose:
+                    dose_parts.append(drug_result.calculated_dose)
+
+                # `safe_range` carries three different things depending on the
+                # path, and this caption used to claim all three were a range.
+                # The worst case was a 6 KB quoted monograph announced as
+                # "Safe range" — and putting the same 6 KB here while the
+                # sections were narrowed would only move the wall, not remove it.
+                if drug_result.calculated_dose is None:
+                    # A coverage notice, which explains itself.
+                    dose_parts.append(drug_result.safe_range)
+                elif drug_result.regimen_sections:
+                    # The regimen travels as the narrowed sections. `dose` gets
+                    # the same narrowing rendered flat, because the mobile client
+                    # reads only this field and would otherwise see nothing.
+                    if dose_sections:
+                        dose_parts.append(
+                            "\n".join(
+                                f"{s.label}: {s.text}" if s.label else s.text
+                                for s in dose_sections
+                            )
+                        )
+                else:
+                    dose_parts.append(f"Safe range: {drug_result.safe_range}")
+
+                if drug_result.overdose_threshold:
+                    dose_parts.append(
+                        f"Overdose threshold: {drug_result.overdose_threshold}"
+                    )
+                dose_str = "\n".join(dose_parts) or None
+
+                if dose_sections:
+                    dose_notice = drug_result.calculated_dose
 
             if drug_result.warnings:
-                safety_warning = "\n".join(f"• {w}" for w in drug_result.warnings)
+                safety_warning = _warnings_for(drug_result.warnings, intent, entry)
 
     # ── Step 6: GPT-4o response generation ───────────────────────────────────
     if hard_blocked:
@@ -442,14 +549,37 @@ def query(
             question,
         )
         logger.warning(f"[{session_id}] HARD BLOCK: Overdose detected for: {question[:80]}")
+    elif missing_variables:
+        # A calculation was asked for without the values it needs. The model is
+        # not consulted: it has no formulary, so anything it produced here would
+        # be the ungrounded figure this path exists to prevent.
+        answer = _ask_for_variables(missing_variables, question)
+        logger.info(
+            f"[{session_id}] Dose calculation needs: {','.join(missing_variables)}"
+        )
     else:
-        raw_response = generate_response(question, chunks, query_type, citations)
+        raw_response = generate_response(
+            question,
+            chunks,
+            query_type,
+            citations,
+            intent=intent,
+            # Engine-first: the model is handed the approved figure rather than
+            # asked to produce one. None here is an explicit prohibition in the
+            # prompt, not an omission.
+            approved_dose=approved_dose,
+            coverage_note=coverage_note,
+        )
         sections = parse_bnp_sections(raw_response)
 
         answer = sections["answer"]
         indication = sections.get("indication")
 
-        if not dose_str:
+        # The model's own Dose section is a fallback for questions the engine
+        # could not answer from the formulary — a drug it does not stock, or a
+        # protocol question. It must never fill a dose the engine deliberately
+        # withheld, which is what a missing-variables answer is.
+        if not dose_str and not missing_variables:
             dose_str = sections.get("dose")
         if not safety_warning:
             safety_warning = sections.get("safety_warning")
@@ -466,6 +596,21 @@ def query(
 
         # ── Step 6b: Validate the generated answer ───────────────────────────
         answer_check = check_answer(answer, top_confidence)
+
+        if answer_check.is_safe:
+            # A dose figure in the prose must have come from the approved path.
+            # check_answer looks for hedging words, not for numbers, so until
+            # now nothing reconciled what `answer` said against what the
+            # formulary allowed — the structured field was protected and the
+            # sentence a nurse reads was not.
+            answer_check = check_dose_is_grounded(
+                answer,
+                top_confidence,
+                approved_dose=approved_dose,
+                approved_text=_approved_text(drug_result, chunks),
+                enforced=intent in _DOSE_INTENTS,
+            )
+
         if not answer_check.is_safe:
             logger.warning(f"[{session_id}] Answer rejected: {answer_check.rejection_reason}")
             audit(
@@ -479,6 +624,7 @@ def query(
             return QueryResponse(
                 session_id=session_id,
                 query_type=query_type,
+            intent=intent,
                 answer=_msg(
                     "تعذّر التحقق من الإجابة من المصادر الطبية المتاحة.",
                     "The generated answer could not be verified against the "
@@ -528,6 +674,8 @@ def query(
         dose=dose_str,
         dose_sections=dose_sections,
         dose_notice=dose_notice,
+        intent=intent,
+        missing_variables=missing_variables,
         indication=indication,
         safety_warning=safety_warning,
         safety_alert=safety_alert,
@@ -543,6 +691,132 @@ def query(
         safety_alerts=safety_alerts,
         context_validation=context_validation_msg,
     )
+
+
+# What to call each missing value when asking a nurse for it.
+_VARIABLE_LABELS = {
+    "patient_weight_kg": ("وزن المريض بالكيلوغرام", "the patient's weight in kilograms"),
+    "age": ("عمر المريض", "the patient's age"),
+}
+
+
+def _ask_for_variables(missing, question: str) -> str:
+    """
+    The answer when a calculation was asked for without the values it needs.
+
+    Written here rather than left to the model. A request for missing data is
+    the one answer that must never be improvised: the model has no formulary,
+    and an invented figure is exactly what this path exists to prevent.
+    """
+    arabic = _is_arabic(question)
+    bullets = "\n".join(
+        f"• {_VARIABLE_LABELS.get(v, (v, v))[0 if arabic else 1]}" for v in missing
+    )
+    if arabic:
+        return (
+            "لحساب الجرعة من البيانات المعتمدة، النظام يحتاج:\n"
+            f"{bullets}\n\n"
+            "لم تُحسب أي جرعة ولم يُقدَّر أي رقم. زوّد القيم أعلاه وأعد السؤال."
+        )
+    return (
+        "To calculate this dose from approved data, the system needs:\n"
+        f"{bullets}\n\n"
+        "No dose has been calculated and no figure has been estimated. "
+        "Supply the values above and ask again."
+    )
+
+
+# Where a number in the prose is a dose instruction rather than a product
+# property. A preparation volume or an infusion concentration is neither, and
+# enforcing the gate there would manufacture refusals on correct answers.
+_DOSE_INTENTS = frozenset({
+    ClinicalIntent.DOSE,
+    ClinicalIntent.DOSE_CALCULATION,
+    ClinicalIntent.PEDIATRIC_DOSING,
+})
+
+
+def _approved_text(drug_result, chunks) -> str:
+    """
+    Every figure the approved sources actually state, for grounding an answer.
+
+    Two sources count, and the distinction is the whole rule. The formulary row
+    is the pharmacist-signed record. The retrieved chunks are the hospital's own
+    indexed documents — quoting a range from the manual the nurse would
+    otherwise walk to the shelf for is the intended behaviour.
+
+    What is *not* here is any figure the model produced by doing arithmetic on
+    that text, which is what the brief forbids and what this catches: a number
+    present in neither the formulary nor any retrieved passage was computed, and
+    the model has no formulary to compute from.
+    """
+    parts = []
+    if drug_result is not None:
+        parts.append(drug_result.safe_range or "")
+        parts += [s.text for s in (drug_result.regimen_sections or [])]
+        parts += list(drug_result.warnings or [])
+        if drug_result.overdose_threshold:
+            parts.append(drug_result.overdose_threshold)
+    parts += [c.get("content", "") for c in (chunks or [])]
+    return "\n".join(parts)
+
+
+def _sections_for(sections, intent):
+    """
+    The regimen fields this intent asked about.
+
+    `None` means "all of them" (FULL_DRUG_INFO); an empty selection means the
+    answer lives elsewhere in the record and a regimen dump would bury it. A
+    selection that matches nothing falls back to everything rather than showing
+    an empty panel — a nurse who asked about preparation and gets silence
+    learns nothing, while getting the whole record is merely verbose.
+    """
+    if not sections:
+        return None
+
+    wanted = sections_for_intent(intent)
+    if wanted is None:
+        return list(sections)
+    if not wanted:
+        return None
+
+    chosen = [s for s in sections if s.label in wanted]
+    return chosen or list(sections)
+
+
+def _warnings_for(warnings, intent, entry):
+    """
+    The safety text this intent needs, as a bullet list.
+
+    The workbook converter puts six labelled fields into the `warnings` column
+    — cautions, adverse reactions, monitoring, pregnancy, lactation, storage —
+    and the importer splits them on "|", so each arrives as its own
+    "Label: value" string. Handing all six to every question made a second wall
+    of text beside the dose one.
+
+    Cautions and adverse reactions always travel: they are the warning, and an
+    intent is not a reason to drop one.
+    """
+    always = ("Cautions and warnings", "Adverse drug reactions")
+    if intent is ClinicalIntent.FULL_DRUG_INFO:
+        kept = list(warnings)
+    elif intent is ClinicalIntent.MONITORING:
+        note = monitoring_note(entry)
+        kept = [w for w in warnings if w.startswith(always)]
+        if note:
+            kept.insert(0, f"Monitoring: {note}")
+    else:
+        kept = [
+            w
+            for w in warnings
+            # An unlabelled warning is a coverage notice or a seeded string, and
+            # those are the ones that explain a missing dose. Never dropped.
+            if w.startswith(always) or ": " not in w.split(" | ")[0][:40]
+        ]
+        if not kept:
+            kept = list(warnings)
+
+    return "\n".join(f"• {w}" for w in kept) if kept else None
 
 
 def _log_query(

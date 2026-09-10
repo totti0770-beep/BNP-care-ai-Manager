@@ -11,7 +11,7 @@ to compare protocols and recommend the best approach for the clinical context.
 import os
 import logging
 from typing import List, Optional
-from models.schemas import QueryType, Citation
+from models.schemas import ClinicalIntent, QueryType, Citation
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,12 @@ BNP_SYSTEM_PROMPT = """You are BNP Clinical AI Engine, a hospital-grade nursing 
  CLINICAL BEHAVIOR
 ══════════════════════════════════════════════════
 • If the question is about MEDICATIONS:
-  → Calculate dosage if patient weight is provided
-  → Show safe dosage range from the source
+  → NEVER calculate, derive or estimate a dose yourself. You do not have the
+    hospital's approved formulary and must not do arithmetic on source text.
+  → An APPROVED DOSE, when one is supplied below, is the only figure you may
+    present as the dose. Quote it exactly; you may explain it.
+  → With no APPROVED DOSE supplied, state that no dose was calculated and why.
+    You may still quote a range the source document states verbatim.
   → Add overdose warnings if relevant
 
 • If the question is about PROTOCOLS:
@@ -166,14 +170,79 @@ def _rag_only_response(chunks: List[dict]) -> str:
     return "\n".join(lines)
 
 
+# What each intent asks the model to produce. The blanket "complete 6-section"
+# instruction is kept only for the two intents that genuinely want a full
+# reference — asking for every section is what turned "what is the dose?" into a
+# page of monograph.
+_INTENT_BRIEF = {
+    ClinicalIntent.DOSE: (
+        "The nurse asked for the DOSE. Answer with the dosing information and "
+        "nothing else. Do not describe preparation, reconstitution, dilution, "
+        "stability, adverse effects or storage unless a safety qualification "
+        "requires it."
+    ),
+    ClinicalIntent.DOSE_CALCULATION: (
+        "The nurse asked HOW TO CALCULATE a dose. Present the APPROVED DOSE "
+        "supplied below and the basis it was calculated from. Perform no "
+        "arithmetic of your own. If no approved dose is supplied, say which "
+        "patient values are needed and stop."
+    ),
+    ClinicalIntent.PREPARATION: (
+        "The nurse asked HOW TO PREPARE this medication. Answer with vial "
+        "strength, reconstitution, diluent, resulting concentration, final "
+        "volume and stability. Do not restate general dosing."
+    ),
+    ClinicalIntent.ADMINISTRATION: (
+        "The nurse asked HOW TO ADMINISTER this medication. Answer with route, "
+        "infusion requirements and rate, and the monitoring that belongs to "
+        "administration itself. Do not return the full drug record."
+    ),
+    ClinicalIntent.RENAL_ADJUSTMENT: (
+        "The nurse asked about RENAL OR HEPATIC dose adjustment. Answer only "
+        "from the adjustment guidance in the sources. State plainly that this "
+        "system does not compute a renal adjustment and that the decision rests "
+        "with the prescriber or pharmacist."
+    ),
+    ClinicalIntent.PEDIATRIC_DOSING: (
+        "The nurse asked about PEDIATRIC dosing. Answer from pediatric guidance "
+        "only. Never present an adult figure as if it were a pediatric one."
+    ),
+    ClinicalIntent.ANTIDOTE: (
+        "The nurse asked for the ANTIDOTE. Name it, say what it reverses, cite "
+        "the source. Do not return the drug's full record."
+    ),
+    ClinicalIntent.MONITORING: (
+        "The nurse asked WHAT TO MONITOR. Answer with monitoring parameters and "
+        "their timing. Do not restate dosing or preparation."
+    ),
+    ClinicalIntent.FULL_DRUG_INFO: (
+        "The nurse asked for the COMPLETE record. Produce the full 6-section "
+        "BNP Clinical Output; this is the one case where that is wanted."
+    ),
+    ClinicalIntent.GENERAL_DRUG_INFO: (
+        "Answer the question that was asked, from the sources, and no more."
+    ),
+}
+
+
 def generate_response(
     question: str,
     chunks: List[dict],
     query_type: QueryType,
     citations: List[Citation],
+    *,
+    intent: Optional[ClinicalIntent] = None,
+    approved_dose: Optional[str] = None,
+    coverage_note: Optional[str] = None,
 ) -> str:
     """
-    Generate fully structured 6-section clinical response via GPT-4o.
+    Generate a structured clinical response via GPT-4o.
+
+    `intent` narrows what is asked for; `approved_dose` is the figure
+    `drug_calculator` derived from the pharmacist-signed formulary row, and is
+    the ONLY dose the model is permitted to present. The keyword arguments
+    default to None so existing callers keep their behaviour.
+
     Prefers Replit AI Integration proxy; falls back to user OPENAI_API_KEY; then RAG-only.
     """
     # Prefer Replit AI Integration (no scope restrictions)
@@ -214,12 +283,45 @@ def generate_response(
             if doc_count > 1 else ""
         )
 
+        # Engine-first dosing: the approved figure is handed to the model rather
+        # than the model being asked to produce one. When there is none, the
+        # prohibition is explicit — silence would leave the system prompt's
+        # general medication rules as the only guidance.
+        if approved_dose:
+            dose_block = (
+                f"\n\nAPPROVED DOSE (from the pharmacist-signed formulary — "
+                f"present this exact figure and no other):\n{approved_dose}"
+            )
+        else:
+            dose_block = (
+                "\n\nAPPROVED DOSE: none. No dose has been calculated from the "
+                "approved formulary for this drug and this patient. Do NOT state, "
+                "derive or estimate any dose figure of your own. You may quote a "
+                "range the source states verbatim, attributed to that source."
+            )
+        if coverage_note:
+            dose_block += f"\n\nFORMULARY STATUS: {coverage_note}"
+
+        brief = _INTENT_BRIEF.get(intent) if intent else None
+        if brief:
+            task = (
+                f"{brief}\n\nUse the BNP section headers for whatever you do "
+                "return, and omit sections that this question does not call for."
+            )
+        else:
+            task = (
+                "Produce the complete 6-section BNP Clinical Output. "
+                "Do not skip any section. If a section is not applicable, write N/A."
+            )
+
+        intent_line = f"\nClinical Intent: {intent.value.upper()}" if intent else ""
+
         user_content = (
             f"RAG CONTEXT:\n{context_block}\n\n"
             f"CLINICAL QUESTION: {question}\n"
-            f"Query Type: {query_type.value.upper()}{multi_note}\n\n"
-            "Produce the complete 6-section BNP Clinical Output. "
-            "Do not skip any section. If a section is not applicable, write N/A."
+            f"Query Type: {query_type.value.upper()}{intent_line}{multi_note}"
+            f"{dose_block}\n\n"
+            f"{task}"
         )
 
         messages = [
@@ -276,7 +378,15 @@ def parse_bnp_sections(response_text: str) -> dict:
     indication = parse_bullets(extract("Indication") or extract("الدواعي"))
     contraindications_text = parse_bullets(extract("Contraindications") or extract("موانع الاستخدام"))
     nursing_notes_text = parse_bullets(extract("Nursing Notes") or extract("ملاحظات التمريض"))
-    safety_warning = extract("Safety Warning") or extract("تحذير السلامة")
+    # "تنبيه السلامة" is the header BNP_SYSTEM_PROMPT tells the model to use for
+    # Arabic, and it was in SECTION_LABELS but not in this lookup — so an Arabic
+    # response that followed instructions had its safety warning silently
+    # swallowed into the preceding section.
+    safety_warning = (
+        extract("Safety Warning")
+        or extract("تنبيه السلامة")
+        or extract("تحذير السلامة")
+    )
     sources_text = extract("Sources") or extract("المصادر")
 
     # If dose is explicitly N/A, treat as None

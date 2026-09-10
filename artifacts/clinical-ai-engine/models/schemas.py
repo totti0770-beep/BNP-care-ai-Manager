@@ -10,6 +10,28 @@ class QueryType(str, Enum):
     GENERAL = "general"
 
 
+class ClinicalIntent(str, Enum):
+    """
+    What the nurse asked for, orthogonal to `QueryType`.
+
+    `QueryType.DRUG` decides whether the drug-safety layer runs; the intent
+    decides which part of the drug's record answers the question. Keeping them
+    separate is deliberate: every medication question must keep its formulary
+    lookup, contraindication check and overdose gate, whatever was asked.
+    """
+
+    DOSE = "dose"
+    DOSE_CALCULATION = "dose_calculation"
+    PREPARATION = "preparation"
+    ADMINISTRATION = "administration"
+    RENAL_ADJUSTMENT = "renal_adjustment"
+    PEDIATRIC_DOSING = "pediatric_dosing"
+    ANTIDOTE = "antidote"
+    MONITORING = "monitoring"
+    GENERAL_DRUG_INFO = "general_drug_info"
+    FULL_DRUG_INFO = "full_drug_info"
+
+
 class UserRole(str, Enum):
     USER = "user"
     ADMIN = "admin"
@@ -132,6 +154,13 @@ class QueryResponse(BaseModel):
     # `dose_sections`, because a client rendering the sections is not rendering
     # the flat `dose` string that otherwise carries it.
     dose_notice: Optional[str] = None
+    # What the question asked for. Advisory to a client: it changes which fields
+    # are populated, never whether the safety layer ran.
+    intent: Optional[ClinicalIntent] = None
+    # Patient values the approved calculation needs and did not have. Non-empty
+    # means no dose was computed and none was guessed — the answer asks for
+    # these instead. Named for the QueryRequest fields that supply them.
+    missing_variables: List[str] = []
     indication: Optional[str] = None
     safety_warning: Optional[str] = None
     safety_alert: bool = False

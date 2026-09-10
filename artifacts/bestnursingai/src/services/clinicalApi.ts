@@ -27,6 +27,17 @@ export interface EngineQueryResponse {
   dose_sections?: Array<{ label: string; text: string; primary: boolean }> | null;
   /** Why no number was computed. Sent only alongside `dose_sections`. */
   dose_notice?: string | null;
+  /**
+   * What the question asked for, orthogonal to `query_type`. Advisory: it
+   * changes which fields are populated, never whether the safety layer ran.
+   */
+  intent?: string | null;
+  /**
+   * Patient values the approved calculation needed and did not have. Non-empty
+   * means no dose was computed and none was guessed. Named for the request
+   * fields that supply them, so a client can map them onto its own inputs.
+   */
+  missing_variables?: string[];
   indication?: string | null;
   safety_warning?: string | null;
   safety_alert: boolean;
