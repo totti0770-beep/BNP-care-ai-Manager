@@ -87,6 +87,8 @@ function mapToBNP(engine: Awaited<ReturnType<typeof apiQuery>>): BNPResponse {
       pageNumber: c.page_number,
       similarity: c.relevance_score,
       excerpt: c.excerpt,
+      chunkId: c.chunk_id ?? undefined,
+      documentId: c.document_id ?? undefined,
     })),
     confidenceLevel: engine.confidence,
     queryType: mapQueryType(engine.query_type),

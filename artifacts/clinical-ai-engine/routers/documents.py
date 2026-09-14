@@ -8,7 +8,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from models.database import db_cursor
 from models.schemas import DocumentApproval, DocumentMeta
 from services.pdf_processor import process_pdf
-from services.embeddings import get_retriever
+from services.embeddings import get_retriever, is_currently_valid
 from services.metrics import metrics
 from routers.auth import get_current_user, require_admin
 
@@ -365,7 +365,7 @@ def delete_document(
 @router.get("/chunks/{chunk_id}")
 def get_chunk(
     chunk_id: str,
-    _admin: dict = Depends(require_admin),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Return the exact passage behind a citation.
@@ -374,13 +374,23 @@ def get_chunk(
     review can ask "what text produced this recommendation?" and get the answer,
     including for documents that have since been retired — which is why deletion
     is soft.
+
+    Two readers, two rules. An administrator may read any passage, retired or
+    not, because that is what an incident review needs. A nurse may read only a
+    passage the engine would cite today — an approved, in-date, non-retired
+    document — which is exactly what they already saw an excerpt of in the
+    assistant. The rule is applied here, not in a client, and it is the same
+    `is_currently_valid` the retriever uses, so the two cannot disagree.
     """
     with db_cursor() as (cur, _):
         cur.execute(
             """
             SELECT c.chunk_id, c.content, c.page_number, c.chunk_index,
                    c.document_id, c.deleted_at AS chunk_retired_at,
-                   d.filename, d.deleted_at AS document_retired_at
+                   d.filename, d.deleted_at AS document_retired_at,
+                   d.status AS document_status, d.version AS document_version,
+                   d.effective_date, d.expiry_date,
+                   d.approved_by, d.approved_at
             FROM bnp_chunks c
             JOIN bnp_documents d ON c.document_id = d.id
             WHERE c.chunk_id = %s
@@ -392,10 +402,34 @@ def get_chunk(
     if row is None:
         raise HTTPException(status_code=404, detail="Chunk not found")
 
+    row = dict(row)
+    # A retired source is still valid evidence for a past answer; it is just
+    # no longer used for new ones.
+    retired = (
+        row["document_retired_at"] is not None
+        or row["chunk_retired_at"] is not None
+    )
+    currently_valid = not retired and is_currently_valid(
+        {
+            "document_status": row.get("document_status"),
+            "effective_date": row.get("effective_date"),
+            "expiry_date": row.get("expiry_date"),
+        }
+    )
+
+    if current_user.get("role") != "admin" and not currently_valid:
+        # 403, not 404: the passage exists, and saying otherwise would tell a
+        # nurse the citation they are holding never happened.
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "This passage belongs to a document that is not currently "
+                "approved for clinical use. An administrator can still review it."
+            ),
+        )
+
     return {
         **row,
-        # A retired source is still valid evidence for a past answer; it is just
-        # no longer used for new ones.
-        "retired": row["document_retired_at"] is not None
-        or row["chunk_retired_at"] is not None,
+        "retired": retired,
+        "currently_valid": currently_valid,
     }

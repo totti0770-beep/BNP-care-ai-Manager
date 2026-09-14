@@ -10,8 +10,8 @@ import {
   ShieldCheck,
   CheckCircle,
   XCircle,
-  FileText,
 } from 'lucide-react';
+import CitationList from '@/components/CitationList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -230,16 +230,15 @@ const AuditLogPage: React.FC = () => {
               )}
 
               {log.citations.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {log.citations.map((c, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center gap-1 text-xs text-[var(--dg-muted)] bg-[var(--dg-accent-faint)] border border-[var(--dg-border)] rounded px-2 py-0.5"
-                    >
-                      <FileText className="w-3 h-3" />
-                      {c.document_name} · p.{c.page_number}
-                    </span>
-                  ))}
+                <div className="mt-3">
+                  <CitationList
+                    variant="pills"
+                    citations={log.citations.map((c) => ({
+                      documentName: c.document_name,
+                      pageNumber: c.page_number,
+                      chunkId: c.chunk_id ?? undefined,
+                    }))}
+                  />
                 </div>
               )}
 

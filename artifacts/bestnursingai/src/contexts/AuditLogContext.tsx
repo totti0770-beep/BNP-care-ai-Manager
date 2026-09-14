@@ -40,6 +40,7 @@ export interface AuditLogEntry {
     document_name: string;
     page_number: number;
     relevance_score: number;
+    chunk_id?: string | null;
   }>;
   clientIp: string | null;
   model: string | null;

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import CitationList from '@/components/CitationList';
 import type { QueryOptions } from '@/services/clinicalApi';
 
 // ── Voice Input Hook ──────────────────────────────────────────────────────────
@@ -379,21 +380,8 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
             <BookOpen className="w-3.5 h-3.5 text-green-400" />
             <span className="text-green-300 text-xs font-semibold uppercase tracking-wide">{t('secSources')}</span>
           </div>
-          <div className="px-4 py-3 space-y-1.5">
-            {bnp.sources.map((src, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span className="text-green-500 text-xs mt-0.5">[{i + 1}]</span>
-                <div>
-                  <p className="text-[var(--dg-body)] text-xs">{src.documentName}</p>
-                  <p className="text-[var(--dg-muted)] text-xs">
-                    Page {src.pageNumber} · Relevance: {(src.similarity * 100).toFixed(0)}%
-                  </p>
-                  {src.excerpt && (
-                    <p className="text-[var(--dg-muted)] text-xs mt-0.5 line-clamp-2 italic">"{src.excerpt}"</p>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="px-4 py-3">
+            <CitationList citations={bnp.sources} />
           </div>
         </div>
       )}

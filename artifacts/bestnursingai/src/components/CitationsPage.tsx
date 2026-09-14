@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Search, Quote, AlertCircle } from 'lucide-react';
+import { FileText, Search, Quote, AlertCircle, Clock, CalendarX, ShieldCheck, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useBackend } from '@/contexts/BackendContext';
-import { listAuditLog } from '@/services/clinicalApi';
+import { listAuditLog, type EngineDocument } from '@/services/clinicalApi';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * The clinical sources this system answers from.
@@ -15,23 +16,38 @@ import { listAuditLog } from '@/services/clinicalApi';
  * authored here.
  */
 interface SourceRow {
+  id: string;
   filename: string;
   chunkCount: number;
   uploadDate: string;
+  status: EngineDocument['status'];
+  version?: number;
+  effectiveDate?: string | null;
+  expiryDate?: string | null;
+  approvedBy?: string | null;
   citationCount: number;
   pagesCited: number[];
 }
 
+type StatusFilter = 'all' | 'approved' | 'pending' | 'retired' | 'superseded';
+const STATUS_FILTERS: StatusFilter[] = ['all', 'approved', 'pending', 'retired', 'superseded'];
+
 const CitationsPage: React.FC = () => {
   const { t } = useTranslation();
   const { engineDocuments, isEngineAvailable } = useBackend();
+  const { hasPermission } = useAuth();
+  // Citation counts come from the audit trail, which only an administrator may
+  // read. Asking for it as a nurse would be a 403 and a misleading "0".
+  const canReadAudit = hasPermission('settings.manage');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [citationCounts, setCitationCounts] = useState<
     Record<string, { count: number; pages: Set<number> }>
   >({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(canReadAudit);
 
   useEffect(() => {
+    if (!canReadAudit) return;
     let cancelled = false;
 
     // Citation usage is only visible to admins, since it reads the audit log.
@@ -57,16 +73,22 @@ const CitationsPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [canReadAudit]);
 
   const sources: SourceRow[] = useMemo(
     () =>
       engineDocuments.map((doc) => {
         const usage = citationCounts[doc.filename];
         return {
+          id: doc.id,
           filename: doc.filename,
           chunkCount: doc.chunk_count,
           uploadDate: doc.upload_date,
+          status: doc.status,
+          version: doc.version,
+          effectiveDate: doc.effective_date,
+          expiryDate: doc.expiry_date,
+          approvedBy: doc.approved_by,
           citationCount: usage?.count ?? 0,
           pagesCited: usage ? [...usage.pages].sort((a, b) => a - b) : [],
         };
@@ -74,15 +96,24 @@ const CitationsPage: React.FC = () => {
     [engineDocuments, citationCounts],
   );
 
-  const filtered = sources.filter((source) =>
-    source.filename.toLowerCase().includes(searchQuery.toLowerCase()),
+  const filtered = sources.filter(
+    (source) =>
+      source.filename.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      (statusFilter === 'all' || source.status === statusFilter),
   );
+
+  const countFor = (f: StatusFilter) =>
+    f === 'all' ? sources.length : sources.filter((s) => s.status === f).length;
 
   return (
     <div className="flex-1 flex flex-col dg-page min-h-screen p-6">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-[var(--dg-text)]">{t('citations')}</h2>
         <p className="text-[var(--dg-muted)] mt-1">{t('citationsDescription')}</p>
+        <p className="flex items-start gap-2 text-xs text-[var(--dg-muted)] mt-3">
+          <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          {t('evExplorerHint')}
+        </p>
       </div>
 
       {!isEngineAvailable && (
@@ -99,18 +130,39 @@ const CitationsPage: React.FC = () => {
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('search')}
           className="ps-10 bg-[var(--dg-surface)] border-[var(--dg-border)] text-[var(--dg-text)]"
+          aria-label={t('search')}
         />
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-6" role="group" aria-label={t('evStatus')}>
+        {STATUS_FILTERS.map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setStatusFilter(f)}
+            aria-pressed={statusFilter === f}
+            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+              statusFilter === f
+                ? 'bg-[var(--dg-accent-soft)] border-[var(--dg-border-strong)] text-[var(--dg-accent-strong)]'
+                : 'bg-[var(--dg-surface)] border-[var(--dg-border)] text-[var(--dg-muted)] hover:text-[var(--dg-text)]'
+            }`}
+          >
+            {t(`evFilter_${f}`)} · {countFor(f)}
+          </button>
+        ))}
       </div>
 
       {isLoading ? (
         <p className="text-[var(--dg-muted)]">{t('loading')}</p>
       ) : filtered.length === 0 ? (
-        <p className="text-[var(--dg-muted)]">{t('noDocuments')}</p>
+        <p className="text-[var(--dg-muted)]">
+          {sources.length === 0 ? t('noDocuments') : t('evNoDocsMatching')}
+        </p>
       ) : (
         <div className="space-y-3">
           {filtered.map((source) => (
             <div
-              key={source.filename}
+              key={source.id}
               className="rounded-xl bg-[var(--dg-surface)] border border-[var(--dg-border)] p-4"
             >
               <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -121,6 +173,37 @@ const CitationsPage: React.FC = () => {
                     <p className="text-[var(--dg-muted)] text-xs mt-1">
                       {source.chunkCount} {t('indexedSegments')} ·{' '}
                       {new Date(source.uploadDate).toLocaleDateString()}
+                      {typeof source.version === 'number' && (
+                        <> · {t('evVersion', { version: source.version })}</>
+                      )}
+                    </p>
+                    {/* The badge follows the document's state as the engine
+                        reports it. A row without a status is not presumed
+                        approved — it simply carries no badge. */}
+                    <p className="text-xs mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {source.status === 'approved' ? (
+                        <span className="flex items-center gap-1 text-green-400">
+                          <ShieldCheck className="w-3 h-3" /> {t('docStatus_approved')}
+                        </span>
+                      ) : source.status === 'pending' ? (
+                        <span className="flex items-center gap-1 text-amber-400">
+                          <Clock className="w-3 h-3" /> {t('docStatus_pending')}
+                        </span>
+                      ) : source.status === 'retired' || source.status === 'superseded' ? (
+                        <span className="flex items-center gap-1 text-[var(--dg-muted)]">
+                          <CalendarX className="w-3 h-3" /> {t(`docStatus_${source.status}`)}
+                        </span>
+                      ) : null}
+                      {source.expiryDate && (
+                        <span className="text-[var(--dg-muted)]">
+                          {t('evExpires')}: {new Date(source.expiryDate).toLocaleDateString()}
+                        </span>
+                      )}
+                      {source.approvedBy && (
+                        <span className="text-[var(--dg-muted)]">
+                          {t('evApprovedBy')}: {source.approvedBy}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
