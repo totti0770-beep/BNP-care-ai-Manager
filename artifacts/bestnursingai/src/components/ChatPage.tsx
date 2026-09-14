@@ -426,6 +426,7 @@ function PatientContextPanel({
   opts: QueryOptions;
   onChange: (o: QueryOptions) => void;
 }) {
+  const { t } = useTranslation();
   const [conditionInput, setConditionInput] = useState('');
   const [drugInput, setDrugInput] = useState('');
 
@@ -452,7 +453,7 @@ function PatientContextPanel({
   return (
     <div className="border border-[var(--dg-border)] rounded-xl p-4 bg-[var(--dg-surface)] space-y-4">
       <p className="text-[var(--dg-accent-strong)] text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
-        <UserCircle className="w-3.5 h-3.5" /> Patient Context (optional — enables safety checks)
+        <UserCircle className="w-3.5 h-3.5" aria-hidden="true" /> {t('patientContextHint')}
       </p>
 
       {/* Weight + Age */}
@@ -630,12 +631,14 @@ const ChatPage: React.FC = () => {
   const engineBadge = isChecking ? (
     <span className="px-3 py-1 rounded-full bg-gray-600/20 text-[var(--dg-muted)] text-xs flex items-center gap-1">
       <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
-      Connecting...
+      {t('engineConnecting')}
     </span>
   ) : isEngineAvailable ? (
     <span className="px-3 py-1 rounded-full bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] text-xs flex items-center gap-1">
       <Zap className="w-3 h-3" />
-      Live Engine · {indexedChunks} chunks{openaiEnabled ? ' · GPT-4o' : ''}
+      {openaiEnabled
+        ? t('engineLiveModel', { count: indexedChunks, model: 'GPT-4o' })
+        : t('engineLive', { count: indexedChunks })}
     </span>
   ) : (
     <span className="px-3 py-1 rounded-full bg-red-600/20 text-red-300 text-xs flex items-center gap-1">
@@ -666,7 +669,12 @@ const ChatPage: React.FC = () => {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div
+        className="flex-1 overflow-y-auto p-4 space-y-5"
+        role="log"
+        aria-live="polite"
+        aria-label={t('answerRegion')}
+      >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-2">
             <div className="w-20 h-20 rounded-2xl dg-gradient flex items-center justify-center mb-4 shadow-lg shadow-[rgba(0,166,166,0.2)]">
@@ -675,16 +683,16 @@ const ChatPage: React.FC = () => {
             <h3 className="text-xl font-semibold text-[var(--dg-text)] mb-1">{SYSTEM_NAME}</h3>
             <p className="text-[var(--dg-muted)] text-sm mb-1">
               {isEngineAvailable
-                ? `متصل بالمحرك السريري · ${indexedChunks} مقطع مفهرس`
+                ? t('chatConnectedSummary', { count: indexedChunks })
                 : t('engineUnavailableBody')}
             </p>
             <p className="text-[var(--dg-muted)] text-xs mb-4">
-              حساب الجرعات · تحذيرات السلامة · مراجع موثّقة
+              {t('chatCapabilities')}
             </p>
             {voiceSupported && (
               <div className="flex items-center gap-1.5 text-xs text-[var(--dg-accent-strong)]/70 bg-[var(--dg-accent-faint)] border border-[var(--dg-border)] rounded-full px-3 py-1.5 mb-5">
                 <Mic className="w-3 h-3" />
-                يمكنك التحدث بسؤالك بالضغط على زر الميكروفون
+                {t('chatVoiceHint')}
               </div>
             )}
             <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
@@ -749,7 +757,7 @@ const ChatPage: React.FC = () => {
                 <span className="w-2 h-2 bg-[var(--dg-accent)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 bg-[var(--dg-accent)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 <span className="text-[var(--dg-muted)] text-xs ms-2">
-                  {isEngineAvailable ? 'Querying Clinical AI Engine...' : 'Processing clinical context...'}
+                  {isEngineAvailable ? t('engineQuerying') : t('engineProcessing')}
                 </span>
               </div>
             </div>
@@ -771,7 +779,7 @@ const ChatPage: React.FC = () => {
             }`}
           >
             <UserCircle className="w-3.5 h-3.5" />
-            Patient Context
+            {t('patientContext')}
             {hasPatientCtx && (
               <span className="bg-[var(--dg-accent)] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
                 {(patientOpts.conditions?.length ?? 0) + (patientOpts.otherDrugs?.length ?? 0) +
@@ -795,7 +803,8 @@ const ChatPage: React.FC = () => {
             <button
               onClick={handleMicClick}
               disabled={isTyping}
-              title={isListening ? 'إيقاف التسجيل' : 'تحدّث بسؤالك'}
+              title={isListening ? t('micStop') : t('micStart')}
+              aria-label={isListening ? t('micStop') : t('micStart')}
               className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
                 isListening
                   ? 'bg-red-500/20 text-red-400 animate-pulse hover:bg-red-500/30'

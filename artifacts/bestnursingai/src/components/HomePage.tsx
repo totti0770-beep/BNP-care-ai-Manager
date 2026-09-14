@@ -7,7 +7,11 @@ const HomePage: React.FC = () => {
   const { t } = useTranslation();
 
   const features = [
-    { icon: Lock, label: t('hipaaAware'), color: 'from-amber-500 to-orange-600' },
+    // "HIPAA Aware" used to sit here. No HIPAA mapping exists anywhere in this
+    // repository, so the claim had nothing behind it. The audit chain does:
+    // every answer is hash-linked to the one before it and verifiable end to
+    // end (GET /auth/audit-log/verify).
+    { icon: Lock, label: t('auditTrail'), color: 'from-amber-500 to-orange-600' },
     { icon: BookOpen, label: t('evidenceBased'), color: 'from-emerald-500 to-teal-600' },
     { icon: Zap, label: t('realTime'), color: 'from-yellow-500 to-amber-600' },
     { icon: Brain, label: t('citedSources'), color: 'from-pink-500 to-rose-600' },

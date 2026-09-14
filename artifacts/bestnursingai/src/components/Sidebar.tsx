@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -12,7 +12,6 @@ import {
   FileText,
   Quote,
   Settings,
-  Search,
   X,
   Sun,
   Moon,
@@ -40,26 +39,71 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
   const { user, logout, hasPermission } = useAuth();
   const { currentLanguage, changeLanguage, isRTL } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
   const canManageSettings = hasPermission('settings.manage');
+  const canManageDocuments = hasPermission('documents.manage');
 
-  const mainMenuItems = [
-    { id: 'new-chat', label: t('newChat'), icon: Plus, color: 'dg-gradient' },
+  type MenuItem = { id: string; label: string; icon: React.ElementType };
+
+  /*
+   * Grouped by what a nurse is doing, not by who built it. The three
+   * governance screens used to sit behind a collapsed "Advanced Features"
+   * accordion that defaulted closed — so an admin who did not already know the
+   * formulary existed had no way to find out. Every item a user can see here
+   * is one the server will actually serve them: the formulary and audit routes
+   * are admin-only on the engine, so they are gated on the same permission
+   * rather than shown and then refused.
+   *
+   * The Documents entry used to carry a hardcoded `badge: 4`. Nothing here
+   * knows how many documents exist; a number that is not measured is not shown.
+   */
+  const clinicalItems: MenuItem[] = [
     { id: 'home', label: t('home'), icon: Home },
     { id: 'chat', label: t('chat'), icon: MessageSquare },
-    { id: 'upload', label: t('secureUpload'), icon: Upload },
-    { id: 'documents', label: t('documents'), icon: FileText, badge: 4 },
-    { id: 'citations', label: t('citations'), icon: Quote },
-    { id: 'settings', label: t('settings'), icon: Settings },
   ];
 
-  const advancedMenuItems = [
-    { id: 'formulary', label: t('formulary'), icon: Pill },
-    { id: 'audit-log', label: t('auditLog'), icon: ClipboardList },
-    { id: 'rag-settings', label: t('closedLoopRAG'), icon: Brain },
+  const knowledgeItems: MenuItem[] = [
+    { id: 'documents', label: t('documents'), icon: FileText },
+    { id: 'citations', label: t('citations'), icon: Quote },
+    // Upload is an admin action on the engine (documents.manage). Listing it for
+    // a nurse offered a screen whose only button they could not press.
+    ...(canManageDocuments
+      ? [{ id: 'upload', label: t('secureUpload'), icon: Upload }]
+      : []),
   ];
+
+  const governanceItems: MenuItem[] = canManageSettings
+    ? [
+        { id: 'formulary', label: t('formulary'), icon: Pill },
+        { id: 'audit-log', label: t('auditLog'), icon: ClipboardList },
+        { id: 'rag-settings', label: t('closedLoopRAG'), icon: Brain },
+      ]
+    : [];
+
+  const groups: { key: string; label: string; items: MenuItem[] }[] = [
+    { key: 'clinical', label: t('navClinical'), items: clinicalItems },
+    { key: 'knowledge', label: t('navKnowledge'), items: knowledgeItems },
+    { key: 'governance', label: t('navGovernance'), items: governanceItems },
+  ].filter((g) => g.items.length > 0);
+
+  const renderItem = (item: MenuItem) => {
+    const Icon = item.icon;
+    const isActive = activeTab === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => onTabChange(item.id)}
+        aria-current={isActive ? 'page' : undefined}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+          isActive
+            ? 'bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] border border-[var(--dg-border-strong)]'
+            : 'text-[var(--dg-muted)] hover:bg-[var(--dg-accent-faint)] hover:text-[var(--dg-text)]'
+        }`}
+      >
+        <Icon className="w-5 h-5" aria-hidden="true" />
+        <span className="flex-1 text-start">{item.label}</span>
+      </button>
+    );
+  };
 
   const handleLogout = () => {
     logout();
@@ -119,90 +163,26 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <nav className="space-y-1">
-          {mainMenuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
+        <button
+          onClick={() => onTabChange('new-chat')}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl dg-gradient text-white shadow-lg shadow-[0_6px_18px_rgba(0,166,166,0.28)] transition-all duration-200"
+        >
+          <Plus className="w-5 h-5" aria-hidden="true" />
+          <span className="flex-1 text-start">{t('newChat')}</span>
+        </button>
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => onTabChange(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                  item.id === 'new-chat'
-                    ? 'dg-gradient text-white shadow-lg shadow-[0_6px_18px_rgba(0,166,166,0.28)]'
-                    : isActive
-                    ? 'bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] border border-[var(--dg-border-strong)]'
-                    : 'text-[var(--dg-muted)] hover:bg-[var(--dg-accent-faint)] hover:text-[var(--dg-text)]'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="flex-1 text-start">{item.label}</span>
-                {item.badge && (
-                  <span className="w-6 h-6 rounded-full bg-[var(--dg-accent)] text-white text-xs flex items-center justify-center">
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        {groups.map((group) => (
+          <nav key={group.key} aria-label={group.label} className="mt-6">
+            <h3 className="text-xs font-semibold text-[var(--dg-muted)] uppercase tracking-wider mb-2 px-4">
+              {group.label}
+            </h3>
+            <div className="space-y-1">{group.items.map(renderItem)}</div>
+          </nav>
+        ))}
+
+        <nav aria-label={t('settings')} className="mt-6 space-y-1">
+          {renderItem({ id: 'settings', label: t('settings'), icon: Settings })}
         </nav>
-
-        {canManageSettings && (
-          <div className="mt-6">
-            <button
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between px-4 py-2 text-[var(--dg-muted)] text-xs font-semibold uppercase tracking-wider hover:text-[var(--dg-muted)] transition-colors"
-            >
-              <span>{t('advancedFeatures')}</span>
-              <ChevronRight className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
-            </button>
-
-            {showAdvanced && (
-              <nav className="space-y-1 mt-2">
-                {advancedMenuItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => onTabChange(item.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                        isActive
-                          ? 'bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] border border-[var(--dg-border-strong)]'
-                          : 'text-[var(--dg-muted)] hover:bg-[var(--dg-accent-faint)] hover:text-[var(--dg-text)]'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span className="flex-1 text-start">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            )}
-          </div>
-        )}
-
-        <div className="mt-6">
-          <h3 className="text-xs font-semibold text-[var(--dg-muted)] uppercase tracking-wider mb-3 px-4">
-            {t('recentChats')}
-          </h3>
-          <div className="px-4 mb-3">
-            <div className="relative">
-              <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--dg-muted)]" />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('search')}
-                className="w-full ps-9 pe-3 py-2 bg-[var(--dg-surface)] border border-[var(--dg-border-strong)] rounded-lg text-[var(--dg-text)] placeholder:text-[var(--dg-faint)] text-sm focus:outline-none focus:border-[var(--dg-accent)]"
-              />
-            </div>
-          </div>
-          <div className="px-4 py-8 text-center">
-            <p className="text-[var(--dg-muted)] text-sm">{t('noConversations')}</p>
-          </div>
-        </div>
       </div>
 
       <div className="p-4 border-t border-[var(--dg-border)] space-y-3">
