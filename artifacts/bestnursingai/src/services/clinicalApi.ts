@@ -65,6 +65,18 @@ export interface EngineDocument {
   upload_date: string;
   chunk_count: number;
   uploaded_by: string;
+
+  // Lifecycle. Optional because an engine older than 0004_document_lifecycle
+  // returns rows without them, and a missing status must not render as an
+  // empty badge next to a document that is in fact being searched.
+  status?: "pending" | "approved" | "retired" | "superseded";
+  version?: number;
+  effective_date?: string | null;
+  expiry_date?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  superseded_by?: string | null;
+  source_note?: string | null;
 }
 
 export interface FormularyCounts {
@@ -158,10 +170,22 @@ export async function sendQuery(
   }
 }
 
-/** Upload a PDF to the engine. Returns result or null on failure. */
+/**
+ * Upload a PDF to the engine.
+ *
+ * The document is staged, not published: it lands `pending` and is not
+ * searchable until an admin approves it. `chunks_indexed` is 0 here for that
+ * reason, and `chunks_extracted` is what was read out of the file.
+ */
 export async function uploadDocument(
   file: File
-): Promise<{ document_id: string; filename: string; chunks_indexed: number } | null> {
+): Promise<{
+  document_id: string;
+  filename: string;
+  status?: string;
+  chunks_indexed: number;
+  chunks_extracted?: number;
+} | null> {
   try {
     const form = new FormData();
     form.append("file", file);
@@ -170,6 +194,33 @@ export async function uploadDocument(
     return res.json();
   } catch {
     return null;
+  }
+}
+
+/**
+ * Approve a staged document, which indexes it and makes it citable.
+ *
+ * The approver's name is required by the engine and by a database constraint:
+ * accepting a document as clinical knowledge is an event the audit trail has to
+ * be able to attribute to a person.
+ */
+export async function approveDocument(
+  documentId: string,
+  approvedBy: string,
+  sourceNote?: string
+): Promise<boolean> {
+  try {
+    const res = await authFetch(`/documents/${documentId}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        approved_by: approvedBy,
+        source_note: sourceNote || null,
+      }),
+    });
+    return res?.ok ?? false;
+  } catch {
+    return false;
   }
 }
 

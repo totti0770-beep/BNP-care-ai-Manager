@@ -10,6 +10,9 @@ import {
   Database,
   RefreshCw,
   X,
+  CheckCircle2,
+  Clock,
+  CalendarX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,12 +22,13 @@ import { useBackend } from '@/contexts/BackendContext';
 
 const DocumentsPage: React.FC = () => {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const {
     isEngineAvailable,
     engineDocuments,
     uploadToEngine,
     removeFromEngine,
+    approveInEngine,
     refreshDocuments,
     indexedChunks,
   } = useBackend();
@@ -35,6 +39,7 @@ const DocumentsPage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const canUpload = hasPermission('documents.manage');
 
@@ -51,7 +56,10 @@ const DocumentsPage: React.FC = () => {
     setIsUploading(true);
     const result = await uploadToEngine(file);
     if (result) {
-      toast.success(t('indexedSegmentsToast', { count: result.chunks }));
+      // Not "indexed": the document is staged and invisible to search until an
+      // administrator approves it. Saying otherwise would be the same class of
+      // untruth as a progress bar that finishes before the work does.
+      toast.success(t('stagedPendingApproval', { count: result.chunks }));
     } else {
       toast.error(t('uploadFailedEngine'));
     }
@@ -76,6 +84,22 @@ const DocumentsPage: React.FC = () => {
     }
     setConfirmDeleteId(null);
     setIsDeleting(false);
+  };
+
+  const handleApprove = async (documentId: string) => {
+    const approver = user?.name || user?.email;
+    if (!approver) {
+      toast.error(t('approveNeedsIdentity'));
+      return;
+    }
+    setApprovingId(documentId);
+    const ok = await approveInEngine(documentId, approver);
+    if (ok) {
+      toast.success(t('documentApproved'));
+    } else {
+      toast.error(t('approveFailed'));
+    }
+    setApprovingId(null);
   };
 
   const filteredDocuments = engineDocuments.filter(doc =>
@@ -261,12 +285,61 @@ const DocumentsPage: React.FC = () => {
                   <span className="text-[var(--dg-muted)] text-xs">·</span>
                   <span className="text-[var(--dg-muted)] text-xs">{formatDate(doc.upload_date)}</span>
                   <span className="text-[var(--dg-muted)] text-xs">·</span>
-                  <span className="text-xs text-green-400 flex items-center gap-1">
-                    <Database className="w-3 h-3" />
-                    {t('indexedInDatabase')}
-                  </span>
+                  {/*
+                    This badge used to read "indexed" for every row. A staged
+                    document is not indexed and cannot be cited, and a badge
+                    that says otherwise is exactly the misreport this feature
+                    exists to prevent — so it now follows the document's state.
+                  */}
+                  {doc.status === 'pending' ? (
+                    <span className="text-xs text-amber-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {t('docPendingApproval')}
+                    </span>
+                  ) : doc.status === 'superseded' || doc.status === 'retired' ? (
+                    <span className="text-xs text-[var(--dg-muted)] flex items-center gap-1">
+                      <CalendarX className="w-3 h-3" />
+                      {doc.status === 'superseded'
+                        ? t('docSuperseded')
+                        : t('docRetired')}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-green-400 flex items-center gap-1">
+                      <Database className="w-3 h-3" />
+                      {t('indexedInDatabase')}
+                    </span>
+                  )}
+                  {doc.expiry_date && (
+                    <>
+                      <span className="text-[var(--dg-muted)] text-xs">·</span>
+                      <span className="text-xs text-[var(--dg-muted)]">
+                        {t('docExpires', { date: doc.expiry_date })}
+                      </span>
+                    </>
+                  )}
+                  {doc.approved_by && (
+                    <>
+                      <span className="text-[var(--dg-muted)] text-xs">·</span>
+                      <span className="text-xs text-[var(--dg-muted)] truncate max-w-[16rem]">
+                        {t('docApprovedBy', { name: doc.approved_by })}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
+
+              {/* Approve action — the moment a document becomes citable */}
+              {canUpload && doc.status === 'pending' && (
+                <button
+                  onClick={() => handleApprove(doc.id)}
+                  disabled={approvingId === doc.id}
+                  className="px-3 py-2 rounded-lg bg-green-500/15 hover:bg-green-500/25 text-green-400 text-sm flex items-center gap-2 transition-colors flex-shrink-0 disabled:opacity-50"
+                  title={t('approveDocumentTitle')}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {approvingId === doc.id ? t('approving') : t('approve')}
+                </button>
+              )}
 
               {/* Delete action */}
               {canUpload && (

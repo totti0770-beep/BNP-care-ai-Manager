@@ -71,6 +71,31 @@ class DocumentMeta(BaseModel):
     chunk_count: int
     uploaded_by: str
 
+    # Lifecycle. Optional so a client built against the previous shape still
+    # parses a response, and so this model stays usable for a row read before
+    # 0004_document_lifecycle ran.
+    status: Optional[str] = None
+    version: Optional[int] = None
+    effective_date: Optional[str] = None
+    expiry_date: Optional[str] = None
+    approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
+    superseded_by: Optional[str] = None
+    source_note: Optional[str] = None
+
+
+class DocumentApproval(BaseModel):
+    """
+    Accepting a document as clinical knowledge the engine may answer from.
+
+    `approved_by` is required and non-empty for the same reason
+    `ck_documents_approver_present` exists in the database: an approval nobody
+    is named on cannot be reviewed afterwards, and this event goes onto the
+    tamper-evident audit chain.
+    """
+    approved_by: str = Field(..., min_length=2, max_length=200)
+    source_note: Optional[str] = Field(default=None, max_length=2000)
+
 
 class QueryRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=4000)
