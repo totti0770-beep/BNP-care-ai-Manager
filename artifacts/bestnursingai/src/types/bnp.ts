@@ -23,6 +23,10 @@ export interface BNPResponse {
   doseSections?: DoseSection[];
   /** Why no number was computed. Accompanies `doseSections`. */
   doseNotice?: string;
+  /** What the question asked for. Advisory only. */
+  intent?: string;
+  /** Patient values the calculation needed and did not have. */
+  missingVariables?: string[];
   indication?: string;
   safetyWarning?: string;
   safetyAlert: boolean;

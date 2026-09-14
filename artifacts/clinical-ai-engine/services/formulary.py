@@ -139,6 +139,19 @@ class Formulary:
         Whole-word matching only, so "hep" does not match "hepatic". Longer
         names are tried first: "insulin glargine" must not resolve to "insulin"
         when both are in the formulary.
+
+        The boundary is per-script, and that is not a detail. It used to be
+        `(?<!\w)`, and Python's `\w` is Unicode-aware — so an Arabic letter
+        counts as a word character. A nurse writing "جرعه الvancomycin" glues the
+        Arabic definite article straight onto a Latin drug name, the lookahead
+        failed, and the drug was not found at all: no coverage check, no
+        contraindication check, no interaction check, no overdose gate, and the
+        dose falling through to whatever the language model wrote. Silently.
+
+        A Latin name is therefore bounded by Latin characters only, and an
+        Arabic name may carry the definite article it is almost always written
+        with. Neither loosens the "hep"/"hepatic" guard, because "a" is still a
+        Latin letter and "ـي" is still Arabic.
         """
         import re
 
@@ -148,9 +161,21 @@ class Formulary:
 
         by_name, _ = self._snapshot()
         for term in sorted(by_name, key=len, reverse=True):
-            if re.search(rf"(?<!\w){re.escape(term)}(?!\w)", haystack):
+            if re.search(self._boundary_pattern(term), haystack):
                 return by_name[term]
         return None
+
+    @staticmethod
+    def _boundary_pattern(term: str) -> str:
+        """A whole-word pattern for `term`, bounded within its own script."""
+        import re
+
+        escaped = re.escape(term)
+        if term.isascii():
+            # Arabic text either side is a different script, not a longer word.
+            return rf"(?<![A-Za-z0-9]){escaped}(?![A-Za-z0-9])"
+        # "الفانكومايسين" is "الـ" + the drug name, and is how it is written.
+        return rf"(?<![^\W\d_])(?:ال)?{escaped}(?![^\W\d_])"
 
     def counts(self) -> Dict[str, int]:
         """Approval tally, for /health and the review screen."""

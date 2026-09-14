@@ -55,6 +55,11 @@ export function MessageBubble({
   const isUser = role === "user";
   const isAI = role === "assistant";
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  // The dose field carries the hospital's reference regimen for a
+  // protocol-dosed drug, which is most of the formulary. Unclamped it filled
+  // the screen; this app has no dose_sections support, so a clamp with a
+  // toggle is the honest minimum — nothing is dropped, it is folded.
+  const [doseOpen, setDoseOpen] = useState(false);
 
   const allSources = citations && citations.length > 0 ? citations : [];
 
@@ -170,7 +175,19 @@ export function MessageBubble({
               <Ionicons name="medical" size={12} color="#4CC9F0" />
               <Text style={[styles.cardTitle, { color: "#4CC9F0" }]}>{t("dose")}</Text>
             </View>
-            <Text style={styles.doseText}>{dose}</Text>
+            <Text
+              style={styles.doseText}
+              numberOfLines={doseOpen ? undefined : 8}
+            >
+              {dose}
+            </Text>
+            {dose.length > 320 && (
+              <Pressable onPress={() => setDoseOpen((v) => !v)} hitSlop={8}>
+                <Text style={styles.doseToggle}>
+                  {doseOpen ? t("showLess") : t("showMore")}
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -463,8 +480,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#E2E8F0",
     fontFamily: "Inter_400Regular",
-    textAlign: "right",
-    writingDirection: "rtl",
+    // The regimen is English clinical text with figures in it. Forcing RTL
+    // reordered "15 to 20 mg/kg" on screen; it reads left-to-right whatever
+    // language the surrounding app is in.
+    textAlign: "left",
+    writingDirection: "ltr",
+  },
+  doseToggle: {
+    fontSize: 11,
+    color: "#4CC9F0",
+    fontFamily: "Inter_400Regular",
+    marginTop: 6,
   },
   safetyAlertItem: {
     fontSize: 11,

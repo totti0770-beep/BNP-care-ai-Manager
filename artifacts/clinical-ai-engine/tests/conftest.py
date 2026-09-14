@@ -52,7 +52,11 @@ class StubRetriever:
     def chunk_count(self):
         return len(self._chunks)
 
-    def hybrid_search(self, query, top_k=5):
+    def hybrid_search(self, query, top_k=5, candidate_k=None):
+        # Mirrors HybridRetriever.hybrid_search. `candidate_k` widens the FAISS
+        # pool without widening the result, so a stub that returns a fixed list
+        # correctly ignores it — but it must accept it, or the double stops
+        # standing for the thing it doubles.
         if self._raises is not None:
             raise self._raises
         return self._chunks[:top_k]
@@ -115,7 +119,11 @@ def engine(monkeypatch):
         monkeypatch.setattr(
             query_router,
             "generate_response",
-            lambda question, chunks, query_type, citations: f"Answer: {answer}",
+            # Keyword-only extras mirror the real signature: intent narrows what
+            # is asked for, approved_dose is the engine's figure. The stub
+            # ignores them and returns a fixed answer, which is the point — a
+            # test that wants to exercise them passes its own `answer`.
+            lambda question, chunks, query_type, citations, **_kw: f"Answer: {answer}",
         )
         monkeypatch.setattr(query_router, "translate_for_search", lambda q: q)
 

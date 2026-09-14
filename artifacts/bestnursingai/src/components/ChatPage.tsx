@@ -102,6 +102,13 @@ const REGIMEN_LABEL_KEYS: Record<string, string> = {
   'Preparation, administration and stability': 'regPreparation',
 };
 
+// The engine names each missing value after the request field that supplies it,
+// so the client can map one onto its own input without a second table.
+const MISSING_VARIABLE_KEYS: Record<string, string> = {
+  patient_weight_kg: 'varWeight',
+  age: 'varAge',
+};
+
 function RegimenField({ section }: { section: DoseSection }) {
   const { t } = useTranslation();
   const key = REGIMEN_LABEL_KEYS[section.label];
@@ -217,6 +224,30 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
           <p className="text-[var(--dg-body)] text-sm leading-relaxed whitespace-pre-line">{bnp.answer}</p>
         </div>
       </div>
+
+      {/* The calculation needs patient values it was not given. Shown above the
+          dose card because it explains why that card is empty — the engine
+          refused to guess rather than falling back to an adult figure. */}
+      {bnp.missingVariables && bnp.missingVariables.length > 0 && (
+        <div className="rounded-xl bg-[var(--dg-surface)] border border-amber-500/30 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-600/10 border-b border-amber-500/30">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-amber-300 text-xs font-semibold uppercase tracking-wide">
+              {t('doseNeedsValues')}
+            </span>
+          </div>
+          <ul className="px-4 py-3 space-y-1.5">
+            {bnp.missingVariables.map((v, i) => (
+              <li key={i} className="text-amber-200 text-sm leading-relaxed">
+                • {t(MISSING_VARIABLE_KEYS[v] ?? 'doseNeedsValues')}
+              </li>
+            ))}
+          </ul>
+          <p className="px-4 pb-3 text-[var(--dg-muted)] text-xs leading-relaxed">
+            {t('doseNoGuess')}
+          </p>
+        </div>
+      )}
 
       {/* Dose section */}
       {(bnp.doseSections?.length || bnp.dose) && (
