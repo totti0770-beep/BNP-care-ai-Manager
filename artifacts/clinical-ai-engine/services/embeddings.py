@@ -10,6 +10,7 @@ import uuid
 import logging
 import pickle
 import threading
+import datetime as _dt
 import numpy as np
 from pathlib import Path
 from typing import List, Optional
@@ -35,6 +36,95 @@ EMBEDDING_DIMENSIONS = 1536
 # Written next to the index so a mismatch is detectable. Vectors embedded by one
 # model are meaningless against another of the same width.
 FINGERPRINT_PATH = INDEX_DIR / "embedding_model.txt"
+
+
+def _as_date(value):
+    """
+    Normalise whatever the caller had to a `date`, or None.
+
+    psycopg2 returns a `date` for a DATE column, but the same value arrives as
+    an ISO string from a form field, from the pickled index written by an older
+    build, and from a test fixture. A string compared against a `date` raises,
+    and inside retrieval that would turn a governance check into a 500.
+    """
+    if value is None or isinstance(value, _dt.date) and not isinstance(value, _dt.datetime):
+        return value
+    if isinstance(value, _dt.datetime):
+        return value.date()
+    if isinstance(value, str):
+        try:
+            return _dt.date.fromisoformat(value.strip()[:10])
+        except ValueError:
+            # An unparseable date must not silently read as "no limit".
+            logger.warning(f"Unparseable document date {value!r}; treating as expired")
+            return _dt.date.min
+    return None
+
+
+def chunk_metadata(
+    *,
+    chunk_id: str,
+    document_id: str,
+    document_name: str,
+    page_number: int,
+    chunk_index: int,
+    document_status: str = "approved",
+    document_version: int = 1,
+    effective_date=None,
+    expiry_date=None,
+) -> dict:
+    """
+    The metadata every indexed chunk carries.
+
+    One function rather than two dict literals: the index is built in two places
+    — a full rebuild from the database and an incremental add on approval — and
+    when those drifted apart before, the symptom was a citation that could not
+    be joined back to its row. A governance field missing from one path would be
+    worse: `hybrid_search` reads these values to decide whether a chunk may be
+    cited at all, and a missing `expiry_date` reads as "never expires".
+    """
+    return {
+        "chunk_id":         chunk_id,
+        "document_id":      document_id,
+        "document_name":    document_name,
+        "page_number":      page_number,
+        "chunk_index":      chunk_index,
+        "document_status":  document_status or "approved",
+        "document_version": document_version if document_version is not None else 1,
+        "effective_date":   _as_date(effective_date),
+        "expiry_date":      _as_date(expiry_date),
+    }
+
+
+def is_currently_valid(chunk: dict, today: Optional[_dt.date] = None) -> bool:
+    """
+    May this chunk be cited in a clinical answer right now?
+
+    Separate from the SQL filter on purpose. The index is loaded at startup and
+    this process can run for days, so a document whose `expiry_date` passes at
+    midnight would otherwise keep being cited until someone restarted the engine.
+    Expiry is a clinical statement about when guidance stops being valid, and it
+    has to take effect on the day it says.
+
+    A chunk indexed by an older build carries no governance keys at all. It is
+    treated as valid: those chunks are in the index precisely because the
+    database said they belonged to a live document, and refusing them would take
+    the corpus silent on upgrade.
+    """
+    today = today or _dt.date.today()
+
+    if chunk.get("document_status", "approved") != "approved":
+        return False
+
+    effective = _as_date(chunk.get("effective_date"))
+    if effective is not None and today < effective:
+        return False
+
+    expiry = _as_date(chunk.get("expiry_date"))
+    if expiry is not None and today >= expiry:
+        return False
+
+    return True
 
 
 class EmbeddingsUnavailable(RuntimeError):
@@ -164,12 +254,22 @@ class HybridRetriever:
             with db_cursor() as (cur, _):
                 cur.execute("""
                     SELECT c.chunk_id, c.content, c.page_number, c.chunk_index,
-                           c.document_id, d.filename
+                           c.document_id, d.filename,
+                           d.status  AS document_status,
+                           d.version AS document_version,
+                           d.effective_date, d.expiry_date
                     FROM bnp_chunks c
                     JOIN bnp_documents d ON c.document_id = d.id
                     -- Retired documents keep their text for the audit trail but
                     -- must never be retrievable again.
-                    WHERE c.deleted_at IS NULL AND d.deleted_at IS NULL
+                    --
+                    -- `status = 'approved'` is the governance half of the same
+                    -- rule: pending, superseded and retired documents exist, and
+                    -- are resolvable by chunk_id for an auditor, but nothing
+                    -- outside that status may reach a clinical answer.
+                    WHERE c.deleted_at IS NULL
+                      AND d.deleted_at IS NULL
+                      AND d.status = 'approved'
                     ORDER BY d.upload_date ASC, c.chunk_index ASC
                 """)
                 rows = cur.fetchall()
@@ -198,13 +298,17 @@ class HybridRetriever:
             lc_docs = []
             new_chunks = []
             for row in rows:
-                meta = {
-                    "chunk_id":      row["chunk_id"],
-                    "document_id":   row["document_id"],
-                    "document_name": row["filename"],
-                    "page_number":   row["page_number"],
-                    "chunk_index":   row["chunk_index"],
-                }
+                meta = chunk_metadata(
+                    chunk_id=row["chunk_id"],
+                    document_id=row["document_id"],
+                    document_name=row["filename"],
+                    page_number=row["page_number"],
+                    chunk_index=row["chunk_index"],
+                    document_status=row["document_status"],
+                    document_version=row["document_version"],
+                    effective_date=row["effective_date"],
+                    expiry_date=row["expiry_date"],
+                )
                 lc_docs.append(Document(page_content=row["content"], metadata=meta))
                 new_chunks.append({"content": row["content"], **meta})
 
@@ -242,7 +346,17 @@ class HybridRetriever:
         self.bm25 = BM25Okapi(tokenized) if tokenized else None
 
     # ── Indexing ──────────────────────────────────────────────────────────────
-    def add_chunks(self, chunks: List[dict], document_id: str, document_name: str):
+    def add_chunks(
+        self,
+        chunks: List[dict],
+        document_id: str,
+        document_name: str,
+        *,
+        document_status: str = "approved",
+        document_version: int = 1,
+        effective_date=None,
+        expiry_date=None,
+    ):
         """
         Add chunks to the FAISS and BM25 indexes.
 
@@ -250,6 +364,12 @@ class HybridRetriever:
         index used to mint its own uuid4 here, so the same physical chunk had two
         different identifiers and a citation could never be traced back to its
         database row.
+
+        The document's governance state travels with its chunks, because
+        `hybrid_search` answers from `self.chunks` and has no database at hand.
+        `document_status` defaults to "approved" for the one caller that reaches
+        here — approval — and because indexing anything else would contradict
+        the filter `sync_from_db` applies.
         """
         from langchain_community.vectorstores import FAISS
         from langchain_core.documents import Document
@@ -262,13 +382,17 @@ class HybridRetriever:
                 raise ValueError(
                     "add_chunks requires a chunk_id matching the bnp_chunks row"
                 )
-            meta = {
-                "chunk_id": chunk_id,
-                "document_id": document_id,
-                "document_name": document_name,
-                "page_number": chunk.get("page_number", 1),
-                "chunk_index": chunk.get("chunk_index", 0),
-            }
+            meta = chunk_metadata(
+                chunk_id=chunk_id,
+                document_id=document_id,
+                document_name=document_name,
+                page_number=chunk.get("page_number", 1),
+                chunk_index=chunk.get("chunk_index", 0),
+                document_status=document_status,
+                document_version=document_version,
+                effective_date=effective_date,
+                expiry_date=expiry_date,
+            )
             lc_docs.append(Document(page_content=chunk["content"], metadata=meta))
             new_chunks.append({"content": chunk["content"], **meta})
 
@@ -386,11 +510,48 @@ class HybridRetriever:
         if not chunks or vectorstore is None:
             return []
 
+        # Governance is applied here, not only in the SQL that builds the index,
+        # because a document expires on a calendar day while this process may
+        # have been running since before it. Chunks outside their validity
+        # window are excluded from `index_of` below, so FAISS and BM25 hits
+        # against them are dropped before scoring rather than filtered out of
+        # the results afterwards — otherwise an expired chunk would occupy one
+        # of the top_k slots and a valid source would be pushed out of the
+        # answer.
+        today = _dt.date.today()
+        servable = {
+            c.get("chunk_id")
+            for c in chunks
+            if is_currently_valid(c, today)
+        }
+        if len(servable) < len(chunks):
+            logger.info(
+                f"Retrieval: {len(chunks) - len(servable)} chunk(s) withheld — "
+                "document not approved, not yet effective, or expired"
+            )
+        if not servable:
+            return []
+
         n = len(chunks)
         k = min(max(top_k, candidate_k or 0), n)
 
-        # chunk_id -> position, so scoring is O(k) rather than a linear scan per hit.
-        index_of = {c.get("chunk_id"): i for i, c in enumerate(chunks)}
+        # FAISS scores only the k nearest vectors, and withheld chunks are still
+        # *in* the index — so they occupy candidate slots and a valid chunk can
+        # end up with no semantic score at all. Asking for proportionally more
+        # candidates keeps the valid corpus as well represented as it would be
+        # if the withheld documents were not there. Without this, retiring one
+        # document quietly degrades the answers drawn from the others.
+        if 0 < len(servable) < n:
+            k = min(n, -(-k * n // len(servable)))
+
+        # chunk_id -> position, so scoring is O(k) rather than a linear scan per
+        # hit. Withheld chunks are absent, which is what makes a FAISS or BM25
+        # hit against them score nothing.
+        index_of = {
+            c.get("chunk_id"): i
+            for i, c in enumerate(chunks)
+            if c.get("chunk_id") in servable
+        }
 
         # ── Semantic (FAISS similarity scores) ───────────────────────────────
         sem_scores = np.zeros(n, dtype=float)
@@ -432,6 +593,17 @@ class HybridRetriever:
 
         # ── Hybrid combination ────────────────────────────────────────────────
         combined = 0.6 * sem_scores + 0.4 * bm25_scores
+
+        # BM25 scores every position in the corpus, so dropping a withheld chunk
+        # from `index_of` suppresses only its semantic half. Without this mask a
+        # chunk from an expired document could still be returned on its keyword
+        # score alone.
+        if len(servable) < n:
+            mask = np.array(
+                [c.get("chunk_id") in servable for c in chunks], dtype=bool
+            )
+            combined = np.where(mask, combined, 0.0)
+
         top_indices = np.argsort(combined)[::-1][:top_k]
 
         results = []

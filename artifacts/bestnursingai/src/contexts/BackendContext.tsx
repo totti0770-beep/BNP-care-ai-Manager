@@ -24,6 +24,7 @@ import {
   uploadDocument as apiUpload,
   listDocuments as apiListDocs,
   deleteDocument as apiDeleteDoc,
+  approveDocument as apiApproveDoc,
   type EngineDocument,
   type QueryOptions,
 } from "@/services/clinicalApi";
@@ -127,6 +128,12 @@ interface BackendContextType {
   sendQuery: (question: string, opts?: QueryOptions) => Promise<BNPResponse | null>;
   uploadToEngine: (file: File) => Promise<{ filename: string; chunks: number } | null>;
   removeFromEngine: (documentId: string) => Promise<boolean>;
+  /** Approve a staged document, which is what indexes and publishes it. */
+  approveInEngine: (
+    documentId: string,
+    approvedBy: string,
+    sourceNote?: string
+  ) => Promise<boolean>;
   refreshDocuments: () => Promise<void>;
 }
 
@@ -206,6 +213,22 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
     [isEngineReachable, indexedChunks, refreshDocuments]
   );
 
+  const approveInEngine = useCallback(
+    async (
+      documentId: string,
+      approvedBy: string,
+      sourceNote?: string
+    ): Promise<boolean> => {
+      if (!isEngineReachable) return false;
+      const ok = await apiApproveDoc(documentId, approvedBy, sourceNote);
+      // Approval changes both the document's status and the indexed chunk
+      // count, so the list is re-read rather than patched locally.
+      if (ok) await refreshDocuments();
+      return ok;
+    },
+    [isEngineReachable, refreshDocuments]
+  );
+
   const removeFromEngine = useCallback(
     async (documentId: string): Promise<boolean> => {
       if (!isEngineReachable) return false;
@@ -229,6 +252,7 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
         sendQuery,
         uploadToEngine,
         removeFromEngine,
+        approveInEngine,
         refreshDocuments,
       }}
     >
