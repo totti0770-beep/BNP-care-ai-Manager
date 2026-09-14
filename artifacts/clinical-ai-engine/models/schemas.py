@@ -202,6 +202,52 @@ class QueryResponse(BaseModel):
     context_validation: Optional[str] = None
 
 
+class FormularyLookupMatch(BaseModel):
+    """
+    One drug as a nurse may see it.
+
+    The review screen returns every column of the row to an administrator. A
+    nurse gets this projection instead, and the difference is not cosmetic:
+    every clinical field below is None unless `review_status` is "approved",
+    because a dosing figure nobody has signed off must not be shown to the
+    person who might act on it. That rule is applied here, on the server,
+    rather than left to a client to remember.
+
+    Governance internals a nurse has no use for — the reviewer's licence
+    number, who ran the import, the import file — are not on this model at all.
+    """
+    drug_id: str
+    generic_name: str
+    name_ar: Optional[str] = None
+    aliases: List[str] = []
+    review_status: str
+    coverage: str
+    high_risk: bool
+    unit: str
+    # Provenance is always shown: a pending drug still has a source, and a
+    # nurse is entitled to know what the pharmacist is reviewing.
+    source_name: str
+    source_edition: Optional[str] = None
+    source_ref: Optional[str] = None
+    version: int
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    # True whenever the fields below were withheld. Lets a client say "not
+    # shown until approved" rather than rendering an empty card.
+    clinical_data_withheld: bool
+    # ── Approved rows only ───────────────────────────────────────────────
+    route: Optional[str] = None
+    frequency: Optional[str] = None
+    adult_max_daily: Optional[float] = None
+    overdose_threshold_absolute: Optional[float] = None
+    overdose_threshold_per_kg: Optional[float] = None
+    antidote: Optional[str] = None
+    regimen_sections: List[RegimenSection] = []
+    contraindications: List[str] = []
+    interactions: List[str] = []
+    warnings: List[str] = []
+
+
 class AuditLogEntry(BaseModel):
     id: int
     session_id: str

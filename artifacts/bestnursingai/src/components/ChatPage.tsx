@@ -86,7 +86,7 @@ const SUGGESTED = [
 // The engine labels regimen fields in English, from the closed set its own
 // workbook converter writes. Translating the heading touches no clinical text —
 // the value underneath is the hospital's, verbatim, in either language.
-const REGIMEN_LABEL_KEYS: Record<string, string> = {
+export const REGIMEN_LABEL_KEYS: Record<string, string> = {
   'Therapeutic class': 'regTherapeuticClass',
   'Indications': 'regIndications',
   'Dosage form and strength': 'regDosageForm',

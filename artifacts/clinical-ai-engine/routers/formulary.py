@@ -38,6 +38,10 @@ from services.formulary_import import (
     load_mapping,
 )
 
+from models.schemas import FormularyLookupMatch
+from services.drug_calculator import split_regimen
+from routers.auth import get_current_user
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -79,6 +83,94 @@ def list_drugs(
         cur.execute(LIST_SQL, {"status": status, "limit": limit, "offset": offset})
         rows = [dict(r) for r in cur.fetchall()]
     return {"summary": get_formulary().counts(), "drugs": rows}
+
+
+# ── Nurse lookup ──────────────────────────────────────────────────────────────
+
+LOOKUP_MIN_CHARS = 2
+LOOKUP_MAX_RESULTS = 25
+
+
+def _nurse_projection(entry) -> FormularyLookupMatch:
+    """
+    The subset of a formulary row a nurse may see, decided here.
+
+    Only an approved row carries clinical fields. For pending and rejected
+    rows the projection stops at names, status and provenance — the same rule
+    `calculate_dose` applies before it will quote a figure, so a nurse reading
+    this screen and a nurse reading an answer are told the same thing.
+    """
+    approved = entry.review_status.value == "approved"
+    base = dict(
+        drug_id=entry.drug_id,
+        generic_name=entry.generic_name,
+        name_ar=entry.name_ar,
+        aliases=list(entry.aliases),
+        review_status=entry.review_status.value,
+        coverage=entry.coverage.value,
+        high_risk=entry.high_risk,
+        unit=entry.unit,
+        source_name=entry.source_name,
+        source_edition=entry.source_edition,
+        source_ref=entry.source_ref,
+        version=entry.version,
+        reviewed_by=entry.reviewed_by if approved else None,
+        reviewed_at=entry.reviewed_at.isoformat() if (approved and entry.reviewed_at) else None,
+        clinical_data_withheld=not approved,
+    )
+    if not approved:
+        return FormularyLookupMatch(**base)
+    return FormularyLookupMatch(
+        **base,
+        route=entry.route,
+        frequency=entry.frequency,
+        adult_max_daily=entry.adult_max_daily,
+        overdose_threshold_absolute=entry.overdose_threshold_absolute,
+        overdose_threshold_per_kg=entry.overdose_threshold_per_kg,
+        antidote=entry.antidote,
+        regimen_sections=split_regimen(entry.reference_regimen),
+        contraindications=list(entry.contraindications),
+        interactions=list(entry.interactions),
+        warnings=list(entry.warnings),
+    )
+
+
+def _matches(entry, needle: str) -> bool:
+    if needle in entry.generic_name.lower():
+        return True
+    if entry.name_ar and needle in entry.name_ar:
+        return True
+    return any(needle in (a or "").lower() for a in entry.aliases)
+
+
+@router.get("/lookup", response_model=list[FormularyLookupMatch])
+def lookup(
+    q: str = Query(..., min_length=LOOKUP_MIN_CHARS, max_length=100),
+    _user: dict = Depends(get_current_user),
+):
+    """
+    Search the formulary by generic name, Arabic name or alias.
+
+    Any signed-in user may call this. The review listing above is admin-only
+    because it returns every column, including figures nobody has approved and
+    the governance trail behind them; this endpoint returns the nurse-safe
+    projection, in which an unapproved drug is visible by name and status and
+    nothing else. Reads the same in-memory snapshot the clinical pipeline
+    answers from, so a nurse looking a drug up and a nurse asking about it in
+    a question see one formulary, not two.
+    """
+    formulary = get_formulary()
+    if not formulary.is_available:
+        raise HTTPException(
+            status_code=503,
+            detail=formulary.degraded_reason or "The medication formulary is unavailable.",
+        )
+    needle = q.strip().lower()
+    hits = [e for e in formulary.all() if _matches(e, needle)]
+    # Exact name first, then high-risk, then alphabetical — a nurse typing
+    # "insulin" wants insulin, not "insulin glargine" above it.
+    hits.sort(key=lambda e: (e.generic_name.lower() != needle, not e.high_risk, e.generic_name.lower()))
+    return [_nurse_projection(e) for e in hits[:LOOKUP_MAX_RESULTS]]
 
 
 @router.get("/summary")
