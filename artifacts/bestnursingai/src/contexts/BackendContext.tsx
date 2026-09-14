@@ -26,6 +26,7 @@ import {
   deleteDocument as apiDeleteDoc,
   approveDocument as apiApproveDoc,
   type EngineDocument,
+  type FormularyCounts,
   type QueryOptions,
 } from "@/services/clinicalApi";
 
@@ -125,6 +126,10 @@ interface BackendContextType {
   indexedChunks: number;
   openaiEnabled: boolean;
   engineDocuments: EngineDocument[];
+  /** Approval tally from /health — the same call every user already makes. */
+  formularyCounts: FormularyCounts | null;
+  /** The engine's own one-line review status, verbatim. */
+  formularyReviewStatus: string | null;
   sendQuery: (question: string, opts?: QueryOptions) => Promise<BNPResponse | null>;
   uploadToEngine: (file: File) => Promise<{ filename: string; chunks: number } | null>;
   removeFromEngine: (documentId: string) => Promise<boolean>;
@@ -151,6 +156,8 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
   const [indexedChunks, setIndexedChunks] = useState(0);
   const [openaiEnabled, setOpenaiEnabled] = useState(false);
   const [engineDocuments, setEngineDocuments] = useState<EngineDocument[]>([]);
+  const [formularyCounts, setFormularyCounts] = useState<FormularyCounts | null>(null);
+  const [formularyReviewStatus, setFormularyReviewStatus] = useState<string | null>(null);
   const initDone = useRef(false);
 
   const refreshDocuments = useCallback(async () => {
@@ -172,6 +179,8 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
         setIndexedChunks(health.indexed_chunks);
         setOpenaiEnabled(health.openai_enabled);
         setEngineProblems(health.problems ?? []);
+        setFormularyCounts(health.formulary ?? null);
+        setFormularyReviewStatus(health.drug_db_review_status ?? null);
         setIsEngineAvailable(health.status === "ok");
         await refreshDocuments();
       }
@@ -204,6 +213,8 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
       const health = await checkHealth();
       if (health) {
         setEngineProblems(health.problems ?? []);
+        setFormularyCounts(health.formulary ?? null);
+        setFormularyReviewStatus(health.drug_db_review_status ?? null);
         setIsEngineAvailable(health.status === "ok");
         setIndexedChunks(health.indexed_chunks);
       }
@@ -249,6 +260,8 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
         indexedChunks,
         openaiEnabled,
         engineDocuments,
+        formularyCounts,
+        formularyReviewStatus,
         sendQuery,
         uploadToEngine,
         removeFromEngine,

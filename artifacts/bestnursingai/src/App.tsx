@@ -4,6 +4,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { AuditLogProvider } from '@/contexts/AuditLogContext';
 import { BackendProvider } from '@/contexts/BackendContext';
+import { PatientProvider } from '@/contexts/PatientContext';
 import { Toaster } from '@/components/ui/sonner';
 import LoginScreen from '@/components/LoginScreen';
 import Sidebar from '@/components/Sidebar';
@@ -22,6 +23,14 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
+  // A question typed on the home console is carried into the assistant and
+  // asked once. Held in memory only, and cleared as soon as it is consumed.
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+
+  const askFromHome = (question: string) => {
+    setPendingQuestion(question);
+    setActiveTab('chat');
+  };
   // Open on a desktop, closed on a phone. The sidebar is 320px wide, so
   // starting it open on a 375px screen left about 55px for the content.
   const [sidebarOpen, setSidebarOpen] = useState(
@@ -46,9 +55,14 @@ function AppContent() {
     switch (activeTab) {
       case 'home':
       case 'new-chat':
-        return <HomePage />;
+        return <HomePage onAsk={askFromHome} onNavigate={setActiveTab} />;
       case 'chat':
-        return <ChatPage />;
+        return (
+          <ChatPage
+            initialQuestion={pendingQuestion}
+            onInitialQuestionConsumed={() => setPendingQuestion(null)}
+          />
+        );
       case 'upload':
         return <SecureUploadPage />;
       case 'documents':
@@ -64,7 +78,7 @@ function AppContent() {
       case 'rag-settings':
         return <RAGSettingsPage />;
       default:
-        return <HomePage />;
+        return <HomePage onAsk={askFromHome} onNavigate={setActiveTab} />;
     }
   };
 
@@ -103,6 +117,7 @@ function App() {
     <LanguageProvider>
       <AuditLogProvider>
             <BackendProvider>
+            <PatientProvider>
               <AppContent />
               <Toaster
                 position="top-center"
@@ -114,6 +129,7 @@ function App() {
                   },
                 }}
               />
+            </PatientProvider>
             </BackendProvider>
       </AuditLogProvider>
     </LanguageProvider>
