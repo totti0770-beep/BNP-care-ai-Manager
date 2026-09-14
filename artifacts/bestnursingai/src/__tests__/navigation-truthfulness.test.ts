@@ -77,8 +77,11 @@ describe('the home page claims only what exists', () => {
     expect(read('i18n.ts')).not.toMatch(/HIPAA/);
   });
 
-  it('the replacement claim is one the audit chain evidences', () => {
-    expect(code('components/HomePage.tsx')).toMatch(/t\('auditTrail'\)/);
+  it('makes no capability or compliance claim pills at all', () => {
+    // The console replaced the four marketing pills outright. What remains on
+    // the page is measured state read from endpoints, not adjectives.
+    const home = code('components/HomePage.tsx');
+    expect(home).not.toMatch(/evidenceBased|realTime|citedSources|auditTrail|hipaaAware/);
   });
 });
 
@@ -118,7 +121,7 @@ describe('every clinical label in the chat is a translation key', () => {
 
 describe('copy exists in both languages', () => {
   const KEYS = [
-    'auditTrail', 'navClinical', 'navKnowledge', 'navGovernance',
+    'navClinical', 'navKnowledge', 'navGovernance',
     'patientContext', 'patientContextHint', 'engineConnecting', 'engineLive',
     'engineLiveModel', 'engineQuerying', 'engineProcessing', 'micStart',
     'micStop', 'chatConnectedSummary', 'chatCapabilities', 'chatVoiceHint',

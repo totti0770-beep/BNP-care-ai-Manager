@@ -58,12 +58,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
    */
   const clinicalItems: MenuItem[] = [
     { id: 'home', label: t('home'), icon: Home },
-    { id: 'chat', label: t('chat'), icon: MessageSquare },
+    { id: 'chat', label: t('navClinicalAssistant'), icon: MessageSquare },
   ];
 
   const knowledgeItems: MenuItem[] = [
     { id: 'documents', label: t('documents'), icon: FileText },
-    { id: 'citations', label: t('citations'), icon: Quote },
+    { id: 'citations', label: t('navClinicalEvidence'), icon: Quote },
     // Upload is an admin action on the engine (documents.manage). Listing it for
     // a nurse offered a screen whose only button they could not press.
     ...(canManageDocuments
@@ -75,7 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
     ? [
         { id: 'formulary', label: t('formulary'), icon: Pill },
         { id: 'audit-log', label: t('auditLog'), icon: ClipboardList },
-        { id: 'rag-settings', label: t('closedLoopRAG'), icon: Brain },
+        { id: 'rag-settings', label: t('navEngineHealth'), icon: Brain },
       ]
     : [];
 
@@ -180,7 +180,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
           </nav>
         ))}
 
-        <nav aria-label={t('settings')} className="mt-6 space-y-1">
+        <nav aria-label={t('navAccount')} className="mt-6">
+          <h3 className="text-xs font-semibold text-[var(--dg-muted)] uppercase tracking-wider mb-2 px-4">
+            {t('navAccount')}
+          </h3>
           {renderItem({ id: 'settings', label: t('settings'), icon: Settings })}
         </nav>
       </div>

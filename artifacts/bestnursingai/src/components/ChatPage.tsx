@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BNPResponse, DoseSection, SYSTEM_NAME } from '@/types/bnp';
 import { useBackend } from '@/contexts/BackendContext';
+import { usePatient } from '@/contexts/PatientContext';
 import {
   Send, Bot, User, Shield, AlertTriangle, BookOpen,
   Pill, Activity, ShieldAlert, Info, Zap, ClipboardList,
@@ -546,7 +547,13 @@ function PatientContextPanel({
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-const ChatPage: React.FC = () => {
+interface ChatPageProps {
+  /** A question carried in from the home console, asked once on arrival. */
+  initialQuestion?: string | null;
+  onInitialQuestionConsumed?: () => void;
+}
+
+const ChatPage: React.FC<ChatPageProps> = ({ initialQuestion, onInitialQuestionConsumed }) => {
   const { t } = useTranslation();
   const { isEngineAvailable, isChecking, indexedChunks, openaiEnabled, sendQuery } = useBackend();
 
@@ -554,7 +561,8 @@ const ChatPage: React.FC = () => {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showPatientCtx, setShowPatientCtx] = useState(false);
-  const [patientOpts, setPatientOpts] = useState<QueryOptions>({});
+  // Shared with the home console, and memory-only: see contexts/PatientContext.
+  const { patient: patientOpts, setPatient: setPatientOpts, clearPatient, hasPatient: hasPatientCtx } = usePatient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { isListening, isSupported: voiceSupported, start: startVoice, stop: stopVoice } =
@@ -563,11 +571,6 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const hasPatientCtx =
-    !!(patientOpts.patientWeightKg || patientOpts.age ||
-       (patientOpts.conditions ?? []).length ||
-       (patientOpts.otherDrugs ?? []).length);
 
   const handleMicClick = () => {
     if (isListening) {
@@ -619,6 +622,13 @@ const ChatPage: React.FC = () => {
     setMessages(prev => [...prev, aiMsg]);
     setIsTyping(false);
   };
+
+  useEffect(() => {
+    if (!initialQuestion) return;
+    onInitialQuestionConsumed?.();
+    void sendMessage(initialQuestion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuestion]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -768,31 +778,72 @@ const ChatPage: React.FC = () => {
 
       {/* Input */}
       <div className="p-4 border-t border-[var(--dg-border)] space-y-2">
-        {/* Patient context toggle */}
+        {/* Patient context — always visible, never buried.
+            These values decide whether a dose is computed at all, so a nurse
+            has to see what is set before asking, not discover a collapsed
+            control afterwards. The editor itself still folds away. */}
         {isEngineAvailable && (
-          <button
-            onClick={() => setShowPatientCtx(v => !v)}
-            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
-              hasPatientCtx
-                ? 'border-[var(--dg-accent)]/60 bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)]'
-                : 'border-[var(--dg-border)] bg-transparent text-[var(--dg-muted)] hover:text-[var(--dg-body)] hover:border-[var(--dg-border-strong)]'
-            }`}
-          >
-            <UserCircle className="w-3.5 h-3.5" />
-            {t('patientContext')}
-            {hasPatientCtx && (
-              <span className="bg-[var(--dg-accent)] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
-                {(patientOpts.conditions?.length ?? 0) + (patientOpts.otherDrugs?.length ?? 0) +
-                  (patientOpts.patientWeightKg ? 1 : 0) + (patientOpts.age ? 1 : 0)}
-              </span>
+          <div className="rounded-xl border border-[var(--dg-border)] bg-[var(--dg-surface)] p-3 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <span className="text-xs font-semibold text-[var(--dg-accent-strong)] flex items-center gap-1.5">
+                  <UserCircle className="w-3.5 h-3.5" aria-hidden="true" />
+                  {t('patientContext')}
+                </span>
+                {hasPatientCtx ? (
+                  <>
+                    {patientOpts.patientWeightKg && (
+                      <span className="px-2 py-0.5 rounded-full bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] text-xs">
+                        {t('ctxKg', { value: patientOpts.patientWeightKg })}
+                      </span>
+                    )}
+                    {patientOpts.age && (
+                      <span className="px-2 py-0.5 rounded-full bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] text-xs">
+                        {t('ctxYears', { value: patientOpts.age })}
+                      </span>
+                    )}
+                    {(patientOpts.conditions ?? []).map((c) => (
+                      <span key={`c-${c}`} className="px-2 py-0.5 rounded-full bg-[var(--dg-elevated)] border border-[var(--dg-border)] text-[var(--dg-body)] text-xs">
+                        {c}
+                      </span>
+                    ))}
+                    {(patientOpts.otherDrugs ?? []).map((d) => (
+                      <span key={`d-${d}`} className="px-2 py-0.5 rounded-full bg-[var(--dg-elevated)] border border-[var(--dg-border)] text-[var(--dg-body)] text-xs">
+                        {d}
+                      </span>
+                    ))}
+                  </>
+                ) : (
+                  <span className="text-xs text-[var(--dg-muted)]">
+                    {t('ctxEmpty')} — {t('ctxEmptyHint')}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {hasPatientCtx && (
+                  <button
+                    type="button"
+                    onClick={clearPatient}
+                    className="text-xs px-2.5 py-1 rounded-lg text-[var(--dg-muted)] hover:text-red-300"
+                  >
+                    {t('ctxClear')}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowPatientCtx(v => !v)}
+                  aria-expanded={showPatientCtx}
+                  className="text-xs px-3 py-1 rounded-lg border border-[var(--dg-border-strong)] text-[var(--dg-accent-strong)] hover:bg-[var(--dg-accent-soft)] flex items-center gap-1"
+                >
+                  {showPatientCtx ? t('ctxDone') : hasPatientCtx ? t('ctxEdit') : t('ctxAdd')}
+                  {showPatientCtx ? <ChevronUp className="w-3 h-3" aria-hidden="true" /> : <ChevronDown className="w-3 h-3" aria-hidden="true" />}
+                </button>
+              </div>
+            </div>
+            {showPatientCtx && (
+              <PatientContextPanel opts={patientOpts} onChange={setPatientOpts} />
             )}
-            {showPatientCtx ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
-          </button>
-        )}
-
-        {/* Expandable patient panel */}
-        {showPatientCtx && isEngineAvailable && (
-          <PatientContextPanel opts={patientOpts} onChange={setPatientOpts} />
+          </div>
         )}
 
         <div className={`flex items-center gap-2 bg-[var(--dg-surface)] rounded-xl border p-2 transition-all duration-300 ${
