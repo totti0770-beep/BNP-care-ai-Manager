@@ -40,6 +40,9 @@ export interface BNPResponse {
     pageNumber: number;
     similarity: number;
     excerpt?: string;
+    /** Present when the engine recorded which stored passage was cited. */
+    chunkId?: string;
+    documentId?: string;
   }[];
   confidenceLevel: number;
   sessionId?: string;

@@ -51,6 +51,10 @@ export interface EngineQueryResponse {
     page_number: number;
     relevance_score: number;
     excerpt: string;
+    // Resolve the cited passage back to its stored row. Optional because an
+    // engine older than this contract omits them.
+    chunk_id?: string | null;
+    document_id?: string | null;
   }>;
   confidence: number;
   rejected: boolean;
@@ -324,6 +328,7 @@ export interface EngineAuditEntry {
     document_name: string;
     page_number: number;
     relevance_score: number;
+    chunk_id?: string | null;
   }> | null;
   safety_alerts: string[] | null;
   client_ip: string | null;
@@ -559,4 +564,56 @@ export async function reviewFormularyDrug(
 /** The URL of the sign-off packet. A plain link so the browser downloads it. */
 export function reviewPacketUrl(status: ReviewStatus | "all" = "pending"): string {
   return `${BASE}/formulary/review-packet.xlsx?status=${status}`;
+}
+
+// ── Clinical evidence ─────────────────────────────────────────────────────────
+
+/** The stored passage behind one citation, as GET /documents/chunks/{id} returns it. */
+export interface EvidenceChunk {
+  chunk_id: string;
+  document_id: string;
+  content: string;
+  page_number: number;
+  chunk_index: number;
+  filename: string;
+  document_status?: "pending" | "approved" | "retired" | "superseded" | null;
+  document_version?: number | null;
+  effective_date?: string | null;
+  expiry_date?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  /** The document or the passage has been soft-deleted. */
+  retired: boolean;
+  /** The engine would cite this passage today. False for a nurse never arrives: they get 403 instead. */
+  currently_valid: boolean;
+}
+
+export type EvidenceOutcome =
+  | { kind: "ok"; chunk: EvidenceChunk }
+  /** The passage exists but is not currently approved; only an administrator may read it. */
+  | { kind: "forbidden"; detail: string | null }
+  | { kind: "not-found" }
+  | { kind: "error" };
+
+/**
+ * Fetch the exact text behind a citation.
+ *
+ * Who may read what is decided by the engine — an administrator sees any
+ * passage, a nurse only one from a document that is approved, in date and
+ * not retired. This client only reports which of those answers came back.
+ */
+export async function getEvidenceChunk(chunkId: string): Promise<EvidenceOutcome> {
+  try {
+    const res = await authFetch(`/documents/chunks/${encodeURIComponent(chunkId)}`);
+    if (!res) return { kind: "error" };
+    if (res.status === 403) {
+      const body = await res.json().catch(() => null);
+      return { kind: "forbidden", detail: body?.detail ?? null };
+    }
+    if (res.status === 404) return { kind: "not-found" };
+    if (!res.ok) return { kind: "error" };
+    return { kind: "ok", chunk: (await res.json()) as EvidenceChunk };
+  } catch {
+    return { kind: "error" };
+  }
 }
