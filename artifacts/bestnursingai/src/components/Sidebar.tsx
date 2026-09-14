@@ -59,6 +59,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
   const clinicalItems: MenuItem[] = [
     { id: 'home', label: t('home'), icon: Home },
     { id: 'chat', label: t('navClinicalAssistant'), icon: MessageSquare },
+    // Backed by GET /formulary/lookup, which any signed-in user may call.
+    { id: 'medication-safety', label: t('navMedicationSafety'), icon: Pill },
   ];
 
   const knowledgeItems: MenuItem[] = [

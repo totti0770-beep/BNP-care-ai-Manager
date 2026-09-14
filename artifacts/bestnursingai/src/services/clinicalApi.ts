@@ -245,6 +245,65 @@ export async function deleteDocument(documentId: string): Promise<boolean> {
   }
 }
 
+// ── Medication safety (nurse-safe formulary read) ────────────────────────────
+
+/**
+ * One drug as the engine lets a nurse see it.
+ *
+ * `clinical_data_withheld` is the field to branch on. When it is true the
+ * engine has sent names, status and provenance and nothing else — every dosing
+ * and safety field arrives null or empty — because the row is not approved.
+ * The client renders that as "not shown until approved"; it never fills a gap.
+ */
+export interface FormularyLookupMatch {
+  drug_id: string;
+  generic_name: string;
+  name_ar: string | null;
+  aliases: string[];
+  review_status: "pending" | "approved" | "rejected";
+  coverage: string;
+  high_risk: boolean;
+  unit: string;
+  source_name: string;
+  source_edition: string | null;
+  source_ref: string | null;
+  version: number;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  clinical_data_withheld: boolean;
+  route: string | null;
+  frequency: string | null;
+  adult_max_daily: number | null;
+  overdose_threshold_absolute: number | null;
+  overdose_threshold_per_kg: number | null;
+  antidote: string | null;
+  regimen_sections: { label: string; text: string; primary: boolean }[];
+  contraindications: string[];
+  interactions: string[];
+  warnings: string[];
+}
+
+export type LookupOutcome =
+  | { kind: "ok"; matches: FormularyLookupMatch[] }
+  | { kind: "unavailable"; reason: string }
+  | { kind: "error" };
+
+/** Search the formulary by generic, Arabic or alias name. Any signed-in user. */
+export async function lookupFormulary(q: string): Promise<LookupOutcome> {
+  try {
+    const res = await authFetch(`/formulary/lookup?q=${encodeURIComponent(q)}`);
+    if (!res) return { kind: "error" };
+    if (res.status === 503) {
+      const body = await res.json().catch(() => ({}));
+      return { kind: "unavailable", reason: String(body?.detail ?? "") };
+    }
+    if (!res.ok) return { kind: "error" };
+    return { kind: "ok", matches: await res.json() };
+  } catch {
+    return { kind: "error" };
+  }
+}
+
 // ── Audit log ─────────────────────────────────────────────────────────────────
 
 export interface EngineAuditEntry {

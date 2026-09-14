@@ -80,9 +80,7 @@ const HomePage: React.FC<Props> = ({ onAsk, onNavigate }) => {
       icon: Pill,
       label: t('qaMedication'),
       hint: t('qaMedicationHint'),
-      // Focuses the ask box with a medication-shaped prompt. No text is
-      // injected: the nurse writes the question.
-      run: () => setPlaceholder(t('qaMedicationHint')),
+      run: () => onNavigate('medication-safety'),
     },
     {
       id: 'dose',

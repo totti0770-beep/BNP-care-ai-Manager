@@ -17,6 +17,7 @@ import AuditLogPage from '@/components/AuditLogPage';
 import FormularyPage from '@/components/FormularyPage';
 import RAGSettingsPage from '@/components/RAGSettingsPage';
 import SecureUploadPage from '@/components/SecureUploadPage';
+import MedicationSafetyPage from '@/components/MedicationSafetyPage';
 import '@/i18n';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
@@ -63,6 +64,8 @@ function AppContent() {
             onInitialQuestionConsumed={() => setPendingQuestion(null)}
           />
         );
+      case 'medication-safety':
+        return <MedicationSafetyPage />;
       case 'upload':
         return <SecureUploadPage />;
       case 'documents':
