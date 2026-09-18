@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DgLogo from '@/components/DgLogo';
+import { ROUTE_PERMISSION, type TabId } from '@/lib/router';
 
 interface SidebarProps {
   activeTab: string;
@@ -39,7 +40,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
   const { user, logout, hasPermission } = useAuth();
   const { currentLanguage, changeLanguage, isRTL } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
-  const canManageSettings = hasPermission('settings.manage');
+  // One source of truth for which screens a role may open: the same table
+  // App.tsx gates routes on, so a link and its destination cannot disagree.
+  const canOpen = (id: TabId) => {
+    const need = ROUTE_PERMISSION[id];
+    return !need || hasPermission(need);
+  };
+  const canManageSettings = canOpen('formulary');
 
   type MenuItem = { id: string; label: string; icon: React.ElementType };
 
@@ -165,7 +172,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
 
       <div className="flex-1 overflow-y-auto p-4">
         <button
-          onClick={() => onTabChange('new-chat')}
+          onClick={() => onTabChange('home')}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl dg-gradient text-white shadow-lg shadow-[0_6px_18px_rgba(0,166,166,0.28)] transition-all duration-200"
         >
           <Plus className="w-5 h-5" aria-hidden="true" />

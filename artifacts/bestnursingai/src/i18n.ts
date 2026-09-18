@@ -578,6 +578,10 @@ const resources = {
       ehMetricName: 'Counter',
       ehMetricValue: 'Value',
       ehEnforcedByEngine: 'Retrieval thresholds and dose limits are enforced by the engine and cannot be changed from this screen.',
+      // Phase 11: routing
+      notPermittedTitle: 'This screen is not available to your role',
+      notPermittedBody: 'The engine restricts this screen to administrators, and would refuse its requests regardless of what is shown here.',
+      backToHome: 'Back to Clinical Intelligence',
     }
   },
   ar: {
@@ -1155,6 +1159,10 @@ const resources = {
       ehMetricName: 'العدّاد',
       ehMetricValue: 'القيمة',
       ehEnforcedByEngine: 'يفرض المحرك عتبات الاسترجاع وحدود الجرعات ولا يمكن تغييرها من هذه الشاشة.',
+      // Phase 11: routing
+      notPermittedTitle: 'هذه الشاشة غير متاحة لدورك',
+      notPermittedBody: 'يقصر المحرك هذه الشاشة على المسؤولين، وسيرفض طلباتها بغض النظر عمّا يُعرض هنا.',
+      backToHome: 'العودة إلى الذكاء السريري',
     }
   }
 };
