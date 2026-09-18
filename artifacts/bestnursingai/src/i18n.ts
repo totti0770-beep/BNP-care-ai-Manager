@@ -536,6 +536,21 @@ const resources = {
       formularyRetireConfirm: 'Retire this entry',
       formularyRetireSuccess: 'Entry retired and withdrawn from the live formulary.',
       formularyRetireFailed: 'Retire failed',
+      // Phase 7: audit filters + CSV export
+      auditFilters: 'Narrow the loaded entries',
+      auditFrom: 'From date',
+      auditTo: 'To date',
+      auditUser: 'User',
+      auditAllUsers: 'All users',
+      auditQueryType: 'Question type',
+      auditType_all: 'All types',
+      auditType_drug: 'Medication',
+      auditType_protocol: 'Protocol',
+      auditType_general: 'General',
+      auditFilteredNote: '{{shown}} of the {{loaded}} loaded entries match. Filters apply to the loaded entries only; export for the complete trail.',
+      auditClearFilters: 'Clear filters',
+      exportJson: 'Export JSON',
+      exportCsv: 'Export CSV',
     }
   },
   ar: {
@@ -1071,6 +1086,21 @@ const resources = {
       formularyRetireConfirm: 'سحب هذا الإدخال',
       formularyRetireSuccess: 'تم سحب الإدخال وإزالته من دستور الأدوية الفعّال.',
       formularyRetireFailed: 'فشل السحب',
+      // Phase 7: audit filters + CSV export
+      auditFilters: 'تضييق السجلات المحمّلة',
+      auditFrom: 'من تاريخ',
+      auditTo: 'إلى تاريخ',
+      auditUser: 'المستخدم',
+      auditAllUsers: 'كل المستخدمين',
+      auditQueryType: 'نوع السؤال',
+      auditType_all: 'كل الأنواع',
+      auditType_drug: 'دوائي',
+      auditType_protocol: 'بروتوكول',
+      auditType_general: 'عام',
+      auditFilteredNote: '{{shown}} من السجلات المحمّلة {{loaded}} مطابقة. تنطبق التصفية على السجلات المحمّلة فقط؛ صدّر للحصول على السجل الكامل.',
+      auditClearFilters: 'مسح التصفية',
+      exportJson: 'تصدير JSON',
+      exportCsv: 'تصدير CSV',
     }
   }
 };

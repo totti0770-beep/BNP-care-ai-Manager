@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '@/contexts/AuditLogContext';
 import {
@@ -15,6 +15,15 @@ import CitationList from '@/components/CitationList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { toCsv } from '@/lib/auditCsv';
+
+type QueryTypeFilter = 'all' | 'drug' | 'protocol' | 'general';
+const QUERY_TYPES: QueryTypeFilter[] = ['all', 'drug', 'protocol', 'general'];
+
+/** Start of the day in local time, as the date input gives it. */
+const dayStart = (iso: string) => new Date(`${iso}T00:00:00`);
+/** End of the day in local time, inclusive. */
+const dayEnd = (iso: string) => new Date(`${iso}T23:59:59.999`);
 
 /**
  * Server-backed audit log. There is no "clear" action: the record of what
@@ -22,10 +31,23 @@ import { toast } from 'sonner';
  */
 const AuditLogPage: React.FC = () => {
   const { t } = useTranslation();
-  const { logs, isLoading, chainStatus, refresh, exportLogs, truncated, windowSize } =
+  const { logs, isLoading, chainStatus, refresh, exportRows, truncated, windowSize } =
     useAuditLog();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'rejected' | 'alerts'>('all');
+  // These narrow the rows already on screen — the window the engine returned,
+  // not the trail. The engine's list takes only limit/offset, so a filter that
+  // pretended to search the whole trail would be lying; the caption under the
+  // bar says how many of the loaded rows match.
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [userFilter, setUserFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState<QueryTypeFilter>('all');
+
+  const usernames = useMemo(
+    () => [...new Set(logs.map((l) => l.username))].sort((a, b) => a.localeCompare(b)),
+    [logs],
+  );
 
   const filteredLogs = logs.filter((log) => {
     const haystack = [
@@ -43,30 +65,50 @@ const AuditLogPage: React.FC = () => {
       filter === 'all' ||
       (filter === 'rejected' && log.rejected) ||
       (filter === 'alerts' && log.safetyAlerts.length > 0);
+    const matchesFrom = fromDate === '' || log.timestamp >= dayStart(fromDate);
+    const matchesTo = toDate === '' || log.timestamp <= dayEnd(toDate);
+    const matchesUser = userFilter === 'all' || log.username === userFilter;
+    const matchesType = typeFilter === 'all' || log.queryType === typeFilter;
 
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesFilter && matchesFrom && matchesTo && matchesUser && matchesType;
   });
 
-  const [isExporting, setIsExporting] = useState(false);
+  const filtersActive =
+    searchQuery !== '' || filter !== 'all' || fromDate !== '' || toDate !== '' ||
+    userFilter !== 'all' || typeFilter !== 'all';
 
-  const handleExport = async () => {
-    setIsExporting(true);
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilter('all');
+    setFromDate('');
+    setToDate('');
+    setUserFilter('all');
+    setTypeFilter('all');
+  };
+
+  const [isExporting, setIsExporting] = useState<'json' | 'csv' | null>(null);
+
+  const handleExport = async (format: 'json' | 'csv') => {
+    setIsExporting(format);
     // The export walks every page, so it is not instant on a busy trail — and
     // it must not fall back to the window on screen, which would produce a
-    // short file indistinguishable from a complete one.
-    const json = await exportLogs();
-    setIsExporting(false);
+    // short file indistinguishable from a complete one. Both formats are
+    // projections of the same complete fetch.
+    const rows = await exportRows();
+    setIsExporting(null);
 
-    if (json === null) {
+    if (rows === null) {
       toast.error(t('auditExportFailed'));
       return;
     }
 
-    const blob = new Blob([json], { type: 'application/json' });
+    const body = format === 'csv' ? toCsv(rows) : JSON.stringify(rows, null, 2);
+    const type = format === 'csv' ? 'text/csv;charset=utf-8' : 'application/json';
+    const blob = new Blob([body], { type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `audit-log-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `audit-log-${new Date().toISOString().split('T')[0]}.${format}`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success(t('logsExported'));
@@ -92,13 +134,22 @@ const AuditLogPage: React.FC = () => {
             {t('refresh')}
           </Button>
           <Button
-            onClick={() => void handleExport()}
-            disabled={isExporting}
+            onClick={() => void handleExport('json')}
+            disabled={isExporting !== null}
             variant="outline"
             className="border-[var(--dg-border-strong)] text-[var(--dg-text)] hover:bg-[var(--dg-accent-soft)]"
           >
-            <Download className="w-4 h-4 me-2" />
-            {t('export')}
+            <Download className="w-4 h-4 me-2" aria-hidden="true" />
+            {t('exportJson')}
+          </Button>
+          <Button
+            onClick={() => void handleExport('csv')}
+            disabled={isExporting !== null}
+            variant="outline"
+            className="border-[var(--dg-border-strong)] text-[var(--dg-text)] hover:bg-[var(--dg-accent-soft)]"
+          >
+            <Download className="w-4 h-4 me-2" aria-hidden="true" />
+            {t('exportCsv')}
           </Button>
         </div>
       </div>
@@ -143,13 +194,14 @@ const AuditLogPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--dg-muted)]" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--dg-muted)]" aria-hidden="true" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('search')}
+            aria-label={t('search')}
             className="ps-9 bg-[var(--dg-surface)] border-[var(--dg-border)] text-[var(--dg-text)]"
           />
         </div>
@@ -168,6 +220,68 @@ const AuditLogPage: React.FC = () => {
           </Button>
         ))}
       </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3" role="group" aria-label={t('auditFilters')}>
+        <label className="text-xs text-[var(--dg-muted)] flex flex-col gap-1">
+          {t('auditFrom')}
+          <Input
+            type="date"
+            value={fromDate}
+            max={toDate || undefined}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="bg-[var(--dg-surface)] border-[var(--dg-border)] text-[var(--dg-text)]"
+          />
+        </label>
+        <label className="text-xs text-[var(--dg-muted)] flex flex-col gap-1">
+          {t('auditTo')}
+          <Input
+            type="date"
+            value={toDate}
+            min={fromDate || undefined}
+            onChange={(e) => setToDate(e.target.value)}
+            className="bg-[var(--dg-surface)] border-[var(--dg-border)] text-[var(--dg-text)]"
+          />
+        </label>
+        <label className="text-xs text-[var(--dg-muted)] flex flex-col gap-1">
+          {t('auditUser')}
+          <select
+            value={userFilter}
+            onChange={(e) => setUserFilter(e.target.value)}
+            className="h-9 rounded-md border border-[var(--dg-border)] bg-[var(--dg-surface)] px-3 text-sm text-[var(--dg-text)]"
+          >
+            <option value="all">{t('auditAllUsers')}</option>
+            {usernames.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-[var(--dg-muted)] flex flex-col gap-1">
+          {t('auditQueryType')}
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as QueryTypeFilter)}
+            className="h-9 rounded-md border border-[var(--dg-border)] bg-[var(--dg-surface)] px-3 text-sm text-[var(--dg-text)]"
+          >
+            {QUERY_TYPES.map((k) => (
+              <option key={k} value={k}>{t(`auditType_${k}`)}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {/* A filter narrows the loaded window, never the trail. Saying how many
+          of the loaded rows match keeps an empty result from reading as
+          "there were none". */}
+      {!isLoading && logs.length > 0 && (
+        <p className="text-[var(--dg-muted)] text-xs mb-3 flex items-center gap-3 flex-wrap" aria-live="polite">
+          <span>{t('auditFilteredNote', { shown: filteredLogs.length, loaded: logs.length })}</span>
+          {filtersActive && (
+            <button type="button" onClick={clearFilters} className="underline hover:text-[var(--dg-text)]">
+              {t('auditClearFilters')}
+            </button>
+          )}
+        </p>
+      )}
 
       {/* An auditor searching for one refusal must know whether they searched
           the trail or only the newest slice of it. */}

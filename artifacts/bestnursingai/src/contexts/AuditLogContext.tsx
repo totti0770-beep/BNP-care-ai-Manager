@@ -67,6 +67,11 @@ interface AuditLogContextType {
    * of writing a short file that looks whole.
    */
   exportLogs: () => Promise<string | null>;
+  /**
+   * The complete trail as rows, for a caller that serialises it another way
+   * (CSV). Same fetch, same refusal to return a partial result.
+   */
+  exportRows: () => Promise<AuditLogEntry[] | null>;
 }
 
 const AuditLogContext = createContext<AuditLogContextType | undefined>(undefined);
@@ -128,11 +133,16 @@ export const AuditLogProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Exports the whole trail, not the window on screen. There is no
   // client-side delete either: the audit log is not the client's to erase.
-  const exportLogs = useCallback(async () => {
+  const exportRows = useCallback(async () => {
     const { rows, complete } = await fetchAllAuditLog();
     if (!complete) return null;
-    return JSON.stringify(rows.map(toEntry), null, 2);
+    return rows.map(toEntry);
   }, []);
+
+  const exportLogs = useCallback(async () => {
+    const rows = await exportRows();
+    return rows === null ? null : JSON.stringify(rows, null, 2);
+  }, [exportRows]);
 
   return (
     <AuditLogContext.Provider
@@ -142,6 +152,7 @@ export const AuditLogProvider: React.FC<{ children: React.ReactNode }> = ({
         chainStatus,
         refresh,
         exportLogs,
+        exportRows,
         truncated,
         windowSize: WINDOW,
       }}
