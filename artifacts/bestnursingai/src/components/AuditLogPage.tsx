@@ -115,13 +115,13 @@ const AuditLogPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col dg-page min-h-screen p-6">
+    <div className="flex-1 flex flex-col dg-page min-h-screen p-4 md:p-6">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-[var(--dg-text)] flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[var(--dg-text)] flex items-center gap-3">
             <ClipboardList className="w-8 h-8 text-[var(--dg-accent-strong)]" />
             {t('auditLog')}
-          </h2>
+          </h1>
           <p className="text-[var(--dg-muted)] mt-1">{t('auditLogDescription')}</p>
         </div>
         <div className="flex items-center gap-2">

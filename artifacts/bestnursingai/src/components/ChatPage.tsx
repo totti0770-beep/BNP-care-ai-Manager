@@ -497,22 +497,24 @@ function PatientContextPanel({
       {/* Weight + Age */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-[var(--dg-muted)] text-xs mb-1 block">Weight (kg)</label>
+          <label htmlFor="pc-weight" className="text-[var(--dg-muted)] text-xs mb-1 block">{t('pcWeight')}</label>
           <Input
+            id="pc-weight"
             type="number"
             min={1} max={300}
-            placeholder="e.g. 70"
+            placeholder={t('phWeight')}
             value={opts.patientWeightKg ?? ''}
             onChange={e => onChange({ ...opts, patientWeightKg: e.target.value ? Number(e.target.value) : undefined })}
             className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)] text-sm h-8"
           />
         </div>
         <div>
-          <label className="text-[var(--dg-muted)] text-xs mb-1 block">Age (years)</label>
+          <label htmlFor="pc-age" className="text-[var(--dg-muted)] text-xs mb-1 block">{t('pcAge')}</label>
           <Input
+            id="pc-age"
             type="number"
             min={0} max={120}
-            placeholder="e.g. 45"
+            placeholder={t('phAge')}
             value={opts.age ?? ''}
             onChange={e => onChange({ ...opts, age: e.target.value ? Number(e.target.value) : undefined })}
             className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-text)] text-sm h-8"
@@ -522,10 +524,11 @@ function PatientContextPanel({
 
       {/* Conditions */}
       <div>
-        <label className="text-[var(--dg-muted)] text-xs mb-1 block">Patient Conditions (for contraindication check)</label>
+        <label htmlFor="pc-condition" className="text-[var(--dg-muted)] text-xs mb-1 block">{t('pcConditions')}</label>
         <div className="flex gap-2">
           <Input
-            placeholder="e.g. severe liver disease"
+            id="pc-condition"
+            placeholder={t('phConditions')}
             value={conditionInput}
             onChange={e => setConditionInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCondition(); } }}
@@ -533,6 +536,7 @@ function PatientContextPanel({
           />
           <button
             onClick={addCondition}
+            aria-label={t('a11yAddCondition')}
             className="w-8 h-8 rounded-lg bg-[var(--dg-accent-soft)] hover:bg-[var(--dg-border-strong)] text-[var(--dg-accent-strong)] flex items-center justify-center transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -543,7 +547,7 @@ function PatientContextPanel({
             {opts.conditions!.map((c, i) => (
               <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-600/20 border border-yellow-500/30 text-yellow-300 text-xs">
                 {c}
-                <button onClick={() => removeCondition(i)}><X className="w-3 h-3" /></button>
+                <button type="button" onClick={() => removeCondition(i)} aria-label={`${t('a11yRemoveItem')}: ${c}`}><X className="w-3 h-3" aria-hidden="true" /></button>
               </span>
             ))}
           </div>
@@ -552,10 +556,11 @@ function PatientContextPanel({
 
       {/* Other drugs */}
       <div>
-        <label className="text-[var(--dg-muted)] text-xs mb-1 block">Other Medications (for interaction check)</label>
+        <label htmlFor="pc-drug" className="text-[var(--dg-muted)] text-xs mb-1 block">{t('pcDrugs')}</label>
         <div className="flex gap-2">
           <Input
-            placeholder="e.g. warfarin, aspirin"
+            id="pc-drug"
+            placeholder={t('phDrugs')}
             value={drugInput}
             onChange={e => setDrugInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDrug(); } }}
@@ -563,6 +568,7 @@ function PatientContextPanel({
           />
           <button
             onClick={addDrug}
+            aria-label={t('a11yAddDrug')}
             className="w-8 h-8 rounded-lg bg-[var(--dg-accent-soft)] hover:bg-[var(--dg-border-strong)] text-[var(--dg-accent-strong)] flex items-center justify-center transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -573,7 +579,7 @@ function PatientContextPanel({
             {opts.otherDrugs!.map((d, i) => (
               <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-600/20 border border-orange-500/30 text-orange-300 text-xs">
                 {d}
-                <button onClick={() => removeDrug(i)}><X className="w-3 h-3" /></button>
+                <button type="button" onClick={() => removeDrug(i)} aria-label={`${t('a11yRemoveItem')}: ${d}`}><X className="w-3 h-3" aria-hidden="true" /></button>
               </span>
             ))}
           </div>
@@ -704,7 +710,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ initialQuestion, onInitialQuestionC
             <Bot className="w-5 h-5 text-[var(--dg-text)]" />
           </div>
           <div>
-            <h2 className="text-[var(--dg-text)] font-semibold">{SYSTEM_NAME}</h2>
+            <h1 className="text-[var(--dg-text)] font-semibold">{SYSTEM_NAME}</h1>
             <p className="text-[var(--dg-muted)] text-xs">
               {t('engineSubtitle')}
             </p>
@@ -912,20 +918,25 @@ const ChatPage: React.FC<ChatPageProps> = ({ initialQuestion, onInitialQuestionC
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isListening ? '🎤 جارٍ الاستماع...' : 'Ask a clinical question... (include drug name for safety checks)'}
+            placeholder={isListening ? t('phListening') : t('phAsk')}
+            aria-label={t('phAsk')}
             className="flex-1 bg-transparent border-0 text-[var(--dg-text)] placeholder:text-[var(--dg-faint)] focus-visible:ring-0 shadow-none text-sm"
             disabled={isTyping}
           />
           <Button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || isTyping}
+            aria-label={t('a11ySend')}
             className="dg-gradient hover:brightness-110 text-white px-4"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
+        {/* The footer used to promise "No Hallucination". No system can
+            promise that; what this one does is refuse to answer without a
+            cited, approved source, and that is what the line now says. */}
         <p className="text-center text-[var(--dg-muted)] text-xs">
-          {SYSTEM_NAME} · RAG-Only · No Hallucination · Sources Always Cited
+          {SYSTEM_NAME} · {t('chatFooterNote')}
         </p>
       </div>
     </div>

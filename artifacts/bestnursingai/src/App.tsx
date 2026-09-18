@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
@@ -25,6 +26,7 @@ import '@/i18n';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
 function AppContent() {
+  const { t } = useTranslation();
   const { isAuthenticated, isLoading, hasPermission } = useAuth();
   // The screen is the URL fragment, so a refresh keeps it, Back returns to the
   // previous screen, and any screen can be linked to.
@@ -47,6 +49,14 @@ function AppContent() {
       typeof window === 'undefined' ||
       window.matchMedia('(min-width: 768px)').matches,
   );
+  // A tablet rotated, or a window resized across the breakpoint, should get
+  // the layout that width deserves rather than the one it started with.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = (e: MediaQueryListEvent) => setSidebarOpen(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   // The screen requested before an OIDC sign-in, applied once after it.
   useEffect(() => {
@@ -121,6 +131,18 @@ function AppContent() {
 
   return (
     <div className="flex h-screen bg-[var(--dg-bg)] overflow-hidden">
+      {/* Keyboard users land here first. A plain `href="#main"` would be read
+          by the hash router as a screen id, so the link moves focus itself. */}
+      <a
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById('main')?.focus();
+        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:start-2 focus:z-[100] focus:px-3 focus:py-2 focus:rounded-lg focus:bg-[var(--dg-surface)] focus:text-[var(--dg-text)] focus:border focus:border-[var(--dg-border-strong)]"
+      >
+        {t('skipToContent')}
+      </a>
       <Sidebar
         activeTab={activeTab}
         onTabChange={navigate}
@@ -138,6 +160,7 @@ function AppContent() {
           keeps every screen's layout identical in both directions. */}
       <main
         id="main"
+        tabIndex={-1}
         className={`flex-1 transition-all duration-300 overflow-auto ${
           sidebarOpen ? 'ms-0 md:ms-80' : 'ms-0 pt-16'
         }`}

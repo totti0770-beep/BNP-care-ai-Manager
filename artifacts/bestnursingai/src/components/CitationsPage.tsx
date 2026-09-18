@@ -113,9 +113,9 @@ const CitationsPage: React.FC<Props> = ({ evidenceChunkId = null, onCloseEvidenc
     f === 'all' ? sources.length : sources.filter((s) => s.status === f).length;
 
   return (
-    <div className="flex-1 flex flex-col dg-page min-h-screen p-6">
+    <div className="flex-1 flex flex-col dg-page min-h-screen p-4 md:p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-[var(--dg-text)]">{t('citations')}</h2>
+        <h1 className="text-2xl font-bold text-[var(--dg-text)]">{t('citations')}</h1>
         <p className="text-[var(--dg-muted)] mt-1">{t('citationsDescription')}</p>
         <p className="flex items-start gap-2 text-xs text-[var(--dg-muted)] mt-3">
           <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />

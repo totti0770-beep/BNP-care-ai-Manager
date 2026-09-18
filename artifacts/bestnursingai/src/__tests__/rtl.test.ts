@@ -31,12 +31,21 @@ const PHYSICAL =
  */
 const DECORATIVE = /rounded-full blur-3xl|translate-x-1\/2/;
 
-/** Every .tsx under src/, except the generated shadcn primitives in ui/. */
+/**
+ * The shadcn primitives the app actually renders in Arabic. The rest of ui/
+ * is generated code the app does not mount, so its physical offsets are
+ * harmless until something mounts them — at which point it joins this list.
+ */
+const RENDERED_PRIMITIVES = ['dialog.tsx', 'select.tsx'];
+
+/** Every .tsx under src/, plus the rendered primitives in ui/. */
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      return entry.name === 'ui' || entry.name === '__tests__' ? [] : sources(path);
+      if (entry.name === '__tests__') return [];
+      if (entry.name === 'ui') return RENDERED_PRIMITIVES.map((f) => join(path, f));
+      return sources(path);
     }
     return entry.name.endsWith('.tsx') ? [path] : [];
   });
