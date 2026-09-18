@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { useBackend } from '@/contexts/BackendContext';
 import { listAuditLog, type EngineDocument } from '@/services/clinicalApi';
 import { useAuth } from '@/contexts/AuthContext';
+import EvidencePassageDialog from '@/components/EvidencePassage';
 
 /**
  * The clinical sources this system answers from.
@@ -32,7 +33,13 @@ interface SourceRow {
 type StatusFilter = 'all' | 'approved' | 'pending' | 'retired' | 'superseded';
 const STATUS_FILTERS: StatusFilter[] = ['all', 'approved', 'pending', 'retired', 'superseded'];
 
-const CitationsPage: React.FC = () => {
+interface Props {
+  /** A chunk id from the URL (`#/citations?chunk=…`); opens the passage viewer. */
+  evidenceChunkId?: string | null;
+  onCloseEvidence?: () => void;
+}
+
+const CitationsPage: React.FC<Props> = ({ evidenceChunkId = null, onCloseEvidence }) => {
   const { t } = useTranslation();
   const { engineDocuments, isEngineAvailable } = useBackend();
   const { hasPermission } = useAuth();
@@ -229,6 +236,10 @@ const CitationsPage: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Deep link: a citation shared as a URL opens the same viewer the
+          assistant and the audit trail use. The engine decides 200 or 403. */}
+      <EvidencePassageDialog chunkId={evidenceChunkId} onClose={() => onCloseEvidence?.()} />
     </div>
   );
 };

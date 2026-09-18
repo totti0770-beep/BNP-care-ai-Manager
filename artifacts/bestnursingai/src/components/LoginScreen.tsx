@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { stashReturnHash } from '@/lib/router';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ArrowRight, AlertTriangle, Loader2 } from 'lucide-react';
 import DgLogo from '@/components/DgLogo';
@@ -64,7 +65,10 @@ const LoginScreen: React.FC = () => {
 
           {oidcAvailable ? (
             <Button
-              onClick={login}
+              onClick={() => {
+                stashReturnHash();
+                login();
+              }}
               className="w-full dg-gradient hover:brightness-110 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-[0_6px_18px_rgba(0,166,166,0.28)]"
             >
               <span className="flex items-center justify-center gap-2">

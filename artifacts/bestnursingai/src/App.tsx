@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
@@ -19,20 +19,27 @@ import RAGSettingsPage from '@/components/RAGSettingsPage';
 import SecureUploadPage from '@/components/SecureUploadPage';
 import MedicationSafetyPage from '@/components/MedicationSafetyPage';
 import KnowledgeGovernancePage from '@/components/KnowledgeGovernancePage';
+import NotPermitted from '@/components/NotPermitted';
+import { CHUNK_ID, ROUTE_PERMISSION, consumeReturnHash, useHashRoute } from '@/lib/router';
 import '@/i18n';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState('home');
+  const { isAuthenticated, isLoading, hasPermission } = useAuth();
+  // The screen is the URL fragment, so a refresh keeps it, Back returns to the
+  // previous screen, and any screen can be linked to.
+  const { route, navigate, replace } = useHashRoute();
+  const activeTab = route.tab;
+
   // A question typed on the home console is carried into the assistant and
   // asked once. Held in memory only, and cleared as soon as it is consumed.
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
 
   const askFromHome = (question: string) => {
     setPendingQuestion(question);
-    setActiveTab('chat');
+    navigate('chat');
   };
+
   // Open on a desktop, closed on a phone. The sidebar is 320px wide, so
   // starting it open on a 375px screen left about 55px for the content.
   const [sidebarOpen, setSidebarOpen] = useState(
@@ -40,6 +47,16 @@ function AppContent() {
       typeof window === 'undefined' ||
       window.matchMedia('(min-width: 768px)').matches,
   );
+
+  // The screen requested before an OIDC sign-in, applied once after it.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const stashed = consumeReturnHash();
+    if (stashed && !window.location.hash) {
+      window.history.replaceState(null, '', stashed);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    }
+  }, [isAuthenticated]);
 
   if (isLoading) {
     return (
@@ -53,11 +70,20 @@ function AppContent() {
     return <LoginScreen />;
   }
 
+  const rawChunk = route.params.get('chunk');
+  const evidenceChunkId = rawChunk && CHUNK_ID.test(rawChunk) ? rawChunk : null;
+
   const renderContent = () => {
+    // Mirrors the engine's RBAC; never replaces it. The engine refuses these
+    // screens' requests for a nurse whatever the client renders.
+    const need = ROUTE_PERMISSION[activeTab];
+    if (need && !hasPermission(need)) {
+      return <NotPermitted onHome={() => navigate('home')} />;
+    }
+
     switch (activeTab) {
       case 'home':
-      case 'new-chat':
-        return <HomePage onAsk={askFromHome} onNavigate={setActiveTab} />;
+        return <HomePage onAsk={askFromHome} onNavigate={navigate} />;
       case 'chat':
         return (
           <ChatPage
@@ -70,11 +96,16 @@ function AppContent() {
       case 'upload':
         return <SecureUploadPage />;
       case 'documents':
-        return <DocumentsPage onNavigate={setActiveTab} />;
+        return <DocumentsPage onNavigate={navigate} />;
       case 'knowledge-governance':
-        return <KnowledgeGovernancePage onNavigate={setActiveTab} />;
+        return <KnowledgeGovernancePage onNavigate={navigate} />;
       case 'citations':
-        return <CitationsPage />;
+        return (
+          <CitationsPage
+            evidenceChunkId={evidenceChunkId}
+            onCloseEvidence={() => replace('citations')}
+          />
+        );
       case 'settings':
         return <SettingsPage />;
       case 'audit-log':
@@ -84,7 +115,7 @@ function AppContent() {
       case 'rag-settings':
         return <RAGSettingsPage />;
       default:
-        return <HomePage onAsk={askFromHome} onNavigate={setActiveTab} />;
+        return <HomePage onAsk={askFromHome} onNavigate={navigate} />;
     }
   };
 
@@ -92,7 +123,7 @@ function AppContent() {
     <div className="flex h-screen bg-[var(--dg-bg)] overflow-hidden">
       <Sidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={navigate}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
@@ -106,6 +137,7 @@ function AppContent() {
           heading begins. Reserving the strip vertically rather than inline
           keeps every screen's layout identical in both directions. */}
       <main
+        id="main"
         className={`flex-1 transition-all duration-300 overflow-auto ${
           sidebarOpen ? 'ms-0 md:ms-80' : 'ms-0 pt-16'
         }`}
