@@ -24,6 +24,8 @@ import {
   uploadDocument as apiUpload,
   listDocuments as apiListDocs,
   deleteDocument as apiDeleteDoc,
+  supersedeDocument as apiSupersedeDoc,
+  type EngineHealth,
   approveDocument as apiApproveDoc,
   type EngineDocument,
   type FormularyCounts,
@@ -135,6 +137,10 @@ interface BackendContextType {
   sendQuery: (question: string, opts?: QueryOptions) => Promise<BNPResponse | null>;
   uploadToEngine: (file: File) => Promise<{ filename: string; chunks: number } | null>;
   removeFromEngine: (documentId: string) => Promise<boolean>;
+  /** Mark a document as replaced by another; the old one stops being cited. */
+  supersedeInEngine: (documentId: string, replacementId: string) => Promise<boolean>;
+  /** Re-read /health and apply it. Used after any change to the corpus. */
+  recheckHealth: () => Promise<void>;
   /** Approve a staged document, which is what indexes and publishes it. */
   approveInEngine: (
     documentId: string,
@@ -167,6 +173,28 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
     setEngineDocuments(docs);
   }, []);
 
+  /**
+   * One place that turns a /health body into state. It used to be written
+   * twice (startup and after upload) and the two copies had already drifted:
+   * one set `openai_enabled`, the other did not.
+   */
+  const applyHealth = useCallback((health: EngineHealth) => {
+    // A body came back at all, so the engine is up and the gateway can reach
+    // it — enough to list and upload documents.
+    setIsEngineReachable(true);
+    setIndexedChunks(health.indexed_chunks);
+    setOpenaiEnabled(health.openai_enabled);
+    setEngineProblems(health.problems ?? []);
+    setFormularyCounts(health.formulary ?? null);
+    setFormularyReviewStatus(health.drug_db_review_status ?? null);
+    setIsEngineAvailable(health.status === "ok");
+  }, []);
+
+  const recheckHealth = useCallback(async () => {
+    const health = await checkHealth();
+    if (health) applyHealth(health);
+  }, [applyHealth]);
+
   useEffect(() => {
     if (initDone.current) return;
     initDone.current = true;
@@ -175,20 +203,12 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsChecking(true);
       const health = await checkHealth();
       if (health) {
-        // A body came back at all, so the engine is up and the gateway can
-        // reach it — enough to list and upload documents.
-        setIsEngineReachable(true);
-        setIndexedChunks(health.indexed_chunks);
-        setOpenaiEnabled(health.openai_enabled);
-        setEngineProblems(health.problems ?? []);
-        setFormularyCounts(health.formulary ?? null);
-        setFormularyReviewStatus(health.drug_db_review_status ?? null);
-        setIsEngineAvailable(health.status === "ok");
+        applyHealth(health);
         await refreshDocuments();
       }
       setIsChecking(false);
     })();
-  }, [refreshDocuments]);
+  }, [applyHealth, refreshDocuments]);
 
   const sendQuery = useCallback(
     async (question: string, opts: QueryOptions = {}): Promise<BNPResponse | null> => {
@@ -212,18 +232,11 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
       setIndexedChunks(chunks);
       // The engine may have just become able to answer. Re-read rather than
       // infer it, so the flag reflects the engine's own verdict.
-      const health = await checkHealth();
-      if (health) {
-        setEngineProblems(health.problems ?? []);
-        setFormularyCounts(health.formulary ?? null);
-        setFormularyReviewStatus(health.drug_db_review_status ?? null);
-        setIsEngineAvailable(health.status === "ok");
-        setIndexedChunks(health.indexed_chunks);
-      }
+      await recheckHealth();
       await refreshDocuments();
       return { filename: result.filename, chunks: result.chunks_indexed };
     },
-    [isEngineReachable, indexedChunks, refreshDocuments]
+    [isEngineReachable, indexedChunks, recheckHealth, refreshDocuments]
   );
 
   const approveInEngine = useCallback(
@@ -246,10 +259,22 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
     async (documentId: string): Promise<boolean> => {
       if (!isEngineReachable) return false;
       const ok = await apiDeleteDoc(documentId);
-      if (ok) await refreshDocuments();
+      // Retiring drops the document's vectors, so the chunk count on the
+      // console and Engine Health changes; re-read it rather than guess.
+      if (ok) await Promise.all([refreshDocuments(), recheckHealth()]);
       return ok;
     },
-    [isEngineReachable, refreshDocuments]
+    [isEngineReachable, recheckHealth, refreshDocuments]
+  );
+
+  const supersedeInEngine = useCallback(
+    async (documentId: string, replacementId: string): Promise<boolean> => {
+      if (!isEngineReachable) return false;
+      const ok = await apiSupersedeDoc(documentId, replacementId);
+      if (ok) await Promise.all([refreshDocuments(), recheckHealth()]);
+      return ok;
+    },
+    [isEngineReachable, recheckHealth, refreshDocuments]
   );
 
   return (
@@ -267,6 +292,8 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
         sendQuery,
         uploadToEngine,
         removeFromEngine,
+        supersedeInEngine,
+        recheckHealth,
         approveInEngine,
         refreshDocuments,
       }}

@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Clock,
   CalendarX,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +21,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBackend } from '@/contexts/BackendContext';
 
-const DocumentsPage: React.FC = () => {
+const DocumentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNavigate }) => {
   const { t } = useTranslation();
   const { hasPermission, user } = useAuth();
   const {
@@ -181,7 +182,18 @@ const DocumentsPage: React.FC = () => {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {canUpload && onNavigate && (
+            <Button
+              onClick={() => onNavigate('knowledge-governance')}
+              variant="outline"
+              size="sm"
+              className="border-[var(--dg-border-strong)] text-[var(--dg-body)] hover:bg-[var(--dg-accent-faint)]"
+            >
+              <ShieldCheck className="w-4 h-4 me-2" aria-hidden="true" />
+              {t('kgManageLink')}
+            </Button>
+          )}
           <Button
             onClick={handleRefresh}
             disabled={isRefreshing}
