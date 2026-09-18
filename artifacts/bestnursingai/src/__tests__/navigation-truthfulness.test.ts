@@ -36,11 +36,13 @@ describe('the sidebar states only what is measured', () => {
     expect(s).not.toMatch(/searchQuery/);
   });
 
-  it('does not offer upload to a user who cannot upload', () => {
-    // The engine gates /documents/upload on documents.manage. Listing the
-    // screen for everyone put a button in front of nurses that only 403s.
+  it('does not list upload as a destination at all', () => {
+    // The engine gates /documents/upload on documents.manage. The screen used
+    // to be listed for everyone (a button that only 403s for nurses), then
+    // gated; it is now reached from Knowledge Governance and the Documents
+    // screen's own upload button, so no nav group carries it.
     const s = code('components/Sidebar.tsx');
-    expect(s).toMatch(/canManageDocuments\s*\?\s*\[\{ id: 'upload'/);
+    expect(s).not.toMatch(/id: 'upload'/);
   });
 });
 

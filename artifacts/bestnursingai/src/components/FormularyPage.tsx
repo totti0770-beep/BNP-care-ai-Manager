@@ -10,6 +10,8 @@ import {
   ShieldCheck,
   Upload,
   XCircle,
+  Search,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,9 +23,11 @@ import {
   type ReviewStatus,
   importFormulary,
   listFormulary,
+  retireFormularyDrug,
   reviewFormularyDrug,
   reviewPacketUrl,
 } from '@/services/clinicalApi';
+import { useAuth } from '@/contexts/AuthContext';
 
 const EMPTY: FormularyCounts = { total: 0, approved: 0, pending: 0, rejected: 0 };
 
@@ -50,6 +54,7 @@ const STATUS_STYLES: Record<ReviewStatus, string> = {
  */
 const FormularyPage: React.FC = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   const [drugs, setDrugs] = useState<FormularyDrug[]>([]);
   const [counts, setCounts] = useState<FormularyCounts>(EMPTY);
@@ -64,6 +69,16 @@ const FormularyPage: React.FC = () => {
   const [isImporting, setIsImporting] = useState(false);
 
   const [openDrug, setOpenDrug] = useState<string | null>(null);
+  // Search and the high-alert toggle narrow the rows already loaded. The
+  // engine's list has no search parameter, so this is not a query — the
+  // caption under the list says how many of the loaded rows are shown.
+  const [search, setSearch] = useState('');
+  const [highAlertOnly, setHighAlertOnly] = useState(false);
+  const [retireDrug, setRetireDrug] = useState<string | null>(null);
+  const [retireReason, setRetireReason] = useState('');
+  const [retiredBy, setRetiredBy] = useState('');
+  const [retireSupersededBy, setRetireSupersededBy] = useState('');
+  const [isRetiring, setIsRetiring] = useState(false);
   const [reviewer, setReviewer] = useState('');
   const [licence, setLicence] = useState('');
   const [note, setNote] = useState('');
@@ -106,6 +121,40 @@ const FormularyPage: React.FC = () => {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const needle = search.trim().toLowerCase();
+  const visible = drugs.filter(
+    (d) =>
+      (!highAlertOnly || d.high_risk) &&
+      (needle === '' ||
+        d.generic_name.toLowerCase().includes(needle) ||
+        (d.name_ar ?? '').toLowerCase().includes(needle)),
+  );
+
+  const openRetire = (drugId: string) => {
+    setRetireDrug(drugId);
+    setRetireReason('');
+    setRetiredBy(user?.name || user?.email || '');
+    setRetireSupersededBy('');
+  };
+
+  const submitRetire = async () => {
+    if (!retireDrug) return;
+    setIsRetiring(true);
+    const outcome = await retireFormularyDrug(retireDrug, {
+      reason: retireReason.trim(),
+      retired_by: retiredBy.trim(),
+      superseded_by: retireSupersededBy.trim() || undefined,
+    });
+    setIsRetiring(false);
+    if (outcome.ok) {
+      toast.success(t('formularyRetireSuccess'));
+      setRetireDrug(null);
+      await refresh();
+    } else {
+      toast.error(outcome.detail ? `${t('formularyRetireFailed')}: ${outcome.detail}` : t('formularyRetireFailed'));
+    }
+  };
 
   const runImport = async (dryRun: boolean) => {
     if (!file) return;
@@ -280,6 +329,28 @@ const FormularyPage: React.FC = () => {
 
       {/* Drug list */}
       <section className="space-y-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('formularySearch')}
+              aria-label={t('formularySearch')}
+              className="ps-9"
+            />
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={highAlertOnly}
+              onChange={(e) => setHighAlertOnly(e.target.checked)}
+              className="h-4 w-4"
+            />
+            {t('formularyHighAlertOnly')}
+          </label>
+        </div>
+
         {/* How much of the queue is on screen. Without this, the bottom of a
             page is indistinguishable from the end of the work. */}
         {!unavailable && drugs.length > 0 && (
@@ -288,6 +359,9 @@ const FormularyPage: React.FC = () => {
               shown: drugs.length,
               total: filter === 'all' ? counts.total : counts[filter],
             })}
+            {visible.length !== drugs.length && (
+              <> · {t('formularyFilteredNote', { shown: visible.length, loaded: drugs.length })}</>
+            )}
           </p>
         )}
 
@@ -308,8 +382,10 @@ const FormularyPage: React.FC = () => {
           </div>
         ) : drugs.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('formularyEmpty')}</p>
+        ) : visible.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('formularyNoMatch')}</p>
         ) : (
-          drugs.map((drug) => (
+          visible.map((drug) => (
             <article key={drug.drug_id} className="rounded-lg border p-4 space-y-3">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
@@ -420,10 +496,53 @@ const FormularyPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
+              ) : retireDrug === drug.drug_id ? (
+                <div className="space-y-2 border-t pt-3" role="group" aria-label={t('formularyRetire')}>
+                  <p className="text-xs text-muted-foreground">{t('formularyRetireHint')}</p>
+                  <div className="grid md:grid-cols-3 gap-2">
+                    <Input
+                      placeholder={t('formularyRetireReason')}
+                      aria-label={t('formularyRetireReason')}
+                      value={retireReason}
+                      onChange={(e) => setRetireReason(e.target.value)}
+                    />
+                    <Input
+                      placeholder={t('formularyRetiredBy')}
+                      aria-label={t('formularyRetiredBy')}
+                      value={retiredBy}
+                      onChange={(e) => setRetiredBy(e.target.value)}
+                    />
+                    <Input
+                      placeholder={t('formularyRetireSupersededBy')}
+                      aria-label={t('formularyRetireSupersededBy')}
+                      value={retireSupersededBy}
+                      onChange={(e) => setRetireSupersededBy(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant="destructive"
+                      disabled={isRetiring || retireReason.trim().length < 4 || retiredBy.trim().length < 2}
+                      onClick={() => void submitRetire()}
+                    >
+                      <Trash2 className="w-4 h-4 me-1" aria-hidden="true" />
+                      {isRetiring ? t('loading') : t('formularyRetireConfirm')}
+                    </Button>
+                    <Button variant="ghost" onClick={() => setRetireDrug(null)} disabled={isRetiring}>
+                      {t('cancel')}
+                    </Button>
+                  </div>
+                </div>
               ) : (
-                <Button variant="outline" size="sm" onClick={() => setOpenDrug(drug.drug_id)}>
-                  {t('formularyReview')}
-                </Button>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => setOpenDrug(drug.drug_id)}>
+                    {t('formularyReview')}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => openRetire(drug.drug_id)}>
+                    <Trash2 className="w-3.5 h-3.5 me-1" aria-hidden="true" />
+                    {t('formularyRetire')}
+                  </Button>
+                </div>
               )}
             </article>
           ))

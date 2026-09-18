@@ -18,6 +18,7 @@ import FormularyPage from '@/components/FormularyPage';
 import RAGSettingsPage from '@/components/RAGSettingsPage';
 import SecureUploadPage from '@/components/SecureUploadPage';
 import MedicationSafetyPage from '@/components/MedicationSafetyPage';
+import KnowledgeGovernancePage from '@/components/KnowledgeGovernancePage';
 import '@/i18n';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
@@ -69,7 +70,9 @@ function AppContent() {
       case 'upload':
         return <SecureUploadPage />;
       case 'documents':
-        return <DocumentsPage />;
+        return <DocumentsPage onNavigate={setActiveTab} />;
+      case 'knowledge-governance':
+        return <KnowledgeGovernancePage onNavigate={setActiveTab} />;
       case 'citations':
         return <CitationsPage />;
       case 'settings':

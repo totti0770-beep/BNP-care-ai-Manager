@@ -79,7 +79,8 @@ const SecureUploadPage: React.FC = () => {
     try {
       const result = await uploadToEngine(pendingFile);
       if (result) {
-        toast.success(t('indexedSegmentsToast', { count: result.chunks }));
+        // Staged, not indexed: nothing is searchable until an administrator approves it.
+        toast.success(t('stagedPendingApproval', { count: result.chunks }));
         setPendingFile(null);
       } else {
         toast.error(t('uploadFailedEngine'));

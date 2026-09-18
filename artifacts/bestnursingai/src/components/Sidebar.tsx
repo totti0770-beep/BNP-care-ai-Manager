@@ -8,7 +8,6 @@ import {
   Plus,
   Home,
   MessageSquare,
-  Upload,
   FileText,
   Quote,
   Settings,
@@ -23,6 +22,7 @@ import {
   ClipboardList,
   Brain,
   Pill,
+  ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DgLogo from '@/components/DgLogo';
@@ -40,7 +40,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
   const { currentLanguage, changeLanguage, isRTL } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
   const canManageSettings = hasPermission('settings.manage');
-  const canManageDocuments = hasPermission('documents.manage');
 
   type MenuItem = { id: string; label: string; icon: React.ElementType };
 
@@ -57,26 +56,26 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
    * knows how many documents exist; a number that is not measured is not shown.
    */
   const clinicalItems: MenuItem[] = [
-    { id: 'home', label: t('home'), icon: Home },
+    { id: 'home', label: t('navClinicalIntelligence'), icon: Home },
     { id: 'chat', label: t('navClinicalAssistant'), icon: MessageSquare },
     // Backed by GET /formulary/lookup, which any signed-in user may call.
     { id: 'medication-safety', label: t('navMedicationSafety'), icon: Pill },
   ];
 
+  // Upload is not a destination of its own any more. It is an admin act on a
+  // document's lifecycle, so it is reached from Knowledge Governance (and from
+  // the Documents screen's own upload button), not listed beside screens a
+  // nurse reads.
   const knowledgeItems: MenuItem[] = [
-    { id: 'documents', label: t('documents'), icon: FileText },
     { id: 'citations', label: t('navClinicalEvidence'), icon: Quote },
-    // Upload is an admin action on the engine (documents.manage). Listing it for
-    // a nurse offered a screen whose only button they could not press.
-    ...(canManageDocuments
-      ? [{ id: 'upload', label: t('secureUpload'), icon: Upload }]
-      : []),
+    { id: 'documents', label: t('documents'), icon: FileText },
   ];
 
   const governanceItems: MenuItem[] = canManageSettings
     ? [
-        { id: 'formulary', label: t('formulary'), icon: Pill },
-        { id: 'audit-log', label: t('auditLog'), icon: ClipboardList },
+        { id: 'formulary', label: t('navFormularyReview'), icon: Pill },
+        { id: 'audit-log', label: t('navAudit'), icon: ClipboardList },
+        { id: 'knowledge-governance', label: t('navKnowledgeGovernance'), icon: ShieldCheck },
         { id: 'rag-settings', label: t('navEngineHealth'), icon: Brain },
       ]
     : [];

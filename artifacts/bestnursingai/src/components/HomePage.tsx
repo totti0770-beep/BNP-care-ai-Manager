@@ -8,6 +8,7 @@ import {
   UserCircle,
   Quote,
   ClipboardList,
+  ShieldCheck,
   Zap,
   FileText,
   AlertTriangle,
@@ -113,6 +114,13 @@ const HomePage: React.FC<Props> = ({ onAsk, onNavigate }) => {
             label: t('qaRecentActivity'),
             hint: t('qaRecentActivityHint'),
             run: () => onNavigate('audit-log'),
+          },
+          {
+            id: 'governance',
+            icon: ShieldCheck,
+            label: t('qaGovernance'),
+            hint: t('qaGovernanceHint'),
+            run: () => onNavigate('knowledge-governance'),
           },
         ]
       : []),

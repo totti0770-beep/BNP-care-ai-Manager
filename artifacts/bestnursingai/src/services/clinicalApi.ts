@@ -240,6 +240,26 @@ export async function listDocuments(): Promise<EngineDocument[]> {
 }
 
 /** Delete a document from the engine (admin only). */
+/**
+ * Record that one document replaces another. The engine marks the old one
+ * superseded, keeps its text for the audit trail and drops only its vectors.
+ * `replacement_id` is a query parameter on the engine route.
+ */
+export async function supersedeDocument(
+  documentId: string,
+  replacementId: string
+): Promise<boolean> {
+  try {
+    const res = await authFetch(
+      `/documents/${encodeURIComponent(documentId)}/supersede?replacement_id=${encodeURIComponent(replacementId)}`,
+      { method: "POST" }
+    );
+    return res?.ok ?? false;
+  } catch {
+    return false;
+  }
+}
+
 export async function deleteDocument(documentId: string): Promise<boolean> {
   try {
     const res = await authFetch(`/documents/${documentId}`, { method: "DELETE" });
@@ -558,6 +578,38 @@ export async function reviewFormularyDrug(
     return res.json();
   } catch {
     return null;
+  }
+}
+
+export interface RetirementDecision {
+  reason: string;
+  retired_by: string;
+  superseded_by?: string;
+}
+
+export type RetireOutcome = { ok: true } | { ok: false; detail: string | null };
+
+/**
+ * Withdraw a drug from the live formulary. Soft: the row stays readable for
+ * audit and stops being served. The engine requires a reason and a name.
+ */
+export async function retireFormularyDrug(
+  drugId: string,
+  decision: RetirementDecision
+): Promise<RetireOutcome> {
+  try {
+    const res = await authFetch(`/formulary/${encodeURIComponent(drugId)}/retire`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(decision),
+    });
+    if (!res) return { ok: false, detail: null };
+    if (res.ok) return { ok: true };
+    const body = await res.json().catch(() => null);
+    const detail = typeof body?.detail === "string" ? body.detail : null;
+    return { ok: false, detail };
+  } catch {
+    return { ok: false, detail: null };
   }
 }
 
