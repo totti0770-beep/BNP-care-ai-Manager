@@ -606,13 +606,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ initialQuestion, onInitialQuestionC
   const [showPatientCtx, setShowPatientCtx] = useState(false);
   // Shared with the home console, and memory-only: see contexts/PatientContext.
   const { patient: patientOpts, setPatient: setPatientOpts, clearPatient, hasPatient: hasPatientCtx } = usePatient();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // The list scrolls itself. scrollIntoView() on a sentinel scrolled every
+  // scrollable ancestor too, and on a phone that pulled the page container
+  // up by the strip reserved for the sidebar toggle — an offset that then
+  // outlived this screen and hid the next screen's title under the toggle.
+  const listRef = useRef<HTMLDivElement>(null);
 
   const { isListening, isSupported: voiceSupported, start: startVoice, stop: stopVoice } =
     useVoiceInput((transcript) => setInput(transcript));
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const list = listRef.current;
+    if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
   const handleMicClick = () => {
@@ -723,6 +728,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ initialQuestion, onInitialQuestionC
 
       {/* Messages */}
       <div
+        ref={listRef}
         className="flex-1 overflow-y-auto p-4 space-y-5"
         role="log"
         aria-live="polite"
@@ -822,7 +828,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ initialQuestion, onInitialQuestionC
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}

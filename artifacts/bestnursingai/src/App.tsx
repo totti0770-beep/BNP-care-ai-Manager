@@ -58,6 +58,13 @@ function AppContent() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
+  // A new screen starts at the top. The page container outlives the screens
+  // inside it, so without this a scroll position carried over from the
+  // previous screen would hide the next one's title under the sidebar toggle.
+  useEffect(() => {
+    document.getElementById('main')?.scrollTo({ top: 0 });
+  }, [activeTab]);
+
   // The screen requested before an OIDC sign-in, applied once after it.
   useEffect(() => {
     if (!isAuthenticated) return;

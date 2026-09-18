@@ -104,6 +104,13 @@ describe('small screens', () => {
     expect(s).toMatch(/<main\s+id="main"\s+tabIndex=\{-1\}/);
   });
 
+  it('a new screen starts at the top, and the chat scrolls its own list only', () => {
+    expect(code(src('App.tsx'))).toMatch(/document\.getElementById\('main'\)\?\.scrollTo\(\{ top: 0 \}\);\s*\}, \[activeTab\]\)/);
+    const chat = code(src('components/ChatPage.tsx'));
+    expect(chat).not.toMatch(/scrollIntoView/);
+    expect(chat).toMatch(/list\.scrollTo\(\{ top: list\.scrollHeight/);
+  });
+
   it('list rows and page gutters adapt', () => {
     expect(code(src('components/DocumentsPage.tsx'))).toMatch(/flex items-center gap-4 flex-wrap p-4/);
     for (const f of ['components/DocumentsPage.tsx', 'components/CitationsPage.tsx', 'components/AuditLogPage.tsx']) {
