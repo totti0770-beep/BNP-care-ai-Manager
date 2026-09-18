@@ -97,10 +97,10 @@ const SecureUploadPage: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col dg-page min-h-screen p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-[var(--dg-text)] flex items-center gap-3">
+        <h1 className="text-2xl font-bold text-[var(--dg-text)] flex items-center gap-3">
           <Shield className="w-8 h-8 text-[var(--dg-accent-strong)]" />
           {t('secureUpload')}
-        </h2>
+        </h1>
         <p className="text-[var(--dg-muted)] mt-1">{t('secureUploadDescription')}</p>
       </div>
 
@@ -161,8 +161,13 @@ const SecureUploadPage: React.FC = () => {
                 {(pendingFile.size / (1024 * 1024)).toFixed(2)} MB
               </p>
             </div>
-            <button onClick={cancelPending} className="text-[var(--dg-muted)] hover:text-red-400 transition-colors">
-              <X className="w-5 h-5" />
+            <button
+              type="button"
+              onClick={cancelPending}
+              aria-label={t('a11yCancelUpload')}
+              className="text-[var(--dg-muted)] hover:text-red-400 transition-colors"
+            >
+              <X className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
 

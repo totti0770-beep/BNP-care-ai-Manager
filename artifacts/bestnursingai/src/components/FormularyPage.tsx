@@ -462,21 +462,25 @@ const FormularyPage: React.FC = () => {
                   <div className="grid md:grid-cols-2 gap-2">
                     <Input
                       placeholder={t('formularyReviewer')}
+                      aria-label={t('formularyReviewer')}
                       value={reviewer}
                       onChange={(e) => setReviewer(e.target.value)}
                     />
                     <Input
                       placeholder={t('formularyLicence')}
+                      aria-label={t('formularyLicence')}
                       value={licence}
                       onChange={(e) => setLicence(e.target.value)}
                     />
                     <Input
                       placeholder={t('formularySourceRef')}
+                      aria-label={t('formularySourceRef')}
                       value={sourceRef}
                       onChange={(e) => setSourceRef(e.target.value)}
                     />
                     <Input
                       placeholder={t('formularyReviewNote')}
+                      aria-label={t('formularyReviewNote')}
                       value={note}
                       onChange={(e) => setNote(e.target.value)}
                     />

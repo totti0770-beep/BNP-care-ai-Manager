@@ -117,7 +117,7 @@ const DocumentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNav
     });
 
   return (
-    <div className="flex-1 flex flex-col dg-page min-h-screen p-6">
+    <div className="flex-1 flex flex-col dg-page min-h-screen p-4 md:p-6">
 
       {/* Delete Confirmation Modal */}
       {confirmDeleteId && confirmDoc && (
@@ -169,7 +169,7 @@ const DocumentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNav
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-[var(--dg-text)]">{t('documents')}</h2>
+          <h1 className="text-2xl font-bold text-[var(--dg-text)]">{t('documents')}</h1>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-[var(--dg-muted)] text-sm">
               {t('documentCountLabel', { count: engineDocuments.length })}
@@ -197,6 +197,7 @@ const DocumentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNav
           <Button
             onClick={handleRefresh}
             disabled={isRefreshing}
+            aria-label={t('refresh')}
             variant="outline"
             size="sm"
             className="border-[var(--dg-border-strong)] text-[var(--dg-body)] hover:bg-[var(--dg-accent-faint)]"
@@ -244,11 +245,12 @@ const DocumentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNav
       {/* Search */}
       {engineDocuments.length > 0 && (
         <div className="relative mb-6">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--dg-muted)]" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--dg-muted)]" aria-hidden="true" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('search')}
+            aria-label={t('search')}
             className="ps-10 bg-[var(--dg-surface)] border-[var(--dg-border-strong)] text-[var(--dg-text)] placeholder:text-[var(--dg-faint)]"
           />
         </div>
@@ -279,7 +281,7 @@ const DocumentsPage: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNav
           {filteredDocuments.map((doc) => (
             <div
               key={doc.id}
-              className="flex items-center gap-4 p-4 rounded-xl border bg-[var(--dg-surface)] border-[var(--dg-border)] hover:border-[var(--dg-border-strong)] transition-colors"
+              className="flex items-center gap-4 flex-wrap p-4 rounded-xl border bg-[var(--dg-surface)] border-[var(--dg-border)] hover:border-[var(--dg-border-strong)] transition-colors"
             >
               {/* Icon */}
               <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0">

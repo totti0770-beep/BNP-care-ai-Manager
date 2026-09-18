@@ -156,12 +156,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onTog
           >
             <X className="w-5 h-5 text-[var(--dg-muted)]" aria-hidden="true" />
           </button>
-          <h1 className="flex items-center gap-2 text-base font-bold text-[var(--dg-text)]" dir="ltr">
+          <div className="flex items-center gap-2 text-base font-bold text-[var(--dg-text)]" dir="ltr">
             <DgLogo size={30} />
             <span>
               BNP <span className="text-[var(--dg-accent)]">DecisionGuard</span>
             </span>
-          </h1>
+          </div>
         </div>
 
         <div className="bg-[var(--dg-elevated)] rounded-xl px-3 py-2.5 border border-[var(--dg-border)] flex items-center gap-2">

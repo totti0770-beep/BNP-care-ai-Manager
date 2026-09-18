@@ -131,6 +131,7 @@ const SettingsPage: React.FC = () => {
                 <Label className="text-[var(--dg-body)]">{t('email')}</Label>
                 <Input
                   value={user?.email}
+                  aria-label={t('email')}
                   disabled
                   className="bg-[var(--dg-inset)] border-[var(--dg-border-strong)] text-[var(--dg-muted)]"
                 />
@@ -346,32 +347,36 @@ const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex dg-page min-h-screen">
-      <div className="w-64 border-e border-[var(--dg-border)] bg-[var(--dg-inset)] p-4">
-        <h2 className="text-xl font-bold text-[var(--dg-text)] mb-6">{t('settings')}</h2>
-        <nav className="space-y-1">
+    <div className="flex-1 flex flex-col md:flex-row dg-page min-h-screen">
+      {/* A fixed 256px rail left ~120px of content on a 375px phone. Below md
+          the sections become a horizontal strip that scrolls; the rail returns
+          at md. */}
+      <div className="w-full md:w-64 border-b md:border-b-0 md:border-e border-[var(--dg-border)] bg-[var(--dg-inset)] p-4">
+        <h1 className="text-xl font-bold text-[var(--dg-text)] mb-3 md:mb-6">{t('settings')}</h1>
+        <nav aria-label={t('settings')} className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0">
           {sections.map((section) => {
             const Icon = section.icon;
             return (
               <button
                 key={section.id}
                 onClick={() => setActiveSection(section.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                aria-current={activeSection === section.id ? 'page' : undefined}
+                className={`shrink-0 md:w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all whitespace-nowrap ${
                   activeSection === section.id
                     ? 'bg-[var(--dg-accent-soft)] text-[var(--dg-accent-strong)] border border-[var(--dg-border-strong)]'
                     : 'text-[var(--dg-muted)] hover:bg-[var(--dg-accent-faint)] hover:text-[var(--dg-text)]'
                 }`}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-5 h-5" aria-hidden="true" />
                 <span className="flex-1 text-start">{section.label}</span>
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4 hidden md:block" aria-hidden="true" />
               </button>
             );
           })}
         </nav>
       </div>
 
-      <div className="flex-1 p-8">
+      <div className="flex-1 p-4 md:p-8">
         <div className="max-w-2xl mx-auto">{renderContent()}</div>
       </div>
     </div>

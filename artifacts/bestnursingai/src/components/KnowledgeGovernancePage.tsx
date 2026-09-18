@@ -36,6 +36,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBackend } from '@/contexts/BackendContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { EngineDocument } from '@/services/clinicalApi';
+import NotPermitted from '@/components/NotPermitted';
 
 /**
  * The lifecycle of clinical documents, for the people accountable for it.
@@ -90,13 +91,9 @@ const KnowledgeGovernancePage: React.FC<Props> = ({ onNavigate }) => {
 
   if (!canGovern) {
     // Defence in depth only: the engine refuses these routes for a nurse
-    // anyway. This avoids a screen of buttons that would each 403.
-    return (
-      <div className="flex-1 dg-page min-h-screen p-6">
-        <h1 className="text-2xl font-bold text-[var(--dg-text)]">{t('kgTitle')}</h1>
-        <p role="alert" className="mt-4 text-sm text-[var(--dg-muted)]">{t('kgNotPermitted')}</p>
-      </div>
-    );
+    // anyway, and the router already gates the screen. This avoids a page
+    // of buttons that would each 403 if the screen is reached another way.
+    return <NotPermitted onHome={() => onNavigate?.('home')} />;
   }
 
   const approverName = user?.name || user?.email || '';
