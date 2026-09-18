@@ -134,6 +134,8 @@ interface BackendContextType {
   formularyCounts: FormularyCounts | null;
   /** The engine's own one-line review status, verbatim. */
   formularyReviewStatus: string | null;
+  /** The last /health body as received, for a screen that shows all of it. */
+  engineHealth: EngineHealth | null;
   sendQuery: (question: string, opts?: QueryOptions) => Promise<BNPResponse | null>;
   uploadToEngine: (file: File) => Promise<{ filename: string; chunks: number } | null>;
   removeFromEngine: (documentId: string) => Promise<boolean>;
@@ -166,6 +168,7 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
   const [engineDocuments, setEngineDocuments] = useState<EngineDocument[]>([]);
   const [formularyCounts, setFormularyCounts] = useState<FormularyCounts | null>(null);
   const [formularyReviewStatus, setFormularyReviewStatus] = useState<string | null>(null);
+  const [engineHealth, setEngineHealth] = useState<EngineHealth | null>(null);
   const initDone = useRef(false);
 
   const refreshDocuments = useCallback(async () => {
@@ -182,6 +185,7 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
     // A body came back at all, so the engine is up and the gateway can reach
     // it — enough to list and upload documents.
     setIsEngineReachable(true);
+    setEngineHealth(health);
     setIndexedChunks(health.indexed_chunks);
     setOpenaiEnabled(health.openai_enabled);
     setEngineProblems(health.problems ?? []);
@@ -289,6 +293,7 @@ export const BackendProvider: React.FC<{ children: React.ReactNode }> = ({
         engineDocuments,
         formularyCounts,
         formularyReviewStatus,
+        engineHealth,
         sendQuery,
         uploadToEngine,
         removeFromEngine,
