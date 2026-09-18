@@ -111,6 +111,23 @@ const MISSING_VARIABLE_KEYS: Record<string, string> = {
   age: 'varAge',
 };
 
+// What the engine understood the question to be asking for. The values are
+// the engine's ClinicalIntent enum; an intent this map does not know is not
+// shown rather than shown raw, so a new engine value never leaks an
+// identifier onto a clinical screen.
+export const INTENT_KEYS: Record<string, string> = {
+  dose: 'intentDose',
+  dose_calculation: 'intentDoseCalculation',
+  preparation: 'intentPreparation',
+  administration: 'intentAdministration',
+  renal_adjustment: 'intentRenalAdjustment',
+  pediatric_dosing: 'intentPediatricDosing',
+  antidote: 'intentAntidote',
+  monitoring: 'intentMonitoring',
+  general_drug_info: 'intentGeneralDrugInfo',
+  full_drug_info: 'intentFullDrugInfo',
+};
+
 function RegimenField({ section }: { section: DoseSection }) {
   const { t } = useTranslation();
   const key = REGIMEN_LABEL_KEYS[section.label];
@@ -165,7 +182,16 @@ function DoseSections({ sections }: { sections: DoseSection[] }) {
 }
 
 // ── BNP structured response renderer ─────────────────────────────────────────
-function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: boolean }) {
+function BNPResponseCard({
+  bnp,
+  fromEngine,
+  onAddPatientValues,
+}: {
+  bnp: BNPResponse;
+  fromEngine?: boolean;
+  /** Opens the patient-context editor. Offered from the missing-values card. */
+  onAddPatientValues?: () => void;
+}) {
   const { t } = useTranslation();
   if (bnp.notFound) {
     return (
@@ -194,8 +220,17 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
                 : 'bg-red-600/15 border-red-500/40 text-red-300'
             }`}>
               <BarChart2 className="w-2.5 h-2.5" />
-              {bnp.confidenceLabel} {t('confidenceSuffix')}
+              {t(`confidence_${bnp.confidenceLabel}`)} {t('confidenceSuffix')}
             </div>
+          )}
+          {/* The intent is advisory: it says which part of the record answered,
+              never whether the safety layer ran. Shown so a nurse can see the
+              question was read the way they meant it. */}
+          {bnp.intent && INTENT_KEYS[bnp.intent] && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-[var(--dg-accent-faint)] border-[var(--dg-border)] text-[var(--dg-muted)]">
+              <Stethoscope className="w-2.5 h-2.5" />
+              {t('intentAskedFor')}: {t(INTENT_KEYS[bnp.intent])}
+            </span>
           )}
         </div>
       )}
@@ -210,7 +245,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
 
       {/* Safety Alert banner */}
       {bnp.safetyAlert && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/40">
+        <div role="alert" className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/40">
           <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0" />
           <span className="text-red-300 text-xs font-semibold uppercase tracking-wide">{t('safetyAlertActive')}</span>
         </div>
@@ -231,7 +266,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
           dose card because it explains why that card is empty — the engine
           refused to guess rather than falling back to an adult figure. */}
       {bnp.missingVariables && bnp.missingVariables.length > 0 && (
-        <div className="rounded-xl bg-[var(--dg-surface)] border border-amber-500/30 overflow-hidden">
+        <div role="alert" className="rounded-xl bg-[var(--dg-surface)] border border-amber-500/30 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2 bg-amber-600/10 border-b border-amber-500/30">
             <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
             <span className="text-amber-300 text-xs font-semibold uppercase tracking-wide">
@@ -248,6 +283,20 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
           <p className="px-4 pb-3 text-[var(--dg-muted)] text-xs leading-relaxed">
             {t('doseNoGuess')}
           </p>
+          {onAddPatientValues && (
+            <div className="px-4 pb-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={onAddPatientValues}
+                className="border-amber-500/40 text-amber-200 hover:bg-amber-600/10"
+              >
+                <Plus className="w-3.5 h-3.5 me-1" />
+                {t('doseAddPatientValues')}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -327,7 +376,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
           <div className="px-4 py-3 space-y-3">
             {bnp.contraindications && bnp.contraindications.length > 0 && (
               <div>
-                <p className="text-yellow-400 text-xs font-semibold mb-1.5">Contraindications</p>
+                <p className="text-yellow-400 text-xs font-semibold mb-1.5">{t('msContraindications')}</p>
                 <ul className="space-y-0.5">
                   {bnp.contraindications.map((c, i) => (
                     <li key={i} className="text-[var(--dg-body)] text-xs flex items-center gap-1.5">
@@ -340,7 +389,7 @@ function BNPResponseCard({ bnp, fromEngine }: { bnp: BNPResponse; fromEngine?: b
             {bnp.interactions && bnp.interactions.length > 0 && (
               <div>
                 <p className="text-yellow-400 text-xs font-semibold mb-1.5 flex items-center gap-1">
-                  <ArrowLeftRight className="w-3 h-3" /> Drug Interactions
+                  <ArrowLeftRight className="w-3 h-3" /> {t('msInteractions')}
                 </p>
                 <ul className="space-y-0.5">
                   {bnp.interactions.map((d, i) => (
@@ -729,7 +778,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ initialQuestion, onInitialQuestionC
                     <p className="text-sm">{msg.content}</p>
                   </div>
                 ) : (
-                  msg.bnp && <BNPResponseCard bnp={msg.bnp} fromEngine={msg.fromEngine} />
+                  msg.bnp && (
+                    <BNPResponseCard
+                      bnp={msg.bnp}
+                      fromEngine={msg.fromEngine}
+                      onAddPatientValues={() => setShowPatientCtx(true)}
+                    />
+                  )
                 )}
                 <span className="text-xs text-[var(--dg-muted)] mt-1 px-1">
                   {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
