@@ -117,6 +117,21 @@ async function authFetch(
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
+ * The engine's Prometheus text, verbatim, or null if it could not be read.
+ * Text, not JSON: the route is PlainTextResponse on the engine and passes
+ * through the gateway unchanged.
+ */
+export async function fetchMetricsText(): Promise<string | null> {
+  try {
+    const res = await authFetch(`/metrics`);
+    if (!res || !res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Returns null if the engine is unreachable or reports itself unhealthy.
  * A degraded engine (for example, one that cannot reach its embedding model)
  * reports status !== "ok" and is treated as unavailable.
